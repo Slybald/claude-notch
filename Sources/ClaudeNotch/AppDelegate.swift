@@ -73,6 +73,7 @@ final class AppCore {
             item["hostBundleId"] = session.hostBundleId
             item["pid"] = session.claudePid.map { Int($0) }
             item["title"] = session.title
+            item["desktopSessionId"] = session.desktopSessionId
             item["currentTask"] = session.currentTask?.subject
             return item
         }

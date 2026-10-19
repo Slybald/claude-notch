@@ -54,6 +54,21 @@ final class ParsingTests: XCTestCase {
             "/Applications/Visual Studio Code.app")
     }
 
+    func testDesktopSessionLink() {
+        let id = "local_00000000-1111-4222-8333-444444444444"
+        XCTAssertEqual(HookHeaders(["x-host-session-id": id]).hostSessionId, id)
+        XCTAssertNil(HookHeaders(["x-host-session-id": "local_x&evil=1"]).hostSessionId)
+        XCTAssertNil(HookHeaders(["x-host-session-id": "cse_abc"]).hostSessionId)
+        XCTAssertEqual(NotchController.desktopSessionURL(id)?.absoluteString, "claude://code/continue?session=\(id)")
+        XCTAssertNil(NotchController.desktopSessionURL("local_"))
+
+        let store = SessionStore()
+        store.handle(HookEvent(raw: ["hook_event_name": "SessionStart", "session_id": "s", "cwd": "/p"]),
+                     context: ProcessContext(source: .desktop, desktopSessionId: id))
+        XCTAssertEqual(store.sessions["s"]?.desktopSessionId, id)
+        XCTAssertEqual(store.sessions["s"]?.sourceLabel, "Claude Code (app)")
+    }
+
     func testInterruptLine() {
         let line = #"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}"#
         XCTAssertTrue(SessionStore.isInterruptLine(Data(line.utf8)))

@@ -75,6 +75,8 @@ struct Session: Identifiable, Equatable {
     var claudeStart: TimeInterval?
     var taskListId: String?
     var configDir: String?
+    /// Session côté Claude Desktop (`local_…`) : le clic sur la carte l'ouvre directement.
+    var desktopSessionId: String?
     var transcriptPath: String?
     var model: String?
     var title: String?
@@ -108,7 +110,8 @@ struct Session: Identifiable, Equatable {
     var isDoneFlashing: Bool { (doneFlashUntil ?? .distantPast) > Date() }
     var completedTaskCount: Int { tasks.filter { $0.status == .completed }.count }
     var currentTask: TaskItem? { tasks.first { $0.status == .inProgress } }
-    var sourceLabel: String { source == .desktop ? "Desktop" : (hostName ?? "CLI") }
+    /// Toutes les cartes sont des sessions Claude Code : l'étiquette dit où elles tournent.
+    var sourceLabel: String { source == .desktop ? "Claude Code (app)" : (hostName ?? "CLI") }
 
     mutating func absorb(_ context: ProcessContext) {
         if let pid = context.claudePid {
@@ -122,6 +125,7 @@ struct Session: Identifiable, Equatable {
         }
         if let id = context.taskListId { taskListId = id }
         if let dir = context.configDir { configDir = dir }
+        if let id = context.desktopSessionId { desktopSessionId = id }
     }
 }
 

@@ -26,7 +26,9 @@ Développement : `swift build`, `swift test`, `./scripts/build.sh` (assemble `bu
   vers `http://127.0.0.1:47823/hook`, avec le PPID du hook et quelques variables d'environnement.
 - L'app remonte la chaîne de processus depuis ce PPID pour trouver le processus Claude
   (détection de fin de session) et l'app hôte (Terminal, iTerm2, Ghostty, VS Code, Desktop…).
-  Un clic sur une carte ramène cette app au premier plan.
+  Un clic sur une carte ramène cette app au premier plan. Pour une session de l'onglet Code de
+  Claude Desktop, le clic ouvre directement cette session (`claude://code/continue?session=local_…`,
+  identifiant transmis par le hook via `CLAUDE_CODE_HOST_SESSION_ID`).
 - Si l'app est fermée, le hook la relance au prochain `SessionStart` ou `UserPromptSubmit`.
 - Interruption par Esc : aucun hook ne part. L'app lit la fin du transcript toutes les 2 s
   pendant un tour et repasse la session en « Prête » si elle y trouve l'interruption.

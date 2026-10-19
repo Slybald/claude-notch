@@ -25,6 +25,7 @@ struct ProcessContext {
     var hostBundleId: String?
     var taskListId: String?
     var configDir: String?
+    var desktopSessionId: String?
 }
 
 struct HostApp: Equatable {
@@ -249,7 +250,8 @@ enum ProcessInspector {
 
     /// À appeler pendant que le script de hook attend la réponse (ses parents sont vivants).
     static func context(for headers: HookHeaders) -> ProcessContext {
-        var context = ProcessContext(taskListId: headers.taskListId, configDir: headers.configDir)
+        var context = ProcessContext(taskListId: headers.taskListId, configDir: headers.configDir,
+                                     desktopSessionId: headers.hostSessionId)
         let chain = headers.ppid.map { ancestors(of: $0) } ?? []
 
         // PID de Claude : premier ancêtre reconnu comme Claude, sinon premier qui n'est pas un shell.

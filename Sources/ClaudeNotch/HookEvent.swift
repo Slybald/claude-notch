@@ -8,6 +8,13 @@ struct HookHeaders {
     var entrypoint: String?
     var taskListId: String?
     var configDir: String?
+    /// Identifiant de la session côté Claude Desktop (`local_…`), absent en CLI.
+    var hostSessionId: String?
+
+    /// Même règle que le gestionnaire `claude://code/continue?session=` de Claude Desktop.
+    static func isDesktopSessionId(_ id: String) -> Bool {
+        id.range(of: "^local_[A-Za-z0-9-]{1,64}$", options: .regularExpression) != nil
+    }
 
     init(_ headers: [String: String] = [:]) {
         func value(_ key: String) -> String? {
@@ -20,6 +27,7 @@ struct HookHeaders {
         entrypoint = value("x-entrypoint")
         taskListId = value("x-task-list-id")
         configDir = value("x-config-dir")
+        hostSessionId = value("x-host-session-id").flatMap { Self.isDesktopSessionId($0) ? $0 : nil }
     }
 }
 

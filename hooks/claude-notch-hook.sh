@@ -17,6 +17,7 @@ send() {
         -H "X-Entrypoint: ${CLAUDE_CODE_ENTRYPOINT:-}" \
         -H "X-Task-List-Id: ${CLAUDE_CODE_TASK_LIST_ID:-}" \
         -H "X-Config-Dir: ${CLAUDE_CONFIG_DIR:-}" \
+        -H "X-Host-Session-Id: ${CLAUDE_CODE_HOST_SESSION_ID:-}" \
         --data-binary @"$TMP" \
         http://127.0.0.1:47823/hook
 }

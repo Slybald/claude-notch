@@ -251,10 +251,37 @@ final class NotchController {
     // MARK: - Actions
 
     private func activate(_ session: Session) {
-        let bundleId = session.hostBundleId ?? (session.source == .desktop ? ProcessInspector.desktopBundleId : nil)
-        if let bundleId { Self.bringToFront(bundleId: bundleId) }
+        if session.source == .desktop, let url = session.desktopSessionId.flatMap(Self.desktopSessionURL) {
+            Self.openInDesktop(url)
+        } else {
+            let bundleId = session.hostBundleId ?? (session.source == .desktop ? ProcessInspector.desktopBundleId : nil)
+            if let bundleId { Self.bringToFront(bundleId: bundleId) }
+        }
         suppressUntilExit = true
         collapse()
+    }
+
+    /// Lien reconnu par Claude Desktop (gestionnaire `open-url`, hôte `code`, chemin `/continue`) :
+    /// il ouvre la session locale dont l'identifiant est exactement `session`, sinon l'accueil de l'onglet Code.
+    static func desktopSessionURL(_ sessionId: String) -> URL? {
+        guard HookHeaders.isDesktopSessionId(sessionId) else { return nil }
+        var components = URLComponents()
+        components.scheme = "claude"
+        components.host = "code"
+        components.path = "/continue"
+        components.queryItems = [URLQueryItem(name: "session", value: sessionId)]
+        return components.url
+    }
+
+    /// Ouvre le lien avec Claude Desktop explicitement, pas avec une autre app qui revendiquerait `claude://`.
+    private static func openInDesktop(_ url: URL) {
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: ProcessInspector.desktopBundleId) else {
+            bringToFront(bundleId: ProcessInspector.desktopBundleId)
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open([url], withApplicationAt: app, configuration: configuration) { _, _ in }
     }
 
     private func openDesktop() {
