@@ -24,6 +24,12 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Claude Notch lance git-radar et course-sorter, qui lisent tes dépôts et tes dossiers de cours sur le Bureau.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Claude Notch lance git-radar, qui vérifie que tes dépôts git dans Documents sont bien poussés.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Claude Notch lance course-sorter, qui range dans tes dossiers de cours les supports téléchargés.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>

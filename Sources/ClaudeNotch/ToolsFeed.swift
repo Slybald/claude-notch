@@ -243,11 +243,12 @@ final class ToolsFeed: ObservableObject {
         return Array(sorted.prefix(limit))
     }
 
-    /// Même règle que pour les projets jetables : dossiers temporaires et espaces de travail éphémères.
+    /// Même règle que pour les projets jetables : dossiers temporaires, espaces de travail éphémères,
+    /// et fichiers internes de Claude Code (mémoire, transcripts sous ~/.claude/projects/).
     static func isTemporary(_ path: String) -> Bool {
         let prefixes = ["/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/"]
         if prefixes.contains(where: { path.hasPrefix($0) }) { return true }
-        return path.contains("/scratch-workspaces/") || path.contains("/scratchpad")
+        return path.contains("/scratch-workspaces/") || path.contains("/scratchpad") || path.contains("/.claude/projects/")
     }
 
     // MARK: - CF3 : git-radar

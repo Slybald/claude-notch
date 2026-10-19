@@ -167,6 +167,22 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(store.earsText, "1/2")
     }
 
+    func testEarsShowSessionsAndAgents() {
+        send("UserPromptSubmit", ["prompt": "lance un workflow"])
+        XCTAssertEqual(store.earsText, "1")
+        for index in 0..<6 {
+            send("SubagentStart", ["agent_id": "a\(index)", "agent_type": "workflow-subagent"])
+        }
+        XCTAssertEqual(store.ears, SessionStore.EarsContent(tasks: nil, sessions: 1, agents: 6))
+        XCTAssertEqual(store.earsText, "1·6")
+
+        // Agents en arrière-plan après le Stop : la session n'est plus active, les agents comptent encore.
+        send("Stop", ["last_assistant_message": "lancé"])
+        XCTAssertEqual(store.earsText, "0·6")
+        for index in 0..<6 { send("SubagentStop", ["agent_id": "a\(index)", "agent_type": "workflow-subagent"]) }
+        XCTAssertNil(store.earsText)
+    }
+
     func testTaskFilesOnDisk() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

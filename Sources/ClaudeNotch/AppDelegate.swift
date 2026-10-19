@@ -26,6 +26,7 @@ final class AppCore {
     let prefs = Preferences.shared
     let tools: ToolsFeed
     let activityLog: ActivityLog
+    let jobs = JobRunner()
     private var server: HookServer?
     private var notch: NotchController?
 
@@ -63,6 +64,7 @@ final class AppCore {
 
         monitor.start()
         store.start()
+        jobs.start()
 
         let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
         notch.start()
@@ -108,6 +110,7 @@ final class AppCore {
         tools["failedWrites"] = activityLog.failedWrites
         tools["logDirectory"] = activityLog.directory.path
         state["tools"] = tools
+        state["jobs"] = jobs.debugSummary
         return state
     }
 }

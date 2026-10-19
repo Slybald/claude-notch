@@ -119,7 +119,7 @@ struct NotchRootView: View {
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
             } else if showsEars {
-                CollapsedEars(indicator: indicator, rightText: store.earsText, notchSize: model.notchSize)
+                CollapsedEars(indicator: indicator, ears: store.ears, notchSize: model.notchSize)
                     .transition(.opacity.animation(.easeInOut(duration: 0.18)))
             }
         }
@@ -144,7 +144,7 @@ struct NotchRootView: View {
 
 struct CollapsedEars: View {
     let indicator: NotchIndicator
-    let rightText: String?
+    let ears: SessionStore.EarsContent?
     let notchSize: CGSize
 
     var body: some View {
@@ -152,14 +152,22 @@ struct CollapsedEars: View {
             IndicatorGlyph(indicator: indicator)
                 .frame(width: NotchController.earWidth)
             Color.clear.frame(width: notchSize.width)
-            Text(rightText ?? "")
+            earText
                 .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                .foregroundColor(.white.opacity(0.85))
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
                 .frame(width: NotchController.earWidth)
         }
         .frame(height: notchSize.height)
+    }
+
+    /// « 3/7 » (tâches), « 1 » (sessions) ou « 1·6 » avec les agents en orange.
+    private var earText: Text {
+        guard let ears else { return Text("") }
+        if let tasks = ears.tasks { return Text(tasks).foregroundColor(.white.opacity(0.85)) }
+        let sessions = Text("\(ears.sessions)").foregroundColor(.white.opacity(0.85))
+        guard ears.agents > 0 else { return sessions }
+        return sessions + Text("·").foregroundColor(Palette.secondary) + Text("\(ears.agents)").foregroundColor(Palette.orange)
     }
 }
 

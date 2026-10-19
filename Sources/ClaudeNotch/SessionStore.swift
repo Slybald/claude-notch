@@ -192,13 +192,29 @@ final class SessionStore: ObservableObject {
 
     /// Oreille droite : tâches de la session en avant, sinon nombre de sessions actives.
     var earsText: String? {
+        guard let ears else { return nil }
+        if let tasks = ears.tasks { return tasks }
+        return ears.agents > 0 ? "\(ears.sessions)·\(ears.agents)" : "\(ears.sessions)"
+    }
+
+    /// Oreille droite : tâches de la session en avant ; sinon sessions actives, puis agents en cours (« 1·6 »).
+    struct EarsContent: Equatable {
+        var tasks: String?
+        var sessions: Int
+        var agents: Int
+    }
+
+    var ears: EarsContent? {
         let sorted = sortedSessions
         let focus = sorted.first { $0.phase.needsAttention || $0.phase.isWorking } ?? sorted.first(where: \.isDoneFlashing)
         if let focus, !focus.tasks.isEmpty {
-            return "\(focus.completedTaskCount)/\(focus.tasks.count)"
+            return EarsContent(tasks: "\(focus.completedTaskCount)/\(focus.tasks.count)", sessions: 0, agents: 0)
         }
         let active = sorted.filter { $0.phase.needsAttention || $0.phase.isWorking }.count
-        return active > 0 ? "\(active)" : nil
+        // Agents en arrière-plan compris : ils tournent parfois après le Stop de leur session.
+        let agents = sorted.filter { $0.phase != .ended }.reduce(0) { $0 + $1.activeAgents.count }
+        guard active > 0 || agents > 0 else { return nil }
+        return EarsContent(tasks: nil, sessions: active, agents: agents)
     }
 
     func clearEnded() {
