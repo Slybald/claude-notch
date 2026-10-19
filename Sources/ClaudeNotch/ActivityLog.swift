@@ -70,7 +70,15 @@ final class ActivityLog {
     func record(_ event: HookEvent, session: Session?, now: Date = Date()) {
         if let line = Self.fileRecord(for: event, session: session, now: now) {
             filesLogged += 1
-            append(line, to: filesURL)
+            // Le projet réel demande de regarder le disque (dépôt git du fichier) : sur la queue, jamais sur
+            // le main thread, où un accès à un dossier protégé peut attendre une fenêtre d'autorisation.
+            append(line, to: filesURL) { record in
+                var record = record
+                if let path = record["path"] as? String, let cwd = record["cwd"] as? String {
+                    record["project"] = Self.projectName(forFile: path, cwd: cwd)
+                }
+                return record
+            }
         }
         if let line = Self.permissionRecord(for: event, session: session, now: now) {
             permissionsLogged += 1
@@ -99,7 +107,7 @@ final class ActivityLog {
             "path": path,
             "tool": tool,
             "session_id": event.sessionId ?? "",
-            "project": projectName(forFile: path, cwd: cwd),
+            "project": projectName(cwd),
             "cwd": cwd,
             "source": "live",
         ]
@@ -160,14 +168,16 @@ final class ActivityLog {
 
     // MARK: - Écriture
 
-    private func append(_ record: [String: Any], to url: URL) {
-        guard var data = try? JSONSerialization.data(withJSONObject: record, options: [.withoutEscapingSlashes]) else {
-            return
-        }
-        data.append(0x0A)
+    private func append(_ record: [String: Any], to url: URL,
+                        refine: (([String: Any]) -> [String: Any])? = nil) {
         let directory = self.directory
         let failures = self.failures
         queue.async {
+            let final = refine?(record) ?? record
+            guard var data = try? JSONSerialization.data(withJSONObject: final, options: [.withoutEscapingSlashes]) else {
+                return
+            }
+            data.append(0x0A)
             do {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 try Self.appendLine(data, to: url)

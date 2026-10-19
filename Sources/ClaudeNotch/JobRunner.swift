@@ -110,16 +110,26 @@ final class JobRunner {
 
     /// Rangement dès qu'un fichier arrive, plutôt qu'au prochain passage de 5 min.
     private func watchDownloads() {
-        let downloads = home.appendingPathComponent("Downloads")
-        let fd = open(downloads.path, O_EVTONLY)
-        guard fd >= 0 else { return }
-        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd,
-                                                               eventMask: [.write, .rename, .extend],
-                                                               queue: .main)
-        source.setEventHandler { [weak self] in self?.downloadsChanged() }
-        source.setCancelHandler { close(fd) }
-        source.resume()
-        downloadsSource = source
+        let path = home.appendingPathComponent("Downloads").path
+        // open() attend la réponse à la fenêtre d'autorisation de macOS (Téléchargements est protégé) :
+        // jamais sur le main thread, sinon la notch reste figée tant qu'on n'a pas répondu.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let fd = open(path, O_EVTONLY)
+            guard fd >= 0 else { return }
+            DispatchQueue.main.async {
+                guard let self else {
+                    close(fd)
+                    return
+                }
+                let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd,
+                                                                       eventMask: [.write, .rename, .extend],
+                                                                       queue: .main)
+                source.setEventHandler { [weak self] in self?.downloadsChanged() }
+                source.setCancelHandler { close(fd) }
+                source.resume()
+                self.downloadsSource = source
+            }
+        }
     }
 
     private func downloadsChanged() {
