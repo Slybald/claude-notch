@@ -39,6 +39,21 @@ la section avec d'autres données, ou `CLAUDE_NOTCH_TOOLS_DIR=standard` pour tes
   en JSON (lecture seule, local uniquement). La clé `tools` résume la section outils : fichiers récents,
   dépôts à traiter, usage du jour, lignes écrites dans les registres depuis le lancement, écritures ratées.
 
+## Tâches des outils compagnons
+
+Claude Notch lance lui-même les tâches de fond des outils installés à côté (`~/.local/share/<outil>/`),
+à la place de LaunchAgents : macOS refuse `~/Documents`, `~/Desktop` et `~/Downloads` aux scripts démarrés
+par launchd (« Operation not permitted »), alors que l'accès accordé une fois à l'app est hérité par les
+processus qu'elle lance. Au premier passage, macOS demande l'accès pour « Claude Notch » : accepte.
+
+- `git-radar scan --quiet` : 20 s après le lancement, puis toutes les 15 min.
+- `claude-usage refresh --quiet` : 40 s après le lancement, puis toutes les 30 min.
+- `course-sorter run` : 12 s après chaque arrivée dans Téléchargements, et toutes les 5 min.
+- `claude-recap morning` : une fois par jour, au premier passage après 8 h 30.
+
+Un outil absent est ignoré. Journaux : `~/Library/Logs/ClaudeNotch/<outil>.log`. État : clé `jobs` de `/state`.
+Les `install.sh` de ces outils ne déposent pas de LaunchAgent quand Claude Notch est installé.
+
 ## Registres partagés
 
 L'app écrit deux journaux, une ligne JSON par événement, dans `~/Library/Application Support/ClaudeNotch/`.
