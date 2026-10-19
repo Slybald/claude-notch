@@ -232,6 +232,8 @@ final class NotchController {
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         startPolling()
         tools.setActive(true)
+        // État des hooks pour le menu « … » (settings.json a pu changer depuis).
+        HookSetup.shared.refresh()
     }
 
     private func collapse() {

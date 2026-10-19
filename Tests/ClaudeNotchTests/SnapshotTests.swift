@@ -101,11 +101,26 @@ final class SnapshotTests: XCTestCase {
                 try render(root(store, real), name: name, to: outputDir)
             }
         }
+
+        // Fenêtre de premier lancement : installation normale, depuis le DMG, mise à jour en erreur.
+        // 32 pt en haut : la place de la barre de titre transparente de la vraie fenêtre.
+        func onboarding(_ view: OnboardingView, _ name: String) throws {
+            try render(view.padding(.top, 32).background(Color.black), name: name, to: outputDir,
+                       size: CGSize(width: 470, height: 640))
+        }
+        try onboarding(OnboardingView(mode: .install, inApplications: true, launchAtLogin: true,
+                                      onInstall: { _ in nil }, onClose: {}), "onboarding")
+        try onboarding(OnboardingView(mode: .install, inApplications: false, launchAtLogin: true,
+                                      onInstall: { _ in nil }, onClose: {}), "onboarding-dmg")
+        let error = HookInstaller.Failure.invalidSettings("« , » ou « } » attendu, ligne 3, colonne 8")
+        try onboarding(OnboardingView(mode: .update, inApplications: true, launchAtLogin: false,
+                                      error: error.localizedDescription, onInstall: { _ in nil }, onClose: {}),
+                       "onboarding-error")
     }
 
     /// Fenêtre hors écran + rendu de l'arbre de calques (ScrollView compris, contrairement à ImageRenderer).
-    private func render<V: View>(_ view: V, name: String, to dir: URL) throws {
-        let size = CGSize(width: 640, height: 480)
+    private func render<V: View>(_ view: V, name: String, to dir: URL,
+                                 size: CGSize = CGSize(width: 640, height: 480)) throws {
         let hosting = NSHostingView(rootView: view.background(Color(white: 0.85)))
         hosting.frame = CGRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)

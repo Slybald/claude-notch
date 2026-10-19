@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>ClaudeNotch</string>
 	<key>CFBundleIdentifier</key>
-	<string>local.claudenotch</string>
+	<string>io.github.slybald.claudenotch</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

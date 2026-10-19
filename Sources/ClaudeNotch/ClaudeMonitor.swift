@@ -65,7 +65,7 @@ final class ProcessScanner {
         let kind: Kind?
     }
 
-    private let queue = DispatchQueue(label: "local.claudenotch.scan", qos: .utility)
+    private let queue = DispatchQueue(label: AppIdentity.bundleId + ".scan", qos: .utility)
     private var cache: [pid_t: Entry] = [:]
     private var bundleIds: [String: String] = [:]
 

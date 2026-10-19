@@ -442,6 +442,8 @@ struct ExpandedPanel: View {
             Divider()
             Button("Effacer les sessions terminées", action: actions.clearEnded)
             Divider()
+            HookMenuItems(setup: .shared)
+            Divider()
             Button("Quitter Claude Notch", action: actions.quit)
         } label: {
             Image(systemName: "ellipsis")

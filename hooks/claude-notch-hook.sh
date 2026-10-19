@@ -25,7 +25,7 @@ send() {
 if ! send; then
     # App fermée : on la relance au début d'une session ou d'un tour, puis on réessaie.
     if grep -Eq '"hook_event_name"[[:space:]]*:[[:space:]]*"(SessionStart|UserPromptSubmit)"' "$TMP"; then
-        open -g -b local.claudenotch >/dev/null 2>&1 || exit 0
+        open -g -b io.github.slybald.claudenotch >/dev/null 2>&1 || exit 0
         i=0
         while [ "$i" -lt 10 ]; do
             sleep 0.3

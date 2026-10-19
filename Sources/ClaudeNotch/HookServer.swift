@@ -14,7 +14,7 @@ final class HookServer {
 
     private let port: UInt16
     private let handler: Handler
-    private let queue = DispatchQueue(label: "local.claudenotch.server", qos: .userInitiated)
+    private let queue = DispatchQueue(label: AppIdentity.bundleId + ".server", qos: .userInitiated)
     private var listener: NWListener?
 
     init(port: UInt16 = HookServer.defaultPort, handler: @escaping Handler) {

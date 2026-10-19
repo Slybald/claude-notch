@@ -49,6 +49,7 @@ final class JobRunner {
     private var timer: Timer?
     private var downloadsSource: DispatchSourceFileSystemObject?
     private var downloadsWork: DispatchWorkItem?
+    private var downloadsWatchStarted = false
 
     init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.home = home
@@ -59,20 +60,32 @@ final class JobRunner {
         timer.tolerance = 10
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        watchDownloads()
+        watchDownloadsIfNeeded()
     }
 
     // MARK: - Planification
 
-    private func scriptURL(_ job: Job) -> URL {
+    private static var courseSorter: Job? { jobs.first { $0.name == "course-sorter" } }
+
+    private static func scriptURL(_ job: Job, home: URL) -> URL {
         home.appendingPathComponent(".local/share").appendingPathComponent(job.script)
+    }
+
+    private func scriptURL(_ job: Job) -> URL {
+        Self.scriptURL(job, home: home)
     }
 
     private func isInstalled(_ job: Job) -> Bool {
         FileManager.default.fileExists(atPath: scriptURL(job).path)
     }
 
+    /// Au moins un outil compagnon installé : l'accès à Documents, Bureau ou Téléchargements est alors attendu.
+    static func anyToolInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+        jobs.contains { FileManager.default.fileExists(atPath: scriptURL($0, home: home).path) }
+    }
+
     private func tick(now: Date = Date()) {
+        watchDownloadsIfNeeded()
         for job in Self.jobs where isInstalled(job) {
             let status = statuses[job.name] ?? Status()
             if status.running {
@@ -108,6 +121,14 @@ final class JobRunner {
 
     // MARK: - Téléchargements
 
+    /// Seulement si course-sorter est installé : sans lui, aucun accès à Téléchargements, donc aucune
+    /// fenêtre d'autorisation de macOS. Revérifié à chaque passage (outil installé après le lancement).
+    private func watchDownloadsIfNeeded() {
+        guard !downloadsWatchStarted, let job = Self.courseSorter, isInstalled(job) else { return }
+        downloadsWatchStarted = true
+        watchDownloads()
+    }
+
     /// Rangement dès qu'un fichier arrive, plutôt qu'au prochain passage de 5 min.
     private func watchDownloads() {
         let path = home.appendingPathComponent("Downloads").path
@@ -135,7 +156,7 @@ final class JobRunner {
     private func downloadsChanged() {
         downloadsWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self, let job = Self.jobs.first(where: { $0.name == "course-sorter" }), self.isInstalled(job) else { return }
+            guard let self, let job = Self.courseSorter, self.isInstalled(job) else { return }
             if self.statuses[job.name]?.running == true {
                 self.pendingRerun.insert(job.name)
             } else {
@@ -224,5 +245,22 @@ final class JobRunner {
         }
         summary["watchingDownloads"] = downloadsSource != nil
         return summary
+    }
+}
+
+/// Documents, Bureau et Téléchargements : macOS demande une autorisation au premier accès, même pour un
+/// simple test d'existence. L'app n'y regarde que si un outil compagnon est installé (il en a besoin, la
+/// fenêtre est alors attendue) ; sinon, aucune fenêtre d'autorisation.
+enum ProtectedFolders {
+    static let names = ["Documents", "Desktop", "Downloads"]
+
+    /// Chemin à l'intérieur d'un de ces dossiers (casse ignorée, comme le disque).
+    static func contains(_ path: String, home: String) -> Bool {
+        let path = path.lowercased()
+        return names.contains { path.hasPrefix((home as NSString).appendingPathComponent($0).lowercased() + "/") }
+    }
+
+    static func mayAccess(_ path: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+        !contains(path, home: home.path) || JobRunner.anyToolInstalled(home: home)
     }
 }

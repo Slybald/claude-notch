@@ -89,13 +89,17 @@ final class ToolsFeed: ObservableObject {
     let paths: Paths
     /// Injectable pour les captures : des chemins fictifs peuvent passer pour présents.
     private let fileExists: (String) -> Bool
-    private let queue = DispatchQueue(label: "local.claudenotch.tools", qos: .utility)
+    private let queue = DispatchQueue(label: AppIdentity.bundleId + ".tools", qos: .utility)
     private var timer: Timer?
     private var loading = false
     private var filesCache: FilesCache?
 
+    /// Dans Documents, Bureau ou Téléchargements sans outil compagnon, le fichier est supposé présent :
+    /// le vérifier ferait surgir une fenêtre d'autorisation de macOS.
     init(paths: Paths = .standard,
-         fileExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) {
+         fileExists: @escaping (String) -> Bool = { path in
+             ProtectedFolders.mayAccess(path) ? FileManager.default.fileExists(atPath: path) : true
+         }) {
         self.paths = paths
         self.fileExists = fileExists
     }

@@ -60,7 +60,7 @@ final class ActivityLog {
     /// Écritures ratées (disque plein, droits) : lu depuis n'importe quel thread pour le diagnostic.
     private let failures = Counter()
 
-    private let queue = DispatchQueue(label: "local.claudenotch.activity-log", qos: .utility)
+    private let queue = DispatchQueue(label: AppIdentity.bundleId + ".activity-log", qos: .utility)
 
     init(directory: URL = SharedFiles.notchDirectory) {
         self.directory = directory
@@ -145,12 +145,15 @@ final class ActivityLog {
     /// après un `cd`) : le dépôt git qui contient le fichier, sinon son dossier parent.
     static func projectName(forFile path: String, cwd: String) -> String {
         if !cwd.isEmpty, path.hasPrefix(cwd.hasSuffix("/") ? cwd : cwd + "/") { return projectName(cwd) }
-        var dir = (path as NSString).deletingLastPathComponent
-        for _ in 0..<12 where dir.count > 1 {
-            if FileManager.default.fileExists(atPath: (dir as NSString).appendingPathComponent(".git")) {
-                return (dir as NSString).lastPathComponent
+        // Documents, Bureau, Téléchargements sans outil compagnon : pas de recherche (fenêtre d'autorisation).
+        if ProtectedFolders.mayAccess(path) {
+            var dir = (path as NSString).deletingLastPathComponent
+            for _ in 0..<12 where dir.count > 1 {
+                if FileManager.default.fileExists(atPath: (dir as NSString).appendingPathComponent(".git")) {
+                    return (dir as NSString).lastPathComponent
+                }
+                dir = (dir as NSString).deletingLastPathComponent
             }
-            dir = (dir as NSString).deletingLastPathComponent
         }
         let parent = ((path as NSString).deletingLastPathComponent as NSString).lastPathComponent
         return parent.isEmpty ? projectName(cwd) : parent

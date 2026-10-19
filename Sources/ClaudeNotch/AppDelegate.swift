@@ -1,21 +1,27 @@
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let core = AppCore()
+    /// Créé après la migration : les préférences lisent le LaunchAgent à leur création.
+    private lazy var core = AppCore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if isAnotherInstanceRunning() {
             NSApp.terminate(nil)
             return
         }
+        AppIdentity.migrateLegacyInstall()
         core.start()
+        HookSetup.shared.showOnboardingIfNeeded()
     }
 
+    /// Une instance sous l'identifiant actuel ou sous l'ancien (local.claudenotch) suffit.
     private func isAnotherInstanceRunning() -> Bool {
-        guard let bundleId = Bundle.main.bundleIdentifier else { return false }
         let me = ProcessInfo.processInfo.processIdentifier
-        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
-            .contains { $0.processIdentifier != me && !$0.isTerminated }
+        let ids = Set([AppIdentity.bundleId, AppIdentity.legacyBundleId, Bundle.main.bundleIdentifier].compactMap { $0 })
+        return ids.contains { id in
+            NSRunningApplication.runningApplications(withBundleIdentifier: id)
+                .contains { $0.processIdentifier != me && !$0.isTerminated }
+        }
     }
 }
 
