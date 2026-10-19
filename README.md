@@ -11,7 +11,7 @@ and the panel unfolds with a summary of every session: state, current tool, task
   <img src="docs/expanded.png" width="620" alt="Expanded panel with three sessions: one waiting for permission, one running a command with a task list, one done">
 </p>
 
-The interface is in French for now. Screenshots use sample data.
+Interface available in English and French (follows the system language). Screenshots use sample data.
 
 *Not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.*
 
@@ -171,6 +171,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
 - `VERSION=1.2.3 scripts/build.sh` sets the app version (default: `CFBundleShortVersionString` of
   `Resources/Info.plist`).
 - `scripts/install.sh` builds and installs from source; `scripts/uninstall.sh` removes it.
+- Translations: `Resources/en.lproj` and `Resources/fr.lproj`. The French text in the code is the key;
+  `LocalizationTests` checks that every key used in the code has an English translation.
 - PNG snapshots of the panel, with sample data: `CLAUDE_NOTCH_SNAPSHOT_DIR=/some/folder swift test --filter SnapshotTests`.
 - **Publishing a release**: push a `vX.Y.Z` tag. GitHub Actions runs the tests, builds the universal app in
   version X.Y.Z, makes the DMG and creates the release with the DMG and its SHA-256.
@@ -190,8 +192,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
 
 App macOS native qui vit dans la notch du MacBook et suit les sessions Claude Code, dans un terminal ou un
 éditeur (CLI) comme dans l'onglet Code de Claude Desktop. Survole la notch : le panneau se déplie et résume
-chaque session (état, outil en cours, liste de tâches, sous-agents). Les captures ci-dessus utilisent des
-données fictives.
+chaque session (état, outil en cours, liste de tâches, sous-agents). Interface disponible en anglais et en
+français (suit la langue du système). Les captures ci-dessus utilisent des données fictives.
 
 *Projet indépendant, ni affilié à Anthropic ni approuvé par Anthropic. Claude est une marque d'Anthropic.*
 
@@ -351,6 +353,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifi�
 - `VERSION=1.2.3 scripts/build.sh` fixe la version de l'app (par défaut : `CFBundleShortVersionString` de
   `Resources/Info.plist`).
 - `scripts/install.sh` compile et installe depuis les sources ; `scripts/uninstall.sh` retire tout.
+- Traductions : `Resources/en.lproj` et `Resources/fr.lproj`. Le texte français du code sert de clé ;
+  `LocalizationTests` vérifie que chaque clé utilisée dans le code a sa traduction anglaise.
 - Captures PNG du panneau, avec des données fictives :
   `CLAUDE_NOTCH_SNAPSHOT_DIR=/un/dossier swift test --filter SnapshotTests`.
 - **Publier une version** : pousse un tag `vX.Y.Z`. GitHub Actions lance les tests, compile l'app universelle
