@@ -85,7 +85,8 @@ final class LayoutTests: XCTestCase {
         // Beaucoup de sessions : la liste cède la place, le tout reste sous 460 pt (fenêtre de 480 moins l'ombre).
         let many = store(sessions: 8)
         let crowdedBase = measure(many, ToolsFeed(paths: Self.absentPaths), pane: nil)
-        XCTAssertEqual(crowdedBase.height, 32 + 10 + 296 + 14, accuracy: 1, "sans outils : liste à 296 comme avant")
+        XCTAssertEqual(crowdedBase.height, 32 + ExpandedPanel.headerHeight + 10 + 296 + 14, accuracy: 1,
+                       "sans outils : bande de la barre des menus, en-tête dessous, liste à 296")
         for pane in [nil, ToolsPane.files, ToolsPane.git] {
             let size = measure(many, tools, pane: pane)
             XCTAssertLessThanOrEqual(size.height, 461, "volet \(String(describing: pane))")

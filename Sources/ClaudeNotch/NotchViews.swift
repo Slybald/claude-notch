@@ -347,6 +347,8 @@ struct ExpandedPanel: View {
 
     private static let spacing: CGFloat = 10
     private static let bottomPadding: CGFloat = 14
+    /// Ligne « ✻ Claude · CLI · Desktop · … », sous la bande de la barre des menus.
+    static let headerHeight: CGFloat = 24
     private static let maxListHeight: CGFloat = 296
     private static let minListHeight: CGFloat = 120
     /// Fenêtre de 480 pt moins la place de l'ombre.
@@ -354,7 +356,8 @@ struct ExpandedPanel: View {
 
     /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge).
     private var listMaxHeight: CGFloat {
-        let available = Self.maxPanelHeight - notchSize.height - Self.spacing - Self.bottomPadding - rowsBelowList
+        let available = Self.maxPanelHeight - notchSize.height - Self.headerHeight - Self.spacing
+            - Self.bottomPadding - rowsBelowList
         return min(Self.maxListHeight, max(Self.minListHeight, available))
     }
 
@@ -398,8 +401,16 @@ struct ExpandedPanel: View {
         .onPreferenceChange(RowsBelowListKey.self) { height in rowsBelowList = height }
     }
 
-    /// En-tête à hauteur de notch, éléments de part et d'autre de la caméra.
+    /// La bande à hauteur de barre des menus reste vide : les icônes de la barre des menus (et les menus de l'app
+    /// au premier plan) se dessinent par-dessus la notch, quel que soit le niveau de la fenêtre. L'en-tête vient dessous.
     private var header: some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: notchSize.height)
+            headerRow.frame(height: Self.headerHeight)
+        }
+    }
+
+    private var headerRow: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
                 switch store.indicator {
@@ -415,14 +426,13 @@ struct ExpandedPanel: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Palette.primary)
             }
-            Spacer(minLength: notchSize.width + 16)
+            Spacer(minLength: 8)
             HStack(spacing: 6) {
                 StatusPill(text: "CLI", active: cliActive)
                 StatusPill(text: "Desktop", active: monitor.desktopRunning)
                 moreMenu
             }
         }
-        .frame(height: notchSize.height)
     }
 
     private var moreMenu: some View {
