@@ -405,6 +405,13 @@ struct SessionCard: View {
                     .foregroundColor(Palette.primary)
                     .lineLimit(1)
                 SourcePill(text: session.sourceLabel)
+                if let title = session.title {
+                    Text(title)
+                        .font(.system(size: 11))
+                        .foregroundColor(Palette.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(-1)
+                }
                 if !session.activeAgents.isEmpty {
                     let count = session.activeAgents.count
                     Text("\(count) agent\(count > 1 ? "s" : "")")

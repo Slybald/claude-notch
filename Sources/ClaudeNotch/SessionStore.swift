@@ -227,7 +227,11 @@ final class SessionStore: ObservableObject {
         case "UserPromptSubmit":
             beginTurn(&session, now: now)
             session.phase = .thinking
-            session.lastPrompt = event.prompt.map { ToolDescriber.firstLine($0, max: 90) }
+            if event.isTaskNotification {
+                session.lastPrompt = "résultat d'un agent en arrière-plan"
+            } else if let prompt = event.prompt {
+                session.lastPrompt = ToolDescriber.firstLine(prompt, max: 90)
+            }
 
         case "PreToolUse":
             handlePreToolUse(event, session: &session, now: now)
@@ -280,6 +284,9 @@ final class SessionStore: ObservableObject {
                 session.tasks = todos
             }
             if tool == "TaskCreate" || tool == "TaskUpdate" { reloadTasks = true }
+            if name == "PostToolUseFailure", event.isInterrupt, session.inTurn {
+                interrupt(&session, now: now)
+            }
 
         case "Notification":
             handleNotification(event, session: &session, now: now)
@@ -301,10 +308,14 @@ final class SessionStore: ObservableObject {
             session.errorText = event.errorText ?? "erreur de l'API"
 
         case "SubagentStart":
-            session.activeAgents.insert(event.agentId ?? UUID().uuidString)
+            if !event.isInternalAgent {
+                session.activeAgents.insert(event.agentId ?? UUID().uuidString)
+            }
 
         case "SubagentStop":
-            if let agent = event.agentId {
+            if event.isInternalAgent {
+                break
+            } else if let agent = event.agentId {
                 session.activeAgents.remove(agent)
             } else if let any = session.activeAgents.first {
                 session.activeAgents.remove(any)
@@ -469,7 +480,7 @@ final class SessionStore: ObservableObject {
                 transcripts[id] = nil
                 continue
             }
-            if session.inTurn, transcriptShowsInterruption(session) {
+            if session.inTurn, scanTranscript(&session) {
                 interrupt(&session, now: now)
             }
             if session.phase != .ended, let tasks = TaskListLoader.load(for: session), tasks != session.tasks {
@@ -525,8 +536,9 @@ final class SessionStore: ObservableObject {
         transcripts[session.id] = TranscriptCursor(offset: Self.fileSize(path))
     }
 
-    /// Lit ce qui a été ajouté au transcript depuis la dernière fois et cherche le marqueur d'interruption.
-    private func transcriptShowsInterruption(_ session: Session) -> Bool {
+    /// Lit ce qui a été ajouté au transcript depuis la dernière fois : marqueur d'interruption (renvoyé)
+    /// et titre généré (ligne `ai-title`).
+    private func scanTranscript(_ session: inout Session) -> Bool {
         guard let path = session.transcriptPath else { return false }
         let size = Self.fileSize(path)
         guard var cursor = transcripts[session.id] else {
@@ -553,7 +565,9 @@ final class SessionStore: ObservableObject {
         var buffer = cursor.carry + data
         var interrupted = false
         while let newline = buffer.firstIndex(of: 0x0A) {
-            if Self.isInterruptLine(buffer[buffer.startIndex..<newline]) { interrupted = true }
+            let line = buffer[buffer.startIndex..<newline]
+            if Self.isInterruptLine(line) { interrupted = true }
+            if let title = Self.aiTitle(in: line) { session.title = title }
             buffer = buffer[(newline + 1)...]
         }
         cursor.carry = buffer.count > 1_000_000 ? Data() : Data(buffer)
@@ -575,6 +589,16 @@ final class SessionStore: ObservableObject {
             return blocks.contains { ($0["text"] as? String)?.hasPrefix(interruptMarker) ?? false }
         }
         return false
+    }
+
+    private static let aiTitleMarker = Data(#""type":"ai-title""#.utf8)
+
+    /// `{"type":"ai-title","aiTitle":"…","sessionId":"…"}`
+    static func aiTitle(in line: Data) -> String? {
+        guard line.range(of: aiTitleMarker) != nil,
+              let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              let title = object["aiTitle"] as? String, !title.isEmpty else { return nil }
+        return title
     }
 
     private static func fileSize(_ path: String) -> UInt64 {

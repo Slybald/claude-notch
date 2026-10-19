@@ -66,6 +66,8 @@ enum ToolDescriber {
             return Description(label: "Skill", detail: text("skill") ?? text("command"), isCode: false)
         case "SlashCommand":
             return Description(label: "Commande", detail: text("command"), isCode: true)
+        case "ToolSearch":
+            return Description(label: "Outils", detail: "chargement", isCode: false)
         default:
             if tool.hasPrefix("mcp__") {
                 let parts = tool.components(separatedBy: "__")

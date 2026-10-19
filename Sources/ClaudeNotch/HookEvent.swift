@@ -50,15 +50,20 @@ struct HookEvent {
     var permissionMode: String? { string("permission_mode") }
     var agentId: String? { string("agent_id") }
     var agentType: String? { string("agent_type") }
+    /// Agents internes (suggestion de prompt, compaction) : `agent_type` vide, SubagentStop sans SubagentStart.
+    var isInternalAgent: Bool { (raw["agent_type"] as? String)?.isEmpty ?? false }
 
     // MARK: - Champs par événement
 
     /// UserPromptSubmit
     var prompt: String? { string("prompt") }
-    /// Stop, SubagentStop
+    /// Le résultat d'un agent d'arrière-plan revient comme un faux prompt `<task-notification>…`.
+    var isTaskNotification: Bool { prompt?.hasPrefix("<task-notification>") ?? false }
+    /// Stop, SubagentStop, StopFailure
     var lastAssistantMessage: String? { string("last_assistant_message") }
     /// SessionStart : startup / resume / clear / compact
     var source: String? { string("source") }
+    /// Absent des payloads observés (2.1.299) ; le titre vient de la ligne `ai-title` du transcript.
     var sessionTitle: String? { string("session_title") }
     var model: String? {
         if let name = string("model") { return name }
@@ -79,7 +84,10 @@ struct HookEvent {
     var title: String? { string("title") }
     var notificationType: String? { string("notification_type") }
 
-    /// PostToolUseFailure, StopFailure
+    /// PostToolUseFailure
+    var isInterrupt: Bool { (raw["is_interrupt"] as? Bool) ?? false }
+
+    /// PostToolUseFailure (« Exit code 1\n… »), StopFailure (code court : « model_not_found »)
     var errorText: String? {
         for key in ["error", "error_type", "error_message"] {
             if let text = string(key) { return text }
@@ -97,7 +105,7 @@ struct HookEvent {
 
     /// TaskCreated, TaskCompleted
     var taskId: String? { string("task_id") }
-    var taskSubject: String? { string("task_subject", "subject") }
+    var taskSubject: String? { string("task_subject") }
 
     // MARK: - Lecture tolérante
 
