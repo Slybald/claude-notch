@@ -9,6 +9,8 @@ final class HookServer {
     static let maxBodySize = 32 * 1024 * 1024
 
     var onFailure: ((Error) -> Void)?
+    /// Diagnostic en lecture seule pour `GET /state` (appelé sur le main thread).
+    var stateProvider: (() -> [String: Any])?
 
     private let port: UInt16
     private let handler: Handler
@@ -80,9 +82,14 @@ final class HookServer {
 
     private func serve(_ request: HTTPRequest, on connection: NWConnection) {
         guard request.method == "POST", request.path == "/hook" else {
-            if request.path == "/health" {
+            switch request.path {
+            case "/health":
                 reply(204, "No Content", on: connection)
-            } else {
+            case "/state" where request.method == "GET":
+                let state = stateProvider.map { provider in DispatchQueue.main.sync(execute: provider) } ?? [:]
+                let body = (try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+                reply(200, "OK", body: body, on: connection)
+            default:
                 reply(404, "Not Found", on: connection)
             }
             return
@@ -97,9 +104,10 @@ final class HookServer {
         handler(event, context)
     }
 
-    private func reply(_ status: Int, _ reason: String, on connection: NWConnection) {
-        let head = "HTTP/1.1 \(status) \(reason)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-        connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in
+    private func reply(_ status: Int, _ reason: String, body: Data = Data(), on connection: NWConnection) {
+        var head = "HTTP/1.1 \(status) \(reason)\r\nContent-Length: \(body.count)\r\nConnection: close\r\n"
+        if !body.isEmpty { head += "Content-Type: application/json\r\n" }
+        connection.send(content: Data((head + "\r\n").utf8) + body, completion: .contentProcessed { _ in
             connection.cancel()
         })
     }

@@ -105,6 +105,19 @@ final class NotchController {
         updateVisibility()
     }
 
+    var debugInfo: [String: Any] {
+        [
+            "shown": isShown,
+            "expanded": model.isExpanded,
+            "hasNotch": model.hasNotch,
+            "notchRect": [notchRect.minX, notchRect.minY, notchRect.width, notchRect.height],
+            "panelFrame": [panel.frame.minX, panel.frame.minY, panel.frame.width, panel.frame.height],
+            "contentSize": [model.contentSize.width, model.contentSize.height],
+            "ignoresMouse": panel.ignoresMouseEvents,
+            "polling": pollTimer != nil,
+        ]
+    }
+
     // MARK: - Géométrie
 
     private func updateGeometry() {

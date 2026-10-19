@@ -32,6 +32,7 @@ final class AppCore {
         let server = HookServer { event, context in
             DispatchQueue.main.async { store.handle(event, context: context) }
         }
+        server.stateProvider = { [weak self] in self?.debugState() ?? [:] }
         server.onFailure = { error in
             // Port déjà pris : une autre instance tourne, inutile de rester.
             NSLog("ClaudeNotch : serveur de hooks indisponible (%@), arrêt.", String(describing: error))
@@ -52,5 +53,40 @@ final class AppCore {
         let notch = NotchController(store: store, monitor: monitor, prefs: prefs)
         notch.start()
         self.notch = notch
+    }
+
+    /// Instantané lisible de l'état, servi par `GET /state` (diagnostic local).
+    func debugState() -> [String: Any] {
+        let sessions: [[String: Any]] = store.sortedSessions.map { session in
+            var item: [String: Any] = [
+                "id": session.id,
+                "project": session.projectName,
+                "source": session.source == .desktop ? "desktop" : "cli",
+                "phase": String(describing: session.phase),
+                "status": [session.status.label, session.status.detail].compactMap { $0 }.joined(separator: " · "),
+                "inTurn": session.inTurn,
+                "toolCount": session.toolCount,
+                "agents": session.activeAgents.count,
+                "tasks": "\(session.completedTaskCount)/\(session.tasks.count)",
+            ]
+            item["host"] = session.hostName
+            item["hostBundleId"] = session.hostBundleId
+            item["pid"] = session.claudePid.map { Int($0) }
+            item["title"] = session.title
+            item["currentTask"] = session.currentTask?.subject
+            return item
+        }
+        var state: [String: Any] = [
+            "sessions": sessions,
+            "indicator": String(describing: store.indicator),
+            "desktopRunning": monitor.desktopRunning,
+            "desktopFrontmost": monitor.desktopFrontmost,
+            "cliPids": monitor.cliPids.map { Int($0) }.sorted(),
+            "desktopPids": monitor.desktopPids.map { Int($0) }.sorted(),
+            "untrackedCli": monitor.cliPids.subtracting(store.trackedPids).count,
+        ]
+        state["ears"] = store.earsText
+        state["notch"] = notch?.debugInfo
+        return state
     }
 }
