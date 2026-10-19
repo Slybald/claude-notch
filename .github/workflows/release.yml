@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Test
+        run: swift test
+
+      - name: Build universal app
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          VERSION="$VERSION" scripts/build.sh
+          lipo -archs build/ClaudeNotch.app/Contents/MacOS/ClaudeNotch
+
+      - name: Build DMG
+        run: scripts/make-dmg.sh
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "build/ClaudeNotch-$VERSION.dmg" \
+            "build/ClaudeNotch-$VERSION.dmg.sha256" \
+            --title "Claude Notch $VERSION" \
+            --generate-notes
