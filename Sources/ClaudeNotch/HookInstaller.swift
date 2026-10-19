@@ -1,0 +1,360 @@
+import Darwin
+import Foundation
+
+/// Ajoute ou retire les hooks de Claude Notch dans la configuration de Claude Code.
+/// Équivalent de scripts/hooks_config.py, pour que l'app s'installe seule depuis un DMG.
+///
+/// Dossier de configuration : `~/.claude`. Une app ouverte depuis le Finder ne voit pas `CLAUDE_CONFIG_DIR`
+/// (variable du shell) ; pour un autre dossier, il reste scripts/install.sh. Le dossier est injectable (tests).
+///
+/// - Idempotent : nos entrées (repérées par « claude-notch-hook.sh ») sont retirées puis rajoutées.
+/// - Les autres hooks et l'ordre des clés sont conservés ; JSON invalide : rien n'est touché.
+/// - Sauvegarde horodatée avant toute écriture, aucune écriture si rien ne change, écriture atomique.
+struct HookInstaller {
+    static let hookFileName = "claude-notch-hook.sh"
+    static let marker = hookFileName
+    static let events = [
+        "SessionStart",
+        "SessionEnd",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "PermissionRequest",
+        "Notification",
+        "Stop",
+        "StopFailure",
+        "SubagentStart",
+        "SubagentStop",
+        "TaskCreated",
+        "TaskCompleted",
+        "PreCompact",
+        "PostCompact",
+    ]
+    static let timeout = "10"
+
+    enum Status: Equatable {
+        case notInstalled
+        case installed
+        /// Entrées présentes mais différentes (chemin, options, événements) ou script de hook absent ou ancien.
+        case outdated
+        case unreadable(String)
+    }
+
+    enum Failure: LocalizedError, Equatable {
+        case invalidSettings(String)
+        case settingsNotObject
+        case hooksNotObject
+        case eventNotList(String)
+        case missingBundledHook
+        case io(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidSettings(let detail):
+                return "settings.json invalide (\(detail)) : rien n'a été modifié."
+            case .settingsNotObject:
+                return "settings.json n'est pas un objet JSON : rien n'a été modifié."
+            case .hooksNotObject:
+                return "La clé « hooks » de settings.json n'est pas un objet : rien n'a été modifié."
+            case .eventNotList(let event):
+                return "hooks.\(event) n'est pas une liste : rien n'a été modifié."
+            case .missingBundledHook:
+                return "Script de hook introuvable dans l'app (Contents/Resources/\(HookInstaller.hookFileName)) : "
+                    + "rien n'a été modifié."
+            case .io(let detail):
+                return detail
+            }
+        }
+    }
+
+    struct Outcome: Equatable {
+        /// settings.json réécrit (faux s'il était déjà à jour).
+        var settingsChanged: Bool
+        /// Copie de l'ancien settings.json, s'il existait.
+        var backup: URL?
+    }
+
+    let configDirectory: URL
+    /// Script embarqué dans l'app (Contents/Resources) ; nil hors bundle (`swift run`).
+    let bundledHook: URL?
+    /// Horloge des noms de sauvegarde (injectable pour les tests).
+    var now: () -> Date = { Date() }
+
+    init(configDirectory: URL, bundledHook: URL?) {
+        self.configDirectory = configDirectory
+        self.bundledHook = bundledHook
+    }
+
+    /// ~/.claude et le script embarqué dans l'app.
+    static var standard: HookInstaller {
+        HookInstaller(configDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude"),
+                      bundledHook: Bundle.main.url(forResource: "claude-notch-hook", withExtension: "sh"))
+    }
+
+    var settingsURL: URL { configDirectory.appendingPathComponent("settings.json") }
+    var hookURL: URL { configDirectory.appendingPathComponent("hooks").appendingPathComponent(Self.hookFileName) }
+    /// Chemin absolu entre guillemets, comme hooks_config.py.
+    var hookCommand: String { "\"\(hookURL.path)\"" }
+
+    // MARK: - Actions
+
+    /// Copie le script de hook (755) puis ajoute nos 16 entrées à settings.json.
+    /// settings.json est validé avant toute écriture : en cas d'erreur, rien n'est touché.
+    @discardableResult
+    func install() throws -> Outcome {
+        guard let bundledHook, let script = try? Data(contentsOf: bundledHook) else { throw Failure.missingBundledHook }
+        let original = try loadSettings()
+        var settings = original
+        try Self.addEntries(to: &settings, command: hookCommand)
+        try writeHookScript(script)
+        return try save(settings, replacing: original)
+    }
+
+    /// Retire nos entrées (et ce qu'elles laissent vide), puis le script de hook.
+    /// settings.json illisible : erreur, et le script reste en place (settings.json y renvoie peut-être encore).
+    @discardableResult
+    func uninstall() throws -> Outcome {
+        let original = try loadSettings()
+        var settings = original
+        Self.strip(&settings, dropEmptyRoot: true)
+        let outcome = try save(settings, replacing: original)
+        if FileManager.default.fileExists(atPath: hookURL.path) {
+            do {
+                try FileManager.default.removeItem(at: hookURL)
+            } catch {
+                throw Failure.io("Suppression de \(hookURL.path) impossible (\(error.localizedDescription)).")
+            }
+        }
+        return outcome
+    }
+
+    /// État actuel, sans rien modifier.
+    func status() -> Status {
+        let settings: OrderedJSON
+        do {
+            settings = try loadSettings()
+        } catch {
+            return .unreadable(error.localizedDescription)
+        }
+        var ours: [String: [OrderedJSON]] = [:]
+        switch settings["hooks"] {
+        case nil:
+            break
+        case .object(let members)?:
+            for member in members {
+                for group in member.value.items ?? [] {
+                    for hook in group["hooks"]?.items ?? [] where Self.isOurs(hook) {
+                        ours[member.key, default: []].append(hook)
+                    }
+                }
+            }
+        default:
+            return .unreadable(Failure.hooksNotObject.localizedDescription)
+        }
+        if ours.isEmpty { return .notInstalled }
+        let entriesCurrent = Set(ours.keys) == Set(Self.events)
+            && ours.values.allSatisfy { $0.count == 1 && isExpectedEntry($0[0]) }
+        return entriesCurrent && hookScriptIsCurrent ? .installed : .outdated
+    }
+
+    // MARK: - Transformations (pures)
+
+    /// Retire nos entrées, puis les groupes et événements que ce retrait a vidés.
+    /// Un événement déjà vide avant (`[]`) reste tel quel, comme dans hooks_config.py.
+    static func strip(_ settings: inout OrderedJSON, dropEmptyRoot: Bool) {
+        guard case .object(let hooks)? = settings["hooks"] else { return }
+        var kept: [OrderedJSON.Member] = []
+        for member in hooks {
+            guard case .array(let groups) = member.value else {
+                kept.append(member)
+                continue
+            }
+            var keptGroups: [OrderedJSON] = []
+            for var group in groups {
+                if let inner = group["hooks"]?.items, inner.contains(where: isOurs) {
+                    let remaining = inner.filter { !isOurs($0) }
+                    if remaining.isEmpty { continue }
+                    group["hooks"] = .array(remaining)
+                }
+                keptGroups.append(group)
+            }
+            if !keptGroups.isEmpty {
+                kept.append(OrderedJSON.Member(key: member.key, value: .array(keptGroups)))
+            } else if groups.isEmpty {
+                kept.append(member)
+            }
+        }
+        settings["hooks"] = dropEmptyRoot && kept.isEmpty ? nil : .object(kept)
+    }
+
+    /// Retire nos anciennes entrées puis ajoute un groupe par événement, en fin de liste.
+    /// « hooks » est créé en fin de fichier s'il manque ; un nouvel événement va en fin de « hooks ».
+    static func addEntries(to settings: inout OrderedJSON, command: String) throws {
+        strip(&settings, dropEmptyRoot: false)
+        var hooks: OrderedJSON
+        switch settings["hooks"] {
+        case nil: hooks = .object([])
+        case .object(let members)?: hooks = .object(members)
+        default: throw Failure.hooksNotObject
+        }
+        for event in events {
+            var groups: [OrderedJSON]
+            switch hooks[event] {
+            case nil: groups = []
+            case .array(let items)?: groups = items
+            default: throw Failure.eventNotList(event)
+            }
+            groups.append(.object([OrderedJSON.Member(key: "hooks", value: .array([entry(command: command)]))]))
+            hooks[event] = .array(groups)
+        }
+        settings["hooks"] = hooks
+    }
+
+    static func entry(command: String) -> OrderedJSON {
+        .object([
+            OrderedJSON.Member(key: "type", value: .string("command")),
+            OrderedJSON.Member(key: "command", value: .string(command)),
+            OrderedJSON.Member(key: "async", value: .bool(true)),
+            OrderedJSON.Member(key: "timeout", value: .number(timeout)),
+        ])
+    }
+
+    /// Un hook (objet) dont la commande contient « claude-notch-hook.sh ». Une commande qui n'est pas
+    /// une chaîne est lue sous forme de texte, comme `str()` en Python.
+    static func isOurs(_ hook: OrderedJSON) -> Bool {
+        guard hook.members != nil, let command = hook["command"] else { return false }
+        let text = command.stringValue ?? String(decoding: command.serialized(), as: UTF8.self)
+        return containsMarker(text)
+    }
+
+    /// Recherche octet par octet (pas de regroupement Unicode, comme `in` en Python).
+    private static func containsMarker(_ text: String) -> Bool {
+        let haystack = Array(text.utf8)
+        let needle = Array(marker.utf8)
+        guard haystack.count >= needle.count else { return false }
+        for start in 0...(haystack.count - needle.count)
+            where haystack[start..<start + needle.count].elementsEqual(needle) {
+            return true
+        }
+        return false
+    }
+
+    // MARK: - État
+
+    /// Exactement notre entrée, à l'ordre des clés près.
+    private func isExpectedEntry(_ hook: OrderedJSON) -> Bool {
+        hook.members?.count == 4
+            && hook["type"] == .string("command")
+            && hook["command"] == .string(hookCommand)
+            && hook["async"] == .bool(true)
+            && hook["timeout"] == .number(Self.timeout)
+    }
+
+    /// Script présent, exécutable et identique à celui de l'app (s'il est connu).
+    private var hookScriptIsCurrent: Bool {
+        let manager = FileManager.default
+        guard manager.isExecutableFile(atPath: hookURL.path) else { return false }
+        guard let bundledHook else { return true }
+        guard let installed = try? Data(contentsOf: hookURL), let expected = try? Data(contentsOf: bundledHook) else {
+            return false
+        }
+        return installed == expected
+    }
+
+    // MARK: - Fichiers
+
+    /// Fichier absent ou vide : objet vide. JSON invalide ou autre chose qu'un objet : erreur.
+    func loadSettings() throws -> OrderedJSON {
+        guard FileManager.default.fileExists(atPath: settingsURL.path) else { return .object([]) }
+        let data: Data
+        do {
+            data = try Data(contentsOf: settingsURL)
+        } catch {
+            throw Failure.io("Lecture de \(settingsURL.path) impossible (\(error.localizedDescription)).")
+        }
+        if let text = String(data: data, encoding: .utf8), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .object([])
+        }
+        let value: OrderedJSON
+        do {
+            value = try OrderedJSON.parse(data)
+        } catch {
+            throw Failure.invalidSettings(String(describing: error))
+        }
+        guard value.members != nil else { throw Failure.settingsNotObject }
+        return value
+    }
+
+    private func writeHookScript(_ script: Data) throws {
+        let manager = FileManager.default
+        do {
+            try manager.createDirectory(at: hookURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if (try? Data(contentsOf: hookURL)) != script {
+                try script.write(to: hookURL, options: .atomic)
+            }
+            try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hookURL.path)
+        } catch {
+            throw Failure.io("Copie du script de hook impossible (\(error.localizedDescription)) : "
+                + "settings.json n'a pas été modifié.")
+        }
+    }
+
+    /// Sauvegarde puis écriture atomique, seulement si quelque chose change.
+    private func save(_ settings: OrderedJSON, replacing original: OrderedJSON) throws -> Outcome {
+        guard settings != original else { return Outcome(settingsChanged: false, backup: nil) }
+        var data = settings.serialized()
+        data.append(0x0A)
+        let manager = FileManager.default
+        do {
+            try manager.createDirectory(at: configDirectory, withIntermediateDirectories: true)
+            var backup: URL?
+            if manager.fileExists(atPath: settingsURL.path) { backup = try makeBackup() }
+            try writeAtomically(data)
+            return Outcome(settingsChanged: true, backup: backup)
+        } catch let failure as Failure {
+            throw failure
+        } catch {
+            throw Failure.io("Écriture de \(settingsURL.path) impossible (\(error.localizedDescription)).")
+        }
+    }
+
+    /// `settings.json.claude-notch-AAAAMMJJ-HHMMSS.bak`, suffixe -1, -2… en cas de collision.
+    /// Copie du contenu (un lien symbolique est suivi), dates et droits conservés.
+    private func makeBackup() throws -> URL {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let stem = settingsURL.path + ".claude-notch-" + formatter.string(from: now())
+        var backup = stem + ".bak"
+        var counter = 1
+        while FileManager.default.fileExists(atPath: backup) {
+            backup = "\(stem)-\(counter).bak"
+            counter += 1
+        }
+        let url = URL(fileURLWithPath: backup)
+        try FileManager.default.copyItem(at: settingsURL.resolvingSymlinksInPath(), to: url)
+        return url
+    }
+
+    /// Fichier temporaire dans le même dossier puis `rename` : jamais de settings.json à moitié écrit.
+    /// Droits de l'ancien fichier conservés (0644 sinon). Un settings.json en lien symbolique (dotfiles)
+    /// reste un lien : c'est sa cible qui est remplacée.
+    private func writeAtomically(_ data: Data) throws {
+        let manager = FileManager.default
+        let target = manager.fileExists(atPath: settingsURL.path) ? settingsURL.resolvingSymlinksInPath() : settingsURL
+        let mode = (try? manager.attributesOfItem(atPath: target.path)[.posixPermissions] as? NSNumber)?.intValue ?? 0o644
+        let temporary = target.deletingLastPathComponent()
+            .appendingPathComponent(".settings.claude-notch-\(UUID().uuidString)")
+        do {
+            try data.write(to: temporary, options: .withoutOverwriting)
+            try manager.setAttributes([.posixPermissions: mode], ofItemAtPath: temporary.path)
+            guard rename(temporary.path, target.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch {
+            try? manager.removeItem(at: temporary)
+            throw error
+        }
+    }
+}

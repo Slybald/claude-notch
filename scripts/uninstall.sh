@@ -3,15 +3,16 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-LABEL=local.claudenotch
 CONFIG_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
-AGENT="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 /usr/bin/python3 -I "$ROOT/scripts/hooks_config.py" uninstall
 rm -f "$CONFIG_DIR/hooks/claude-notch-hook.sh"
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-rm -f "$AGENT"
+# Identifiant actuel, puis celui des premières versions.
+for LABEL in io.github.slybald.claudenotch local.claudenotch; do
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    rm -f "$HOME/Library/LaunchAgents/$LABEL.plist"
+done
 
 pkill -x ClaudeNotch 2>/dev/null || true
 for dir in /Applications "$HOME/Applications"; do

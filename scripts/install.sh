@@ -1,12 +1,16 @@
 #!/bin/sh
-# Compile, installe l'app, le hook, les entrées settings.json et le LaunchAgent.
+# Installation développeur : compile, installe l'app, le hook, les entrées settings.json et le LaunchAgent.
+# (Depuis un DMG, rien de tout ça : l'app installe elle-même ses hooks au premier lancement.)
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-LABEL=local.claudenotch
+# Même valeur que CFBundleIdentifier (Resources/Info.plist) et AppIdentity.bundleId.
+LABEL=io.github.slybald.claudenotch
+LEGACY_LABEL=local.claudenotch
 CONFIG_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 HOOK="$CONFIG_DIR/hooks/claude-notch-hook.sh"
 AGENT="$HOME/Library/LaunchAgents/$LABEL.plist"
+LEGACY_AGENT="$HOME/Library/LaunchAgents/$LEGACY_LABEL.plist"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
 "$ROOT/scripts/build.sh"
@@ -19,6 +23,9 @@ else
     mkdir -p "$DEST"
 fi
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+# Ancien identifiant (local.claudenotch) : LaunchAgent déchargé et supprimé.
+launchctl bootout "gui/$(id -u)/$LEGACY_LABEL" 2>/dev/null || true
+rm -f "$LEGACY_AGENT"
 pkill -x ClaudeNotch 2>/dev/null || true
 i=0
 while pgrep -x ClaudeNotch >/dev/null 2>&1 && [ "$i" -lt 20 ]; do
