@@ -19,6 +19,9 @@ installe `~/.claude/hooks/claude-notch-hook.sh`, ajoute les hooks dans `~/.claud
 `CLAUDE_CONFIG_DIR` est respecté. Pour tout retirer : `./scripts/uninstall.sh`.
 
 Développement : `swift build`, `swift test`, `./scripts/build.sh` (assemble `build/ClaudeNotch.app`).
+Captures PNG du panneau (dont la section outils) : `CLAUDE_NOTCH_SNAPSHOT_DIR=/chemin swift test --filter SnapshotTests`.
+Ajoute `CLAUDE_NOTCH_TOOLS_DIR=/dossier` (contenant `files.jsonl`, `state.json`, `today.json`) pour rendre
+la section avec d'autres données, ou `CLAUDE_NOTCH_TOOLS_DIR=standard` pour tes vrais fichiers (lecture seule).
 
 ## Fonctionnement
 
@@ -33,7 +36,45 @@ Développement : `swift build`, `swift test`, `./scripts/build.sh` (assemble `bu
 - Interruption par Esc : aucun hook ne part. L'app lit la fin du transcript toutes les 2 s
   pendant un tour et repasse la session en « Prête » si elle y trouve l'interruption.
 - Diagnostic : `GET http://127.0.0.1:47823/state` renvoie l'état des sessions et de la notch
-  en JSON (lecture seule, local uniquement).
+  en JSON (lecture seule, local uniquement). La clé `tools` résume la section outils : fichiers récents,
+  dépôts à traiter, usage du jour, lignes écrites dans les registres depuis le lancement, écritures ratées.
+
+## Registres partagés
+
+L'app écrit deux journaux, une ligne JSON par événement, dans `~/Library/Application Support/ClaudeNotch/`.
+Aucun nouveau hook : `PostToolUse` et `PermissionRequest` étaient déjà relayés.
+
+- `files.jsonl` : chaque fichier écrit par Claude (`PostToolUse` réussi de Write, Edit, MultiEdit,
+  NotebookEdit ; jamais `PostToolUseFailure`).
+  `{"ts": "2026-10-19T10:34:56Z", "path": "/abs/fichier", "tool": "Edit", "session_id": "…", "project": "mon-app", "cwd": "/…/mon-app", "source": "live"}`.
+  L'outil `claude-files` y ajoute les écritures passées (`"source": "backfill"`).
+- `permissions.jsonl` : chaque demande de permission.
+  `{"ts", "session_id", "project", "tool", "detail"}` ; `detail` = 1re ligne de la commande pour Bash,
+  chemin du fichier pour une édition, sinon la description courte de l'outil, tronqué à 200 caractères.
+
+Écriture en ajout (`O_APPEND`) sur une queue série, hors du main thread ; le dossier est créé au besoin.
+
+## Section outils
+
+Entre la liste des sessions et la ligne Claude Desktop, une carte compacte :
+
+- **Fichiers récents** (replié par défaut, l'en-tête montre le dernier) : les 5 derniers chemins distincts
+  de `files.jsonl`, classés par date, hors dossiers temporaires et espaces jetables (`/tmp`, `/var/folders`,
+  `scratch-workspaces`, `scratchpad`). Nom en gras, projet et « il y a 3 min » en gris, grisé et marqué
+  « supprimé » si le fichier n'existe plus. Clic : le Finder sélectionne le fichier (ou son dossier parent
+  s'il a disparu) et le panneau se referme.
+- **Git** (si `~/Library/Application Support/GitRadar/state.json` date de moins de 2 h) : pastille verte
+  « Git · tout est poussé » ou ambre « Git · 2 dépôts à traiter ». Le chevron liste les dépôts concernés
+  (branche, ↑ à pousser, ↓ à récupérer, ● modifiés et non suivis, « sans upstream ») ; clic = Finder.
+- **Usage** (si `~/Library/Application Support/ClaudeUsage/today.json` est daté d'aujourd'hui) :
+  « Aujourd'hui · 2 h 10 · 6 sessions », top projets en infobulle.
+
+Un seul volet ouvert à la fois. Rien n'apparaît si les fichiers sont absents. Les fichiers ne sont lus qu'à
+l'ouverture du panneau, puis toutes les 15 s tant qu'il reste ouvert, sur une queue utilitaire ; replié,
+aucune lecture ni timer. `files.jsonl` est lu de façon incrémentale : la première fois ses 16 derniers Mo
+au plus, ensuite seulement les lignes ajoutées (un gros rattrapage ancien ne chasse pas les fichiers récents).
+Quand la section grandit, la liste des sessions rétrécit (120 pt minimum, fondu en bas) pour que
+le panneau reste sous 460 pt.
 
 ## Limites
 
@@ -46,6 +87,16 @@ Développement : `swift build`, `swift test`, `./scripts/build.sh` (assemble `bu
   la carte reste en « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop
   (Claude.app figure parmi ses ancêtres).
+- Registres : seulement pendant que l'app tourne (le hook ne relance l'app qu'au début d'une session
+  ou d'un tour) ; `claude-files` comble les trous. Pas de rotation : les fichiers grossissent
+  (environ 250 octets par ligne) ; au-delà de 16 Mo, l'app n'en lit que la fin.
+- `ts` en direct = heure de réception du hook, à la seconde. Une ligne en direct et la ligne de rattrapage
+  du même fichier n'ont pas forcément le même `ts` : la déduplication par (path, session_id, ts) peut les
+  garder toutes les deux. Sans effet sur « Fichiers récents » (dédupliqué par chemin).
+- `permissions.jsonl` contient aussi AskUserQuestion et ExitPlanMode : Claude Code les fait passer par
+  `PermissionRequest`.
+- Les fichiers écrits dans un espace jetable (`scratch-workspaces` de Claude Desktop, `/tmp`) n'apparaissent
+  jamais dans « Fichiers récents ».
 - Liste de tâches : les outils TaskCreate/TaskUpdate ne sont actifs par défaut que sur
   certains modèles (constaté : absents avec Sonnet). Sinon, `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
   Claude Code supprime les fichiers de tâches quand toute la liste est terminée : la barre disparaît.
