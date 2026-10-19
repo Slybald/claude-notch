@@ -9,19 +9,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        replaceLegacyInstance()
         AppIdentity.migrateLegacyInstall()
         core.start()
         HookSetup.shared.showOnboardingIfNeeded()
     }
 
-    /// Une instance sous l'identifiant actuel ou sous l'ancien (local.claudenotch) suffit.
+    /// Une instance de cette version tourne déjà : elle suffit.
     private func isAnotherInstanceRunning() -> Bool {
         let me = ProcessInfo.processInfo.processIdentifier
-        let ids = Set([AppIdentity.bundleId, AppIdentity.legacyBundleId, Bundle.main.bundleIdentifier].compactMap { $0 })
+        let ids = Set([AppIdentity.bundleId, Bundle.main.bundleIdentifier].compactMap { $0 })
         return ids.contains { id in
             NSRunningApplication.runningApplications(withBundleIdentifier: id)
                 .contains { $0.processIdentifier != me && !$0.isTerminated }
         }
+    }
+
+    /// L'ancienne version (local.claudenotch) cède la place : elle tient le port des hooks.
+    private func replaceLegacyInstance() {
+        let legacy = NSRunningApplication.runningApplications(withBundleIdentifier: AppIdentity.legacyBundleId)
+            .filter { !$0.isTerminated }
+        guard !legacy.isEmpty else { return }
+        legacy.forEach { $0.terminate() }
+        let deadline = Date().addingTimeInterval(3)
+        while legacy.contains(where: { !$0.isTerminated }), Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        legacy.filter { !$0.isTerminated }.forEach { $0.forceTerminate() }
     }
 }
 
