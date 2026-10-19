@@ -52,6 +52,8 @@ processus qu'elle lance. Au premier passage, macOS demande l'accès pour « Clau
 - `claude-recap morning` : une fois par jour, au premier passage après 8 h 30.
 
 Un outil absent est ignoré. Journaux : `~/Library/Logs/ClaudeNotch/<outil>.log`. État : clé `jobs` de `/state`.
+L'app est signée ad hoc : après chaque réinstallation, macOS peut redemander ces accès. Une tâche lancée pendant
+que la fenêtre attend ta réponse patiente (10 min au plus) ; la notch, elle, reste réactive.
 Les `install.sh` de ces outils ne déposent pas de LaunchAgent quand Claude Notch est installé.
 
 ## Registres partagés
