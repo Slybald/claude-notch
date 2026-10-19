@@ -24,14 +24,28 @@ final class AppCore {
     let store = SessionStore()
     let monitor = ClaudeMonitor()
     let prefs = Preferences.shared
+    let tools: ToolsFeed
+    let activityLog: ActivityLog
     private var server: HookServer?
     private var notch: NotchController?
 
-    func start() {
-        let store = self.store
-        let server = HookServer { event, context in
-            DispatchQueue.main.async { store.handle(event, context: context) }
+    init(tools: ToolsFeed = ToolsFeed(), activityLog: ActivityLog = ActivityLog()) {
+        self.tools = tools
+        self.activityLog = activityLog
+    }
+
+    /// Chaque événement met à jour les sessions puis, au besoin, les registres CF1 / CF2 (cwd de la session connu).
+    static func hookHandler(store: SessionStore, log: ActivityLog) -> HookServer.Handler {
+        { event, context in
+            DispatchQueue.main.async {
+                store.handle(event, context: context)
+                log.record(event, session: event.sessionId.flatMap { store.sessions[$0] })
+            }
         }
+    }
+
+    func start() {
+        let server = HookServer(handler: Self.hookHandler(store: store, log: activityLog))
         server.stateProvider = { [weak self] in self?.debugState() ?? [:] }
         server.onFailure = { error in
             // Port déjà pris : une autre instance tourne, inutile de rester.
@@ -50,7 +64,7 @@ final class AppCore {
         monitor.start()
         store.start()
 
-        let notch = NotchController(store: store, monitor: monitor, prefs: prefs)
+        let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
         notch.start()
         self.notch = notch
     }
@@ -88,6 +102,12 @@ final class AppCore {
         ]
         state["ears"] = store.earsText
         state["notch"] = notch?.debugInfo
+        var tools = self.tools.debugSummary
+        tools["filesLogged"] = activityLog.filesLogged
+        tools["permissionsLogged"] = activityLog.permissionsLogged
+        tools["failedWrites"] = activityLog.failedWrites
+        tools["logDirectory"] = activityLog.directory.path
+        state["tools"] = tools
         return state
     }
 }

@@ -7,6 +7,8 @@ final class NotchViewModel: ObservableObject {
     @Published var isExpanded = false
     @Published var notchSize = CGSize(width: 200, height: 32)
     @Published var hasNotch = false
+    /// Volet ouvert dans la section outils ; tout est replié à chaque ouverture du panneau.
+    @Published var toolsPane: ToolsPane?
     /// Taille réelle de la forme noire, mesurée par la vue. Sert aux zones de survol.
     var contentSize: CGSize = .zero
 }
@@ -16,6 +18,8 @@ struct NotchActions {
     var openDesktop: () -> Void
     var clearEnded: () -> Void
     var quit: () -> Void
+    /// Révèle un fichier (ou un dépôt) dans le Finder.
+    var revealFile: (String) -> Void = { _ in }
 }
 
 final class NotchPanel: NSPanel {
@@ -47,6 +51,7 @@ final class NotchController {
     private let store: SessionStore
     private let monitor: ClaudeMonitor
     private let prefs: Preferences
+    private let tools: ToolsFeed
     private let panel: NotchPanel
 
     private var screenFrame = CGRect.zero
@@ -62,10 +67,11 @@ final class NotchController {
     private var cancellables = Set<AnyCancellable>()
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
 
-    init(store: SessionStore, monitor: ClaudeMonitor, prefs: Preferences) {
+    init(store: SessionStore, monitor: ClaudeMonitor, prefs: Preferences, tools: ToolsFeed) {
         self.store = store
         self.monitor = monitor
         self.prefs = prefs
+        self.tools = tools
 
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize),
                            styleMask: [.borderless, .nonactivatingPanel],
@@ -90,9 +96,11 @@ final class NotchController {
             activate: { [weak self] session in self?.activate(session) },
             openDesktop: { [weak self] in self?.openDesktop() },
             clearEnded: { [weak self] in self?.store.clearEnded() },
-            quit: { NSApp.terminate(nil) }
+            quit: { NSApp.terminate(nil) },
+            revealFile: { [weak self] path in self?.reveal(path) }
         )
-        let root = NotchRootView(model: model, store: store, monitor: monitor, prefs: prefs, actions: actions)
+        let root = NotchRootView(model: model, store: store, monitor: monitor, prefs: prefs, tools: tools,
+                                 actions: actions)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.sizingOptions = []
         hosting.frame = NSRect(origin: .zero, size: Self.panelSize)
@@ -223,6 +231,7 @@ final class NotchController {
         model.isExpanded = true
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         startPolling()
+        tools.setActive(true)
     }
 
     private func collapse() {
@@ -231,8 +240,10 @@ final class NotchController {
         closeWork?.cancel()
         closeWork = nil
         stopPolling()
+        tools.setActive(false)
         panel.ignoresMouseEvents = true
         if model.isExpanded { model.isExpanded = false }
+        if model.toolsPane != nil { model.toolsPane = nil }
     }
 
     /// 15 Hz, seulement déplié : rattrape les mouvements que les moniteurs ne voient pas.
@@ -282,6 +293,25 @@ final class NotchController {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
         NSWorkspace.shared.open([url], withApplicationAt: app, configuration: configuration) { _, _ in }
+    }
+
+    /// Sélectionne le fichier dans le Finder ; s'il a disparu, son plus proche dossier parent encore présent.
+    private func reveal(_ path: String) {
+        guard let target = Self.revealTarget(for: path) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([target])
+        Self.bringToFront(bundleId: "com.apple.finder")
+        suppressUntilExit = true
+        collapse()
+    }
+
+    static func revealTarget(for path: String, fileManager: FileManager = .default) -> URL? {
+        var url = URL(fileURLWithPath: path).standardizedFileURL
+        while !fileManager.fileExists(atPath: url.path) {
+            let parent = url.deletingLastPathComponent()
+            if parent.path == url.path { return nil }
+            url = parent
+        }
+        return url
     }
 
     private func openDesktop() {

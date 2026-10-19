@@ -11,7 +11,7 @@ enum Palette {
     static let card = Color.white.opacity(0.05)
 }
 
-private let notchSpring = Animation.spring(response: 0.42, dampingFraction: 0.78)
+let notchSpring = Animation.spring(response: 0.42, dampingFraction: 0.78)
 
 // MARK: - Forme
 
@@ -63,6 +63,22 @@ private struct ListHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+/// Hauteur cumulée des lignes sous la liste des sessions (espacement compris) : la liste leur cède la place
+/// pour que le panneau tienne dans sa fenêtre.
+private struct RowsBelowListKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value += nextValue() }
+}
+
+private extension View {
+    /// Déclare la hauteur de la ligne, plus l'espacement du VStack qui la précède.
+    func countedBelowList(spacing: CGFloat) -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: RowsBelowListKey.self, value: proxy.size.height + spacing)
+        })
+    }
+}
+
 // MARK: - Racine
 
 struct NotchRootView: View {
@@ -70,6 +86,7 @@ struct NotchRootView: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var monitor: ClaudeMonitor
     @ObservedObject var prefs: Preferences
+    let tools: ToolsFeed
     let actions: NotchActions
 
     private var expanded: Bool { model.isExpanded }
@@ -94,8 +111,8 @@ struct NotchRootView: View {
     private var notch: some View {
         ZStack(alignment: .top) {
             if expanded {
-                ExpandedPanel(store: store, monitor: monitor, prefs: prefs,
-                              notchSize: model.notchSize, actions: actions)
+                ExpandedPanel(store: store, monitor: monitor, prefs: prefs, tools: tools,
+                              toolsPane: $model.toolsPane, notchSize: model.notchSize, actions: actions)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
                             .animation(notchSpring.delay(0.06)),
@@ -311,13 +328,27 @@ struct ExpandedPanel: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var monitor: ClaudeMonitor
     @ObservedObject var prefs: Preferences
+    @ObservedObject var tools: ToolsFeed
+    @Binding var toolsPane: ToolsPane?
     let notchSize: CGSize
     let actions: NotchActions
 
     @State private var listHeight: CGFloat = 0
+    @State private var rowsBelowList: CGFloat = 0
     @State private var openChecklists: Set<String> = []
 
+    private static let spacing: CGFloat = 10
+    private static let bottomPadding: CGFloat = 14
     private static let maxListHeight: CGFloat = 296
+    private static let minListHeight: CGFloat = 120
+    /// Fenêtre de 480 pt moins la place de l'ombre.
+    private static let maxPanelHeight: CGFloat = 460
+
+    /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge).
+    private var listMaxHeight: CGFloat {
+        let available = Self.maxPanelHeight - notchSize.height - Self.spacing - Self.bottomPadding - rowsBelowList
+        return min(Self.maxListHeight, max(Self.minListHeight, available))
+    }
 
     private var untrackedCount: Int { monitor.cliPids.subtracting(store.trackedPids).count }
     private var cliActive: Bool {
@@ -326,7 +357,7 @@ struct ExpandedPanel: View {
 
     var body: some View {
         let sessions = store.sortedSessions
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Self.spacing) {
             header
             if sessions.isEmpty {
                 EmptyStateView()
@@ -342,14 +373,21 @@ struct ExpandedPanel: View {
                 .font(.system(size: 11))
                 .foregroundColor(Palette.secondary)
                 .padding(.horizontal, 4)
+                .countedBelowList(spacing: Self.spacing)
+            }
+            if tools.hasContent {
+                ToolsSection(feed: tools, pane: $toolsPane, reveal: actions.revealFile)
+                    .countedBelowList(spacing: Self.spacing)
             }
             if monitor.desktopRunning {
                 DesktopRow(frontmost: monitor.desktopFrontmost, open: actions.openDesktop)
+                    .countedBelowList(spacing: Self.spacing)
             }
         }
         .padding(.horizontal, 14)
-        .padding(.bottom, 14)
+        .padding(.bottom, Self.bottomPadding)
         .frame(width: NotchController.expandedWidth, alignment: .top)
+        .onPreferenceChange(RowsBelowListKey.self) { height in rowsBelowList = height }
     }
 
     /// En-tête à hauteur de notch, éléments de part et d'autre de la caméra.
@@ -414,9 +452,19 @@ struct ExpandedPanel: View {
                     Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
                 })
             }
-            .frame(height: min(listHeight > 0 ? listHeight : estimate, Self.maxListHeight))
+            .frame(height: min(listHeight > 0 ? listHeight : estimate, listMaxHeight))
+            .mask(listFade(overflowing: tools.hasContent && listHeight > listMaxHeight + 1))
         }
         .onPreferenceChange(ListHeightKey.self) { height in listHeight = height }
+    }
+
+    /// Liste tronquée par la section outils : fondu en bas plutôt qu'une carte coupée net.
+    private func listFade(overflowing: Bool) -> some View {
+        VStack(spacing: 0) {
+            Color.black
+            LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+                .frame(height: overflowing ? 22 : 0)
+        }
     }
 
     private func checklistBinding(_ id: String) -> Binding<Bool> {

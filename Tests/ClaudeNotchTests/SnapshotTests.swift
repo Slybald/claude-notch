@@ -44,16 +44,63 @@ final class SnapshotTests: XCTestCase {
         model.hasNotch = true
         let actions = NotchActions(activate: { _ in }, openDesktop: {}, clearEnded: {}, quit: {})
         let monitor = ClaudeMonitor()
+        let noTools = ToolsFeed(paths: LayoutTests.absentPaths)
+        func root(_ store: SessionStore, _ tools: ToolsFeed) -> NotchRootView {
+            NotchRootView(model: model, store: store, monitor: monitor, prefs: Preferences(), tools: tools,
+                          actions: actions)
+        }
 
-        try render(NotchRootView(model: model, store: store, monitor: monitor, prefs: Preferences(), actions: actions),
-                   name: "collapsed", to: outputDir)
+        try render(root(store, noTools), name: "collapsed", to: outputDir)
         model.isExpanded = true
-        try render(NotchRootView(model: model, store: store, monitor: monitor, prefs: Preferences(), actions: actions),
-                   name: "expanded", to: outputDir)
+        try render(root(store, noTools), name: "expanded", to: outputDir)
 
         let empty = SessionStore()
-        try render(NotchRootView(model: model, store: empty, monitor: monitor, prefs: Preferences(), actions: actions),
-                   name: "empty", to: outputDir)
+        try render(root(empty, noTools), name: "empty", to: outputDir)
+
+        // Section outils : fichiers récents (dont un supprimé), git avec deux dépôts à traiter, usage du jour.
+        let fixtures = try ToolsFixtures()
+        defer { fixtures.remove() }
+        try fixtures.writeSample(now: Date())
+        let tools = ToolsFeed(paths: fixtures.paths) { !$0.hasSuffix("old-config.ts") }
+        tools.refreshNow()
+
+        model.toolsPane = nil
+        try render(root(store, tools), name: "tools", to: outputDir)
+        model.toolsPane = .files
+        try render(root(store, tools), name: "tools-files", to: outputDir)
+        model.toolsPane = .git
+        try render(root(store, tools), name: "tools-git", to: outputDir)
+        model.toolsPane = nil
+        try render(root(empty, tools), name: "tools-no-session", to: outputDir)
+
+        // Beaucoup de sessions et volet ouvert : la liste rétrécit, tout tient dans le panneau.
+        for index in 0..<5 {
+            send("UserPromptSubmit", "projet-\(index)", ["prompt": "Tâche \(index)"])
+        }
+        model.toolsPane = .files
+        try render(root(store, tools), name: "tools-crowded", to: outputDir)
+
+        // Git propre et usage seul.
+        try fixtures.writeSample(now: Date(), gitClean: true)
+        try FileManager.default.removeItem(at: fixtures.paths.files)
+        tools.refreshNow()
+        model.toolsPane = nil
+        try render(root(empty, tools), name: "tools-git-clean", to: outputDir)
+
+        // Autres données (lecture seule) : `CLAUDE_NOTCH_TOOLS_DIR` = dossier contenant files.jsonl, state.json
+        // et today.json, ou `standard` pour les vrais fichiers partagés de l'utilisateur.
+        if let dir = ProcessInfo.processInfo.environment["CLAUDE_NOTCH_TOOLS_DIR"] {
+            let base = URL(fileURLWithPath: dir)
+            let real = ToolsFeed(paths: dir == "standard" ? .standard : ToolsFeed.Paths(
+                files: base.appendingPathComponent("files.jsonl"), gitState: base.appendingPathComponent("state.json"),
+                usage: base.appendingPathComponent("today.json")))
+            real.refreshNow()
+            print("TOOLS \(real.debugSummary)")
+            for (pane, name) in [(nil, "tools-real"), (ToolsPane.files, "tools-real-files"), (.git, "tools-real-git")] {
+                model.toolsPane = pane
+                try render(root(store, real), name: name, to: outputDir)
+            }
+        }
     }
 
     /// Fenêtre hors écran + rendu de l'arbre de calques (ScrollView compris, contrairement à ImageRenderer).
