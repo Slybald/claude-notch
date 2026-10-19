@@ -27,47 +27,47 @@ enum ToolDescriber {
         switch tool {
         case "Bash":
             if let description = text("description") {
-                return Description(label: "Terminal", detail: firstLine(description), isCode: false)
+                return Description(label: L("Terminal"), detail: firstLine(description), isCode: false)
             }
-            return Description(label: "Terminal", detail: text("command").map { firstLine($0) }, isCode: true)
+            return Description(label: L("Terminal"), detail: text("command").map { firstLine($0) }, isCode: true)
         case "BashOutput", "TaskOutput":
-            return Description(label: "Terminal", detail: "sortie en arrière-plan", isCode: false)
+            return Description(label: L("Terminal"), detail: L("sortie en arrière-plan"), isCode: false)
         case "KillShell", "KillBash", "TaskStop":
-            return Description(label: "Terminal", detail: "arrêt d'un processus", isCode: false)
+            return Description(label: L("Terminal"), detail: L("arrêt d'un processus"), isCode: false)
         case "Read":
-            return Description(label: "Lecture", detail: file("file_path"), isCode: true)
+            return Description(label: L("Lecture"), detail: file("file_path"), isCode: true)
         case "Edit", "MultiEdit":
-            return Description(label: "Édition", detail: file("file_path"), isCode: true)
+            return Description(label: L("Édition"), detail: file("file_path"), isCode: true)
         case "Write":
-            return Description(label: "Écriture", detail: file("file_path"), isCode: true)
+            return Description(label: L("Écriture"), detail: file("file_path"), isCode: true)
         case "NotebookEdit":
-            return Description(label: "Édition", detail: file("notebook_path"), isCode: true)
+            return Description(label: L("Édition"), detail: file("notebook_path"), isCode: true)
         case "Grep", "Glob":
-            return Description(label: "Recherche", detail: text("pattern").map { firstLine($0) }, isCode: true)
+            return Description(label: L("Recherche"), detail: text("pattern").map { firstLine($0) }, isCode: true)
         case "WebFetch":
             let host = text("url").flatMap { URL(string: $0)?.host }
-            return Description(label: "Web", detail: host, isCode: false)
+            return Description(label: L("Web"), detail: host, isCode: false)
         case "WebSearch":
-            return Description(label: "Recherche web", detail: text("query").map { firstLine($0) }, isCode: false)
+            return Description(label: L("Recherche web"), detail: text("query").map { firstLine($0) }, isCode: false)
         case "Task", "Agent":
             let detail = text("description") ?? text("subagent_type")
-            return Description(label: "Sous-agent", detail: detail.map { firstLine($0) }, isCode: false)
+            return Description(label: L("Sous-agent"), detail: detail.map { firstLine($0) }, isCode: false)
         case "TaskCreate":
-            return Description(label: "Tâches", detail: text("subject").map { firstLine($0) }, isCode: false)
+            return Description(label: L("Tâches"), detail: text("subject").map { firstLine($0) }, isCode: false)
         case _ where taskTools.contains(tool):
-            return Description(label: "Tâches", detail: nil, isCode: false)
+            return Description(label: L("Tâches"), detail: nil, isCode: false)
         case "AskUserQuestion":
-            return Description(label: "Question", detail: question(from: input), isCode: false)
+            return Description(label: L("Question"), detail: question(from: input), isCode: false)
         case "ExitPlanMode":
-            return Description(label: "Plan", detail: nil, isCode: false)
+            return Description(label: L("Plan"), detail: nil, isCode: false)
         case "EnterPlanMode":
-            return Description(label: "Plan", detail: "passage en mode plan", isCode: false)
+            return Description(label: L("Plan"), detail: L("passage en mode plan"), isCode: false)
         case "Skill":
-            return Description(label: "Skill", detail: text("skill") ?? text("command"), isCode: false)
+            return Description(label: L("Skill"), detail: text("skill") ?? text("command"), isCode: false)
         case "SlashCommand":
-            return Description(label: "Commande", detail: text("command"), isCode: true)
+            return Description(label: L("Commande"), detail: text("command"), isCode: true)
         case "ToolSearch":
-            return Description(label: "Outils", detail: "chargement", isCode: false)
+            return Description(label: L("Outils"), detail: L("chargement"), isCode: false)
         default:
             if tool.hasPrefix("mcp__") {
                 let parts = tool.components(separatedBy: "__")

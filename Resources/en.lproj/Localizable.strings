@@ -1,0 +1,153 @@
+/* Claude Notch: English. The key is the French text used in the code (see Sources/ClaudeNotch/Localization.swift). */
+
+/* Panel menu */
+"Toujours visible" = "Always Visible";
+"Lancer à l'ouverture de session" = "Open at Login";
+"Effacer les sessions terminées" = "Clear Ended Sessions";
+"Quitter Claude Notch" = "Quit Claude Notch";
+"Hooks Claude Code installés ✓" = "Claude Code Hooks Installed ✓";
+"Mettre à jour les hooks Claude Code" = "Update Claude Code Hooks";
+"Installer les hooks Claude Code" = "Install Claude Code Hooks";
+"Désinstaller Claude Notch…" = "Uninstall Claude Notch…";
+
+/* Panel */
+"Aucune session en cours" = "No active sessions";
+"Lance `claude` dans un terminal ou ouvre l'onglet Code de Claude Desktop." = "Run `claude` in a terminal or open the Code tab in Claude Desktop.";
+"%d session sans suivi — apparaîtra au prochain message" = "%d untracked session — shows up after its next message";
+"%d sessions sans suivi — apparaîtront au prochain message" = "%d untracked sessions — show up after their next message";
+"Au premier plan" = "In front";
+"Ouvert" = "Running";
+"Ouvrir" = "Open";
+"%d agent" = "%d agent";
+"%d agents" = "%d agents";
+"Claude Code (app)" = "Claude Code (app)";
+
+/* Times */
+"%d s" = "%ds";
+"à l'instant" = "just now";
+"il y a %d s" = "%ds ago";
+"il y a %d min" = "%dm ago";
+"il y a %d h" = "%dh ago";
+"il y a %d j" = "%dd ago";
+
+/* Session states */
+"Prête" = "Ready";
+"Réfléchit…" = "Thinking…";
+"« %@ »" = "“%@”";
+"Outil" = "Tool";
+"Attend ta permission" = "Needs your permission";
+"Attend ta réponse" = "Waiting for your answer";
+"Plan à valider" = "Plan to review";
+"Terminé" = "Done";
+"Erreur" = "Error";
+"Compacte le contexte" = "Compacting context";
+"Session terminée" = "Session ended";
+"résultat d'un agent en arrière-plan" = "background agent result";
+"erreur de l'API" = "API error";
+
+/* Tools */
+"Terminal" = "Terminal";
+"sortie en arrière-plan" = "background output";
+"arrêt d'un processus" = "stopping a process";
+"Lecture" = "Read";
+"Édition" = "Edit";
+"Écriture" = "Write";
+"Recherche" = "Search";
+"Web" = "Web";
+"Recherche web" = "Web search";
+"Sous-agent" = "Subagent";
+"Tâches" = "Tasks";
+"Question" = "Question";
+"Plan" = "Plan";
+"passage en mode plan" = "entering plan mode";
+"Skill" = "Skill";
+"Commande" = "Command";
+"Outils" = "Tools";
+"chargement" = "loading";
+
+/* Tools section: recent files, git, usage */
+"Fichiers récents" = "Recent files";
+"supprimé" = "deleted";
+"Aujourd'hui" = "Today";
+"%d session" = "%d session";
+"%d sessions" = "%d sessions";
+"%d min" = "%dm";
+"%d h" = "%dh";
+"%d h %02d" = "%dh %02dm";
+"Git · tout est poussé" = "Git · all pushed";
+"Git · %d dépôt à traiter" = "Git · %d repo needs attention";
+"Git · %d dépôts à traiter" = "Git · %d repos need attention";
+"%d dépôt suivi par git-radar" = "%d repo tracked by git-radar";
+"%d dépôts suivis par git-radar" = "%d repos tracked by git-radar";
+"et %d autre" = "and %d more";
+"et %d autres" = "and %d more";
+"erreur" = "error";
+"sans upstream" = "no upstream";
+"%d commit à pousser" = "%d commit to push";
+"%d commits à pousser" = "%d commits to push";
+"%d commit à récupérer" = "%d commit to pull";
+"%d commits à récupérer" = "%d commits to pull";
+"%d modifié" = "%d modified";
+"%d modifiés" = "%d modified";
+"%d non suivi" = "%d untracked";
+"%d non suivis" = "%d untracked";
+
+/* First launch window */
+"Bienvenue dans Claude Notch" = "Welcome to Claude Notch";
+"Mettre à jour Claude Notch" = "Update Claude Notch";
+"Tes sessions Claude Code, d'un coup d'œil." = "Your Claude Code sessions at a glance.";
+"Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac." = "Hover over the notch: each Claude Code session (terminal, editor or Claude Desktop) shows its state, current tool, tasks and any permissions waiting for you. Everything stays on your Mac.";
+"Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch continue de suivre tes sessions." = "The installed hooks come from an earlier version of the app. Update them so the notch keeps tracking your sessions.";
+"Glisse d'abord Claude Notch dans Applications" = "First, drag Claude Notch to Applications";
+"L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier Applications, puis rouvre-la depuis là." = "The app is running from the disk image or a temporary copy. Quit it, drag it to the Applications folder, then reopen it from there.";
+"CE QUI SERA MODIFIÉ" = "WHAT WILL CHANGE";
+"Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté." = "Adds Claude Notch’s hooks. Your own hooks stay in place; a timestamped backup is saved next to the file.";
+"Petit script qui relaie chaque événement à l'app, en local (127.0.0.1)." = "A small script that relays each event to the app, locally (127.0.0.1).";
+"Disponible une fois l'app dans Applications." = "Available once the app is in Applications.";
+"Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks installed. Sessions already open will show up after their next message.";
+"Hooks à jour. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks updated. Sessions already open will show up after their next message.";
+"Plus tard" = "Later";
+"Mettre à jour les hooks" = "Update Hooks";
+"Fermer" = "Close";
+
+/* Alerts */
+"Mise à jour des hooks impossible" = "Couldn’t update the hooks";
+"Désinstaller Claude Notch ?" = "Uninstall Claude Notch?";
+"Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh et le lancement à l'ouverture de session. L'app se fermera ensuite." = "Claude Notch’s hooks will be removed from ~/.claude/settings.json (a timestamped backup is kept next to it, and your other hooks stay in place), along with ~/.claude/hooks/claude-notch-hook.sh and the login item. The app will then quit.";
+"Désinstaller" = "Uninstall";
+"Annuler" = "Cancel";
+"Désinstallation interrompue" = "Uninstall interrupted";
+"Claude Notch est désinstallé" = "Claude Notch has been uninstalled";
+"Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage." = "All that’s left is to move Claude Notch from the Applications folder to the Trash. Claude Code sessions already open will forget it when they restart.";
+"Afficher dans le Finder" = "Show in Finder";
+"Quitter" = "Quit";
+
+/* Errors from settings.json */
+"settings.json invalide (%@) : rien n'a été modifié." = "Invalid settings.json (%@): nothing was changed.";
+"settings.json n'est pas un objet JSON : rien n'a été modifié." = "settings.json is not a JSON object: nothing was changed.";
+"La clé « hooks » de settings.json n'est pas un objet : rien n'a été modifié." = "The “hooks” key in settings.json is not an object: nothing was changed.";
+"hooks.%@ n'est pas une liste : rien n'a été modifié." = "hooks.%@ is not a list: nothing was changed.";
+"Script de hook introuvable dans l'app (Contents/Resources/%@) : rien n'a été modifié." = "Hook script not found in the app (Contents/Resources/%@): nothing was changed.";
+"Suppression de %@ impossible (%@)." = "Couldn’t delete %@ (%@).";
+"Lecture de %@ impossible (%@)." = "Couldn’t read %@ (%@).";
+"Copie du script de hook impossible (%@) : settings.json n'a pas été modifié." = "Couldn’t copy the hook script (%@): settings.json was not changed.";
+"Écriture de %@ impossible (%@)." = "Couldn’t write %@ (%@).";
+
+/* JSON parsing errors */
+"%@, ligne %d, colonne %d" = "%@, line %d, column %d";
+"BOM UTF-8 inattendu" = "unexpected UTF-8 BOM";
+"texte qui n'est pas de l'UTF-8 valide" = "text is not valid UTF-8";
+"contenu en trop après la valeur" = "extra content after the value";
+"imbrication trop profonde" = "nesting too deep";
+"valeur attendue" = "value expected";
+"clé entre guillemets attendue" = "quoted key expected";
+"« : » attendu" = "“:” expected";
+"« , » ou « } » attendu" = "“,” or “}” expected";
+"« , » ou « ] » attendu" = "“,” or “]” expected";
+"chaîne non terminée" = "unterminated string";
+"échappement invalide" = "invalid escape";
+"caractère de contrôle dans une chaîne" = "control character in a string";
+"moitié de paire de substitution isolée" = "lone surrogate";
+"échappement \\u invalide" = "invalid \\u escape";
+"échappement \\u incomplet" = "incomplete \\u escape";
+"nombre invalide" = "invalid number";

@@ -82,7 +82,7 @@ final class HookSetup: ObservableObject {
                 try installer.install()
             } catch {
                 Self.activateApp()
-                Self.showError(error, title: "Mise à jour des hooks impossible")
+                Self.showError(error, title: L("Mise à jour des hooks impossible"))
             }
             refresh()
         }
@@ -94,12 +94,12 @@ final class HookSetup: ObservableObject {
             Self.activateApp()
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Désinstaller Claude Notch ?"
-            alert.informativeText = "Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde "
+            alert.messageText = L("Désinstaller Claude Notch ?")
+            alert.informativeText = L("Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde "
                 + "horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh "
-                + "et le lancement à l'ouverture de session. L'app se fermera ensuite."
-            alert.addButton(withTitle: "Désinstaller")
-            alert.addButton(withTitle: "Annuler")
+                + "et le lancement à l'ouverture de session. L'app se fermera ensuite.")
+            alert.addButton(withTitle: L("Désinstaller"))
+            alert.addButton(withTitle: L("Annuler"))
             alert.buttons.first?.hasDestructiveAction = true
             guard alert.runModal() == .alertFirstButtonReturn else { return }
 
@@ -107,17 +107,17 @@ final class HookSetup: ObservableObject {
                 try installer.uninstall()
             } catch {
                 refresh()
-                Self.showError(error, title: "Désinstallation interrompue")
+                Self.showError(error, title: L("Désinstallation interrompue"))
                 return
             }
             LaunchAgent.setEnabled(false)
 
             let done = NSAlert()
-            done.messageText = "Claude Notch est désinstallé"
-            done.informativeText = "Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. "
-                + "Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage."
-            done.addButton(withTitle: "Afficher dans le Finder")
-            done.addButton(withTitle: "Quitter")
+            done.messageText = L("Claude Notch est désinstallé")
+            done.informativeText = L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. "
+                + "Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage.")
+            done.addButton(withTitle: L("Afficher dans le Finder"))
+            done.addButton(withTitle: L("Quitter"))
             if done.runModal() == .alertFirstButtonReturn {
                 NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
             }
@@ -240,7 +240,7 @@ struct OnboardingView: View {
                 }
                 .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(mode == .update ? "Mettre à jour Claude Notch" : "Bienvenue dans Claude Notch")
+                    Text(mode == .update ? L("Mettre à jour Claude Notch") : L("Bienvenue dans Claude Notch"))
                         .font(.system(size: 17, weight: .semibold))
                     Text("Tes sessions Claude Code, d'un coup d'œil.")
                         .font(.system(size: 12))
@@ -248,10 +248,10 @@ struct OnboardingView: View {
                 }
             }
             Text(mode == .update
-                 ? "Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch "
-                    + "continue de suivre tes sessions."
-                 : "Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son "
-                    + "état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac.")
+                 ? L("Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch "
+                    + "continue de suivre tes sessions.")
+                 : L("Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son "
+                    + "état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac."))
                 .font(.system(size: 12.5))
                 .foregroundColor(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
@@ -266,8 +266,8 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Glisse d'abord Claude Notch dans Applications")
                     .font(.system(size: 12.5, weight: .semibold))
-                Text("L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier "
-                     + "Applications, puis rouvre-la depuis là.")
+                Text(L("L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier "
+                       + "Applications, puis rouvre-la depuis là."))
                     .font(.system(size: 11.5))
                     .foregroundColor(Palette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -285,10 +285,10 @@ struct OnboardingView: View {
                 .tracking(0.6)
                 .foregroundColor(Palette.secondary)
             ChangeRow(icon: "doc.text", path: "~/.claude/settings.json",
-                      detail: "Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée "
-                        + "est faite à côté.")
+                      detail: L("Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée "
+                        + "est faite à côté."))
             ChangeRow(icon: "terminal", path: "~/.claude/hooks/claude-notch-hook.sh",
-                      detail: "Petit script qui relaie chaque événement à l'app, en local (127.0.0.1).")
+                      detail: L("Petit script qui relaie chaque événement à l'app, en local (127.0.0.1)."))
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -311,8 +311,9 @@ struct OnboardingView: View {
     }
 
     private var success: String {
-        (mode == .update ? "Hooks à jour." : "Hooks installés.")
-            + " Les sessions déjà ouvertes apparaîtront à leur prochain message."
+        mode == .update
+            ? L("Hooks à jour. Les sessions déjà ouvertes apparaîtront à leur prochain message.")
+            : L("Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message.")
     }
 
     private func message(_ text: String, icon: String, color: Color) -> some View {
@@ -336,7 +337,7 @@ struct OnboardingView: View {
             } else {
                 Button("Plus tard", action: onClose)
                     .keyboardShortcut(.cancelAction)
-                Button(mode == .update ? "Mettre à jour les hooks" : "Installer les hooks Claude Code") {
+                Button(mode == .update ? L("Mettre à jour les hooks") : L("Installer les hooks Claude Code")) {
                     if let error = onInstall(launchAtLogin) {
                         phase = .failed(error)
                     } else {

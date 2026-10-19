@@ -52,16 +52,16 @@ struct HookInstaller {
         var errorDescription: String? {
             switch self {
             case .invalidSettings(let detail):
-                return "settings.json invalide (\(detail)) : rien n'a été modifié."
+                return String(format: L("settings.json invalide (%@) : rien n'a été modifié."), detail)
             case .settingsNotObject:
-                return "settings.json n'est pas un objet JSON : rien n'a été modifié."
+                return L("settings.json n'est pas un objet JSON : rien n'a été modifié.")
             case .hooksNotObject:
-                return "La clé « hooks » de settings.json n'est pas un objet : rien n'a été modifié."
+                return L("La clé « hooks » de settings.json n'est pas un objet : rien n'a été modifié.")
             case .eventNotList(let event):
-                return "hooks.\(event) n'est pas une liste : rien n'a été modifié."
+                return String(format: L("hooks.%@ n'est pas une liste : rien n'a été modifié."), event)
             case .missingBundledHook:
-                return "Script de hook introuvable dans l'app (Contents/Resources/\(HookInstaller.hookFileName)) : "
-                    + "rien n'a été modifié."
+                return String(format: L("Script de hook introuvable dans l'app (Contents/Resources/%@) : "
+                                        + "rien n'a été modifié."), HookInstaller.hookFileName)
             case .io(let detail):
                 return detail
             }
@@ -123,7 +123,8 @@ struct HookInstaller {
             do {
                 try FileManager.default.removeItem(at: hookURL)
             } catch {
-                throw Failure.io("Suppression de \(hookURL.path) impossible (\(error.localizedDescription)).")
+                throw Failure.io(String(format: L("Suppression de %@ impossible (%@)."), hookURL.path,
+                                        error.localizedDescription))
             }
         }
         return outcome
@@ -271,7 +272,8 @@ struct HookInstaller {
         do {
             data = try Data(contentsOf: settingsURL)
         } catch {
-            throw Failure.io("Lecture de \(settingsURL.path) impossible (\(error.localizedDescription)).")
+            throw Failure.io(String(format: L("Lecture de %@ impossible (%@)."), settingsURL.path,
+                                    error.localizedDescription))
         }
         if let text = String(data: data, encoding: .utf8), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .object([])
@@ -295,8 +297,8 @@ struct HookInstaller {
             }
             try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hookURL.path)
         } catch {
-            throw Failure.io("Copie du script de hook impossible (\(error.localizedDescription)) : "
-                + "settings.json n'a pas été modifié.")
+            throw Failure.io(String(format: L("Copie du script de hook impossible (%@) : "
+                                              + "settings.json n'a pas été modifié."), error.localizedDescription))
         }
     }
 
@@ -315,7 +317,8 @@ struct HookInstaller {
         } catch let failure as Failure {
             throw failure
         } catch {
-            throw Failure.io("Écriture de \(settingsURL.path) impossible (\(error.localizedDescription)).")
+            throw Failure.io(String(format: L("Écriture de %@ impossible (%@)."), settingsURL.path,
+                                    error.localizedDescription))
         }
     }
 

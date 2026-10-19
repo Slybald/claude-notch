@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>fr</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Claude Notch</string>
 	<key>CFBundleExecutable</key>
@@ -12,6 +12,11 @@
 	<string>io.github.slybald.claudenotch</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>fr</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>ClaudeNotch</string>
 	<key>CFBundlePackageType</key>
@@ -25,11 +30,11 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSDesktopFolderUsageDescription</key>
-	<string>Claude Notch lance git-radar et course-sorter, qui lisent tes dépôts et tes dossiers de cours sur le Bureau.</string>
+	<string>Claude Notch runs optional companion tools that read files on your Desktop.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
-	<string>Claude Notch lance git-radar, qui vérifie que tes dépôts git dans Documents sont bien poussés.</string>
+	<string>Claude Notch runs optional companion tools that read files in your Documents folder.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
-	<string>Claude Notch lance course-sorter, qui range dans tes dossiers de cours les supports téléchargés.</string>
+	<string>Claude Notch runs optional companion tools that sort files from your Downloads folder.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>

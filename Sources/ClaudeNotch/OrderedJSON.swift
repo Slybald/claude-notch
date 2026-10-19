@@ -24,7 +24,7 @@ indirect enum OrderedJSON {
         let line: Int
         let column: Int
 
-        var description: String { "\(message), ligne \(line), colonne \(column)" }
+        var description: String { String(format: L("%@, ligne %d, colonne %d"), message, line, column) }
     }
 
     /// Clés comparées point de code par point de code, comme Python (pas d'équivalence Unicode canonique).
@@ -195,18 +195,20 @@ private struct Parser {
     }
 
     mutating func parseDocument() throws -> OrderedJSON {
-        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) { throw error("BOM UTF-8 inattendu", at: 0) }
-        guard String(bytes: bytes, encoding: .utf8) != nil else { throw error("texte qui n'est pas de l'UTF-8 valide", at: 0) }
+        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) { throw error(L("BOM UTF-8 inattendu"), at: 0) }
+        guard String(bytes: bytes, encoding: .utf8) != nil else {
+            throw error(L("texte qui n'est pas de l'UTF-8 valide"), at: 0)
+        }
         skipWhitespace()
         let value = try parseValue(depth: 0)
         skipWhitespace()
-        guard index == bytes.count else { throw error("contenu en trop après la valeur") }
+        guard index == bytes.count else { throw error(L("contenu en trop après la valeur")) }
         return value
     }
 
     private mutating func parseValue(depth: Int) throws -> OrderedJSON {
-        guard depth < Self.maxDepth else { throw error("imbrication trop profonde") }
-        guard index < bytes.count else { throw error("valeur attendue") }
+        guard depth < Self.maxDepth else { throw error(L("imbrication trop profonde")) }
+        guard index < bytes.count else { throw error(L("valeur attendue")) }
         switch bytes[index] {
         case UInt8(ascii: "{"): return try parseObject(depth: depth)
         case UInt8(ascii: "["): return try parseArray(depth: depth)
@@ -219,7 +221,7 @@ private struct Parser {
         case UInt8(ascii: "I"): return try literal("Infinity", .number("Infinity"))
         case UInt8(ascii: "-") where matches("-Infinity"): return try literal("-Infinity", .number("-Infinity"))
         case UInt8(ascii: "-"), UInt8(ascii: "0")...UInt8(ascii: "9"): return try parseNumber()
-        default: throw error("valeur attendue")
+        default: throw error(L("valeur attendue"))
         }
     }
 
@@ -234,11 +236,11 @@ private struct Parser {
             return .object(members)
         }
         while true {
-            guard peek == UInt8(ascii: "\"") else { throw error("clé entre guillemets attendue") }
+            guard peek == UInt8(ascii: "\"") else { throw error(L("clé entre guillemets attendue")) }
             let keyBytes = try parseStringBytes()
             let key = String(decoding: keyBytes, as: UTF8.self)
             skipWhitespace()
-            guard peek == UInt8(ascii: ":") else { throw error("« : » attendu") }
+            guard peek == UInt8(ascii: ":") else { throw error(L("« : » attendu")) }
             index += 1
             skipWhitespace()
             let value = try parseValue(depth: depth + 1)
@@ -257,7 +259,7 @@ private struct Parser {
                 index += 1
                 return .object(members)
             default:
-                throw error("« , » ou « } » attendu")
+                throw error(L("« , » ou « } » attendu"))
             }
         }
     }
@@ -281,7 +283,7 @@ private struct Parser {
                 index += 1
                 return .array(items)
             default:
-                throw error("« , » ou « ] » attendu")
+                throw error(L("« , » ou « ] » attendu"))
             }
         }
     }
@@ -297,7 +299,7 @@ private struct Parser {
         index += 1
         var out: [UInt8] = []
         while true {
-            guard index < bytes.count else { throw error("chaîne non terminée", at: start) }
+            guard index < bytes.count else { throw error(L("chaîne non terminée"), at: start) }
             let byte = bytes[index]
             switch byte {
             case UInt8(ascii: "\""):
@@ -305,7 +307,7 @@ private struct Parser {
                 return out
             case UInt8(ascii: "\\"):
                 index += 1
-                guard index < bytes.count else { throw error("chaîne non terminée", at: start) }
+                guard index < bytes.count else { throw error(L("chaîne non terminée"), at: start) }
                 let escape = bytes[index]
                 index += 1
                 switch escape {
@@ -320,10 +322,10 @@ private struct Parser {
                 case UInt8(ascii: "u"):
                     out.append(contentsOf: Array(String(try parseUnicodeEscape()).utf8))
                 default:
-                    throw error("échappement invalide", at: index - 2)
+                    throw error(L("échappement invalide"), at: index - 2)
                 }
             case 0x00..<0x20:
-                throw error("caractère de contrôle dans une chaîne")
+                throw error(L("caractère de contrôle dans une chaîne"))
             default:
                 out.append(byte)
                 index += 1
@@ -337,22 +339,22 @@ private struct Parser {
         let first = try hex4()
         var code = first
         if (0xD800...0xDBFF).contains(first) {
-            guard matches("\\u") else { throw error("moitié de paire de substitution isolée", at: escapeStart) }
+            guard matches("\\u") else { throw error(L("moitié de paire de substitution isolée"), at: escapeStart) }
             index += 2
             let second = try hex4()
             guard (0xDC00...0xDFFF).contains(second) else {
-                throw error("moitié de paire de substitution isolée", at: escapeStart)
+                throw error(L("moitié de paire de substitution isolée"), at: escapeStart)
             }
             code = 0x10000 + ((first - 0xD800) << 10) + (second - 0xDC00)
         } else if (0xDC00...0xDFFF).contains(first) {
-            throw error("moitié de paire de substitution isolée", at: escapeStart)
+            throw error(L("moitié de paire de substitution isolée"), at: escapeStart)
         }
-        guard let scalar = Unicode.Scalar(code) else { throw error("échappement \\u invalide", at: escapeStart) }
+        guard let scalar = Unicode.Scalar(code) else { throw error(L("échappement \\u invalide"), at: escapeStart) }
         return Character(scalar)
     }
 
     private mutating func hex4() throws -> UInt32 {
-        guard index + 4 <= bytes.count else { throw error("échappement \\u incomplet") }
+        guard index + 4 <= bytes.count else { throw error(L("échappement \\u incomplet")) }
         var value: UInt32 = 0
         for byte in bytes[index..<index + 4] {
             let digit: UInt8
@@ -360,7 +362,7 @@ private struct Parser {
             case UInt8(ascii: "0")...UInt8(ascii: "9"): digit = byte - UInt8(ascii: "0")
             case UInt8(ascii: "a")...UInt8(ascii: "f"): digit = byte - UInt8(ascii: "a") + 10
             case UInt8(ascii: "A")...UInt8(ascii: "F"): digit = byte - UInt8(ascii: "A") + 10
-            default: throw error("échappement \\u invalide")
+            default: throw error(L("échappement \\u invalide"))
             }
             value = value << 4 | UInt32(digit)
         }
@@ -377,7 +379,7 @@ private struct Parser {
         } else if isDigit(peek) {
             while isDigit(peek) { index += 1 }
         } else {
-            throw error("nombre invalide", at: start)
+            throw error(L("nombre invalide"), at: start)
         }
         if peek == UInt8(ascii: "."), index + 1 < bytes.count, isDigit(bytes[index + 1]) {
             index += 1
@@ -395,7 +397,7 @@ private struct Parser {
     }
 
     private mutating func literal(_ word: String, _ value: OrderedJSON) throws -> OrderedJSON {
-        guard matches(word) else { throw error("valeur attendue") }
+        guard matches(word) else { throw error(L("valeur attendue")) }
         index += word.utf8.count
         return value
     }

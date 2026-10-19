@@ -307,7 +307,8 @@ final class ToolsFeed: ObservableObject {
 extension ToolsFeed.Usage {
     /// « Aujourd'hui · 2 h 10 · 6 sessions »
     var text: String {
-        "Aujourd'hui · \(Self.duration(minutes: activeMinutes)) · \(sessions) session\(sessions > 1 ? "s" : "")"
+        let count = String(format: L(sessions, one: "%d session", other: "%d sessions"), sessions)
+        return [L("Aujourd'hui"), Self.duration(minutes: activeMinutes), count].joined(separator: " · ")
     }
 
     /// « mon-app 1 h 20 · api 40 min »
@@ -318,9 +319,9 @@ extension ToolsFeed.Usage {
 
     static func duration(minutes: Int) -> String {
         let total = max(0, minutes)
-        if total < 60 { return "\(total) min" }
+        if total < 60 { return String(format: L("%d min"), total) }
         let rest = total % 60
-        return rest == 0 ? "\(total / 60) h" : String(format: "%d h %02d", total / 60, rest)
+        return rest == 0 ? String(format: L("%d h"), total / 60) : String(format: L("%d h %02d"), total / 60, rest)
     }
 }
 
@@ -328,7 +329,8 @@ extension ToolsFeed.GitStatus {
     /// « Git · tout est poussé » ou « Git · 2 dépôts à traiter »
     var text: String {
         needsAttention == 0
-            ? "Git · tout est poussé"
-            : "Git · \(needsAttention) dépôt\(needsAttention > 1 ? "s" : "") à traiter"
+            ? L("Git · tout est poussé")
+            : String(format: L(needsAttention, one: "Git · %d dépôt à traiter",
+                               other: "Git · %d dépôts à traiter"), needsAttention)
     }
 }

@@ -66,7 +66,7 @@ struct ToolsSection: View {
                 .foregroundColor(Palette.primary)
                 .fixedSize()
             if !open, let last = feed.recentFiles.first {
-                Text("\(last.name) · \(SessionCard.relative(now.timeIntervalSince(last.date)))")
+                Text(verbatim: "\(last.name) · \(SessionCard.relative(now.timeIntervalSince(last.date)))")
                     .font(.system(size: 11))
                     .foregroundColor(Palette.secondary)
                     .lineLimit(1)
@@ -113,7 +113,7 @@ struct ToolsSection: View {
             }
             if git.repos.count > Self.maxRepos {
                 let rest = git.repos.count - Self.maxRepos
-                Text("et \(rest) autre\(rest > 1 ? "s" : "")")
+                Text(String(format: L(rest, one: "et %d autre", other: "et %d autres"), rest))
                     .font(.system(size: 11))
                     .foregroundColor(Palette.secondary)
                     .padding(.leading, 28)
@@ -212,7 +212,8 @@ struct GitPill: View {
         .background(Capsule().fill(color.opacity(0.14)))
         .contentShape(Capsule())
         .onTapGesture { if !clean { toggle() } }
-        .help("\(status.total) dépôt\(status.total > 1 ? "s" : "") suivi\(status.total > 1 ? "s" : "") par git-radar")
+        .help(String(format: L(status.total, one: "%d dépôt suivi par git-radar",
+                               other: "%d dépôts suivis par git-radar"), status.total))
     }
 }
 
@@ -243,10 +244,10 @@ struct RepoRow: View {
             Spacer(minLength: 8)
             HStack(spacing: 7) {
                 if repo.error != nil {
-                    badge("erreur", Palette.red)
+                    badge(L("erreur"), Palette.red)
                 }
                 if repo.noUpstream {
-                    badge("sans upstream", Palette.secondary)
+                    badge(L("sans upstream"), Palette.secondary)
                 }
                 if repo.ahead > 0 { badge("↑\(repo.ahead)", Palette.orange) }
                 if repo.behind > 0 { badge("↓\(repo.behind)", Palette.amber) }
@@ -281,10 +282,13 @@ struct RepoRow: View {
 
     private var helpText: String {
         var parts = [repo.path]
-        if repo.ahead > 0 { parts.append("\(repo.ahead) commit\(repo.ahead > 1 ? "s" : "") à pousser") }
-        if repo.behind > 0 { parts.append("\(repo.behind) commit\(repo.behind > 1 ? "s" : "") à récupérer") }
-        if repo.dirty > 0 { parts.append("\(repo.dirty) modifié\(repo.dirty > 1 ? "s" : "")") }
-        if repo.untracked > 0 { parts.append("\(repo.untracked) non suivi\(repo.untracked > 1 ? "s" : "")") }
+        func count(_ n: Int, one: String, other: String) {
+            if n > 0 { parts.append(String(format: L(n, one: one, other: other), n)) }
+        }
+        count(repo.ahead, one: "%d commit à pousser", other: "%d commits à pousser")
+        count(repo.behind, one: "%d commit à récupérer", other: "%d commits à récupérer")
+        count(repo.dirty, one: "%d modifié", other: "%d modifiés")
+        count(repo.untracked, one: "%d non suivi", other: "%d non suivis")
         if let error = repo.error { parts.append(error) }
         return parts.joined(separator: " · ")
     }

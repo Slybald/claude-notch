@@ -163,11 +163,12 @@ struct CollapsedEars: View {
 
     /// « 3/7 » (tâches), « 1 » (sessions) ou « 1·6 » avec les agents en orange.
     private var earText: Text {
-        guard let ears else { return Text("") }
+        guard let ears else { return Text(verbatim: "") }
         if let tasks = ears.tasks { return Text(tasks).foregroundColor(.white.opacity(0.85)) }
-        let sessions = Text("\(ears.sessions)").foregroundColor(.white.opacity(0.85))
+        let sessions = Text(verbatim: "\(ears.sessions)").foregroundColor(.white.opacity(0.85))
         guard ears.agents > 0 else { return sessions }
-        return sessions + Text("·").foregroundColor(Palette.secondary) + Text("\(ears.agents)").foregroundColor(Palette.orange)
+        return sessions + Text(verbatim: "·").foregroundColor(Palette.secondary)
+            + Text(verbatim: "\(ears.agents)").foregroundColor(Palette.orange)
     }
 }
 
@@ -378,7 +379,10 @@ struct ExpandedPanel: View {
             if untrackedCount > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle")
-                    Text("\(untrackedCount) session\(untrackedCount > 1 ? "s" : "") sans suivi — apparaîtra au prochain message")
+                    Text(String(format: L(untrackedCount,
+                                          one: "%d session sans suivi — apparaîtra au prochain message",
+                                          other: "%d sessions sans suivi — apparaîtront au prochain message"),
+                                untrackedCount))
                         .lineLimit(1)
                 }
                 .font(.system(size: 11))
@@ -417,12 +421,12 @@ struct ExpandedPanel: View {
                 case .working: GlyphSpinner(size: 13)
                 case .attention: PulsingHand(size: 12)
                 default:
-                    Text("✻")
+                    Text(verbatim: "✻")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(Palette.orange)
                         .frame(width: 17, height: 17)
                 }
-                Text("Claude")
+                Text(verbatim: "Claude")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Palette.primary)
             }
@@ -541,10 +545,10 @@ struct DesktopRow: View {
             Image(systemName: "macwindow")
                 .font(.system(size: 12))
                 .foregroundColor(Palette.secondary)
-            Text("Claude Desktop")
+            Text(verbatim: "Claude Desktop")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(Palette.primary)
-            Text(frontmost ? "Au premier plan" : "Ouvert")
+            Text(frontmost ? L("Au premier plan") : L("Ouvert"))
                 .font(.system(size: 11))
                 .foregroundColor(Palette.secondary)
             Spacer()
@@ -595,7 +599,7 @@ struct SessionCard: View {
                 }
                 if !session.activeAgents.isEmpty {
                     let count = session.activeAgents.count
-                    Text("\(count) agent\(count > 1 ? "s" : "")")
+                    Text(String(format: L(count, one: "%d agent", other: "%d agents"), count))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(Palette.orange)
                         .padding(.horizontal, 6)
@@ -655,7 +659,7 @@ struct SessionCard: View {
         return HStack(spacing: 8) {
             ProgressBar(fraction: total > 0 ? CGFloat(done) / CGFloat(total) : 0)
                 .frame(width: 72, height: 4)
-            Text("\(done)/\(total)")
+            Text(verbatim: "\(done)/\(total)")
                 .font(.system(size: 11, weight: .semibold).monospacedDigit())
                 .foregroundColor(.white.opacity(0.8))
             if let current = session.currentTask {
@@ -708,18 +712,18 @@ struct SessionCard: View {
 
     static func duration(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
-        if total < 60 { return "\(total) s" }
+        if total < 60 { return String(format: L("%d s"), total) }
         if total < 3600 { return String(format: "%d:%02d", total / 60, total % 60) }
         return String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
     }
 
     static func relative(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
-        if total < 10 { return "à l'instant" }
-        if total < 60 { return "il y a \(total) s" }
-        if total < 3600 { return "il y a \(total / 60) min" }
-        if total < 86_400 { return "il y a \(total / 3600) h" }
-        return "il y a \(total / 86_400) j"
+        if total < 10 { return L("à l'instant") }
+        if total < 60 { return String(format: L("il y a %d s"), total) }
+        if total < 3600 { return String(format: L("il y a %d min"), total / 60) }
+        if total < 86_400 { return String(format: L("il y a %d h"), total / 3600) }
+        return String(format: L("il y a %d j"), total / 86_400)
     }
 }
 
@@ -796,28 +800,32 @@ extension Session {
     var status: SessionStatus {
         switch phase {
         case .ready:
-            return SessionStatus(label: "Prête", detail: lastMessage, isCode: false, color: Palette.secondary)
+            return SessionStatus(label: L("Prête"), detail: lastMessage, isCode: false, color: Palette.secondary)
         case .thinking:
-            return SessionStatus(label: "Réfléchit…", detail: lastPrompt.map { "« \($0) »" }, isCode: false,
-                                 color: Palette.orange)
+            return SessionStatus(label: L("Réfléchit…"), detail: lastPrompt.map { String(format: L("« %@ »"), $0) },
+                                 isCode: false, color: Palette.orange)
         case .tool:
             let tool = currentTool
-            return SessionStatus(label: tool?.label ?? "Outil", detail: tool?.detail, isCode: tool?.isCode ?? false,
+            return SessionStatus(label: tool?.label ?? L("Outil"), detail: tool?.detail, isCode: tool?.isCode ?? false,
                                  color: Palette.orange)
         case .waitingPermission:
-            return SessionStatus(label: "Attend ta permission", detail: attentionText, isCode: true, color: Palette.amber)
+            return SessionStatus(label: L("Attend ta permission"), detail: attentionText, isCode: true,
+                                 color: Palette.amber)
         case .waitingAnswer:
-            return SessionStatus(label: "Attend ta réponse", detail: attentionText, isCode: false, color: Palette.amber)
+            return SessionStatus(label: L("Attend ta réponse"), detail: attentionText, isCode: false,
+                                 color: Palette.amber)
         case .planReview:
-            return SessionStatus(label: "Plan à valider", detail: attentionText, isCode: false, color: Palette.amber)
+            return SessionStatus(label: L("Plan à valider"), detail: attentionText, isCode: false, color: Palette.amber)
         case .done:
-            return SessionStatus(label: "Terminé", detail: lastMessage, isCode: false, color: Palette.green)
+            return SessionStatus(label: L("Terminé"), detail: lastMessage, isCode: false, color: Palette.green)
         case .error:
-            return SessionStatus(label: "Erreur", detail: errorText, isCode: false, color: Palette.red)
+            return SessionStatus(label: L("Erreur"), detail: errorText, isCode: false, color: Palette.red)
         case .compacting:
-            return SessionStatus(label: "Compacte le contexte", detail: nil, isCode: false, color: Palette.orange)
+            return SessionStatus(label: L("Compacte le contexte"), detail: nil, isCode: false,
+                                 color: Palette.orange)
         case .ended:
-            return SessionStatus(label: "Session terminée", detail: nil, isCode: false, color: Palette.secondary)
+            return SessionStatus(label: L("Session terminée"), detail: nil, isCode: false,
+                                 color: Palette.secondary)
         }
     }
 }

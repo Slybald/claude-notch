@@ -40,6 +40,11 @@ plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Inf
 plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
 cp "$ROOT/hooks/claude-notch-hook.sh" "$APP/Contents/Resources/claude-notch-hook.sh"
 chmod 755 "$APP/Contents/Resources/claude-notch-hook.sh"
+# Traductions (en.lproj, fr.lproj) : macOS affiche le français sur un système en français, l'anglais ailleurs.
+for LPROJ in "$ROOT"/Resources/*.lproj; do
+    plutil -lint -s "$LPROJ"/*.strings
+    cp -R "$LPROJ" "$APP/Contents/Resources/"
+done
 
 codesign --force --deep --sign - "$APP"
 echo "App prête : $APP (version $VERSION, $(lipo -archs "$APP/Contents/MacOS/ClaudeNotch"))"

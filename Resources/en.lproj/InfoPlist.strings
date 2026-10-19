@@ -1,0 +1,4 @@
+/* Claude Notch: English texts of Info.plist (privacy prompts). */
+"NSDesktopFolderUsageDescription" = "Claude Notch runs optional companion tools that read files on your Desktop.";
+"NSDocumentsFolderUsageDescription" = "Claude Notch runs optional companion tools that read files in your Documents folder.";
+"NSDownloadsFolderUsageDescription" = "Claude Notch runs optional companion tools that sort files from your Downloads folder.";

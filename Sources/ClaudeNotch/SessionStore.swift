@@ -111,7 +111,7 @@ struct Session: Identifiable, Equatable {
     var completedTaskCount: Int { tasks.filter { $0.status == .completed }.count }
     var currentTask: TaskItem? { tasks.first { $0.status == .inProgress } }
     /// Toutes les cartes sont des sessions Claude Code : l'étiquette dit où elles tournent.
-    var sourceLabel: String { source == .desktop ? "Claude Code (app)" : (hostName ?? "CLI") }
+    var sourceLabel: String { source == .desktop ? L("Claude Code (app)") : (hostName ?? "CLI") }
 
     mutating func absorb(_ context: ProcessContext) {
         if let pid = context.claudePid {
@@ -254,7 +254,7 @@ final class SessionStore: ObservableObject {
             beginTurn(&session, now: now)
             session.phase = .thinking
             if event.isTaskNotification {
-                session.lastPrompt = "résultat d'un agent en arrière-plan"
+                session.lastPrompt = L("résultat d'un agent en arrière-plan")
             } else if let prompt = event.prompt {
                 session.lastPrompt = ToolDescriber.firstLine(prompt, max: 90)
             }
@@ -331,7 +331,7 @@ final class SessionStore: ObservableObject {
         case "StopFailure":
             endTurn(&session, now: now)
             session.phase = .error
-            session.errorText = event.errorText ?? "erreur de l'API"
+            session.errorText = event.errorText ?? L("erreur de l'API")
 
         case "SubagentStart":
             if !event.isInternalAgent {
