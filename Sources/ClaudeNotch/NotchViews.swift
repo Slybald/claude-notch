@@ -480,7 +480,8 @@ struct DesktopRow: View {
                 .font(.system(size: 11))
                 .foregroundColor(Palette.secondary)
             Spacer()
-            Button(action: open) {
+            // Déjà devant : rien à ouvrir, un bouton sans effet visible laisserait croire à une panne.
+            if !frontmost {
                 Text("Ouvrir")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.9))
@@ -488,11 +489,12 @@ struct DesktopRow: View {
                     .padding(.vertical, 3)
                     .background(Capsule().fill(Color.white.opacity(0.12)))
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.03)))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onTapGesture { if !frontmost { open() } }
     }
 }
 
