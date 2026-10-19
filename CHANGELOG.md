@@ -20,8 +20,11 @@ First public release.
 - Click on a card: brings the host app to the front, or opens the exact session in Claude Desktop.
 - Optional tools section: recent files written by Claude, Git status, today's usage.
 - Local logs of written files and permission requests in `~/Library/Application Support/ClaudeNotch/`.
-- First-launch window that installs the hooks (backup of `settings.json`, existing hooks kept), and an
-  uninstall command in the **…** menu (« Désinstaller Claude Notch… »).
+- First-launch window that installs the hooks (backup of `settings.json`, existing hooks kept, key order
+  preserved), and an uninstall command in the **…** menu (**Uninstall Claude Notch…**).
+- Interface in English and French, following the system language.
+- Migration from early builds (`local.claudenotch`): the new version replaces the running one and keeps
+  the "open at login" setting.
 - Universal app (Apple silicon and Intel), macOS 13 or later, distributed as a DMG built by GitHub Actions
   from version tags.
 
