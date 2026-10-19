@@ -134,6 +134,23 @@ final class ToolsTests: XCTestCase {
 
     // MARK: - Lecture CF1
 
+    func testFileProjectFollowsTheFileNotAStaleCwd() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repo = root.appendingPathComponent("ClaudeNotch")
+        try FileManager.default.createDirectory(at: repo.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: repo.appendingPathComponent("Sources/App"), withIntermediateDirectories: true)
+        let other = root.appendingPathComponent("claude-usage").path
+
+        // Après un `cd` ailleurs : le dépôt du fichier, pas le cwd.
+        XCTAssertEqual(ActivityLog.projectName(forFile: repo.appendingPathComponent("Sources/App/x.swift").path, cwd: other),
+                       "ClaudeNotch")
+        // Sous le cwd : le projet du cwd, même dans un sous-dépôt.
+        XCTAssertEqual(ActivityLog.projectName(forFile: other + "/README.md", cwd: other), "claude-usage")
+        // Ni sous le cwd ni dans un dépôt : le dossier parent.
+        XCTAssertEqual(ActivityLog.projectName(forFile: root.appendingPathComponent("notes/a.md").path, cwd: other), "notes")
+    }
+
     func testRecentFilesParsing() throws {
         try fixtures.writeSample(now: now)
         let data = try Data(contentsOf: fixtures.paths.files)

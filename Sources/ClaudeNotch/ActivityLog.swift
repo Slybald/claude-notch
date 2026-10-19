@@ -99,7 +99,7 @@ final class ActivityLog {
             "path": path,
             "tool": tool,
             "session_id": event.sessionId ?? "",
-            "project": projectName(cwd),
+            "project": projectName(forFile: path, cwd: cwd),
             "cwd": cwd,
             "source": "live",
         ]
@@ -131,6 +131,21 @@ final class ActivityLog {
     /// Dernier composant du cwd, comme dans les autres outils.
     static func projectName(_ cwd: String) -> String {
         cwd.isEmpty ? "" : (cwd as NSString).lastPathComponent
+    }
+
+    /// Fichier sous le cwd : le projet du cwd. Ailleurs (Claude a écrit hors de son dossier, ou le cwd a changé
+    /// après un `cd`) : le dépôt git qui contient le fichier, sinon son dossier parent.
+    static func projectName(forFile path: String, cwd: String) -> String {
+        if !cwd.isEmpty, path.hasPrefix(cwd.hasSuffix("/") ? cwd : cwd + "/") { return projectName(cwd) }
+        var dir = (path as NSString).deletingLastPathComponent
+        for _ in 0..<12 where dir.count > 1 {
+            if FileManager.default.fileExists(atPath: (dir as NSString).appendingPathComponent(".git")) {
+                return (dir as NSString).lastPathComponent
+            }
+            dir = (dir as NSString).deletingLastPathComponent
+        }
+        let parent = ((path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+        return parent.isEmpty ? projectName(cwd) : parent
     }
 
     /// Les outils d'édition exigent un chemin absolu ; un chemin relatif est résolu depuis le cwd.
