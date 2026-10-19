@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum Palette {
@@ -164,37 +165,143 @@ struct IndicatorGlyph: View {
     }
 }
 
-/// Spinner à glyphes façon Claude Code. Ne tourne que s'il est affiché.
-struct GlyphSpinner: View {
+/// Spinner à glyphes façon Claude Code (· ✢ ✳ ✶ ✻ ✽).
+struct GlyphSpinner: NSViewRepresentable {
     var size: CGFloat = 13
-    var color: Color = Palette.orange
-    private static let glyphs = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"]
-    private static let interval = 0.12
 
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: Self.interval)) { context in
-            let index = Int(context.date.timeIntervalSinceReferenceDate / Self.interval) % Self.glyphs.count
-            Text(Self.glyphs[index])
-                .font(.system(size: size, weight: .bold))
-                .foregroundColor(color)
-                .frame(width: size + 4, height: size + 4)
-        }
+    func makeNSView(context: Context) -> AnimatedGlyphView { AnimatedGlyphView(style: .spinner, size: size) }
+    func updateNSView(_ view: AnimatedGlyphView, context: Context) {}
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: AnimatedGlyphView, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
     }
 }
 
-struct PulsingHand: View {
+/// Main ambre qui pulse : une permission ou une réponse est attendue.
+struct PulsingHand: NSViewRepresentable {
     var size: CGFloat = 13
-    @State private var bright = false
 
-    var body: some View {
-        Image(systemName: "hand.raised.fill")
-            .font(.system(size: size, weight: .semibold))
-            .foregroundColor(Palette.amber)
-            .opacity(bright ? 1 : 0.35)
-            .scaleEffect(bright ? 1.06 : 0.9)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { bright = true }
+    func makeNSView(context: Context) -> AnimatedGlyphView { AnimatedGlyphView(style: .pulsingHand, size: size) }
+    func updateNSView(_ view: AnimatedGlyphView, context: Context) {}
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: AnimatedGlyphView, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+}
+
+/// Animation confiée à Core Animation : images pré-rendues, animées par le serveur de rendu.
+/// Un TimelineView SwiftUI relançait tout le layout du NSHostingView à chaque image (~8 % de CPU).
+final class AnimatedGlyphView: NSView {
+    enum Style {
+        case spinner
+        case pulsingHand
+    }
+
+    private static let glyphs = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"]
+    private static let glyphInterval: CFTimeInterval = 0.12
+
+    private let style: Style
+    private let size: CGFloat
+    private let content = CALayer()
+
+    init(style: Style, size: CGFloat) {
+        self.style = style
+        self.size = size
+        super.init(frame: NSRect(x: 0, y: 0, width: size + 4, height: size + 4))
+        wantsLayer = true
+        content.contentsGravity = .center
+        layer?.addSublayer(content)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: size + 4, height: size + 4) }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        content.frame = bounds
+        CATransaction.commit()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        restart()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        restart()
+    }
+
+    private func restart() {
+        guard let window else {
+            content.removeAllAnimations()
+            return
+        }
+        let scale = window.backingScaleFactor
+        content.contentsScale = scale
+        content.removeAllAnimations()
+
+        switch style {
+        case .spinner:
+            let font = NSFont.systemFont(ofSize: size, weight: .bold)
+            let color = NSColor(Palette.orange)
+            let images = Self.glyphs.compactMap { glyph in
+                Self.render(scale: scale, box: bounds.size) { rect in
+                    let text = NSAttributedString(string: glyph, attributes: [.font: font, .foregroundColor: color])
+                    let textSize = text.size()
+                    text.draw(at: NSPoint(x: (rect.width - textSize.width) / 2, y: (rect.height - textSize.height) / 2))
+                }
             }
+            content.contents = images.first
+            let animation = CAKeyframeAnimation(keyPath: "contents")
+            animation.values = images
+            animation.calculationMode = .discrete
+            animation.duration = Self.glyphInterval * Double(images.count)
+            animation.repeatCount = .infinity
+            animation.isRemovedOnCompletion = false
+            content.add(animation, forKey: "glyphs")
+
+        case .pulsingHand:
+            let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .semibold)
+                .applying(NSImage.SymbolConfiguration(paletteColors: [NSColor(Palette.amber)]))
+            guard let symbol = NSImage(systemSymbolName: "hand.raised.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(configuration) else { return }
+            content.contents = Self.render(scale: scale, box: bounds.size) { rect in
+                let symbolSize = symbol.size
+                symbol.draw(in: NSRect(x: (rect.width - symbolSize.width) / 2, y: (rect.height - symbolSize.height) / 2,
+                                       width: symbolSize.width, height: symbolSize.height))
+            }
+            let opacity = CABasicAnimation(keyPath: "opacity")
+            opacity.fromValue = 0.35
+            opacity.toValue = 1
+            let scaleAnimation = CABasicAnimation(keyPath: "transform.scale")
+            scaleAnimation.fromValue = 0.9
+            scaleAnimation.toValue = 1.06
+            let group = CAAnimationGroup()
+            group.animations = [opacity, scaleAnimation]
+            group.duration = 0.7
+            group.autoreverses = true
+            group.repeatCount = .infinity
+            group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            group.isRemovedOnCompletion = false
+            content.add(group, forKey: "pulse")
+        }
+    }
+
+    /// Image bitmap à la bonne densité d'écran.
+    private static func render(scale: CGFloat, box: CGSize, draw: (NSRect) -> Void) -> CGImage? {
+        guard box.width > 0, box.height > 0,
+              let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(box.width * scale),
+                                            pixelsHigh: Int(box.height * scale), bitsPerSample: 8, samplesPerPixel: 4,
+                                            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        bitmap.size = box
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        draw(NSRect(origin: .zero, size: box))
+        NSGraphicsContext.restoreGraphicsState()
+        return bitmap.cgImage
     }
 }
 

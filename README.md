@@ -30,6 +30,8 @@ Développement : `swift build`, `swift test`, `./scripts/build.sh` (assemble `bu
 - Si l'app est fermée, le hook la relance au prochain `SessionStart` ou `UserPromptSubmit`.
 - Interruption par Esc : aucun hook ne part. L'app lit la fin du transcript toutes les 2 s
   pendant un tour et repasse la session en « Prête » si elle y trouve l'interruption.
+- Diagnostic : `GET http://127.0.0.1:47823/state` renvoie l'état des sessions et de la notch
+  en JSON (lecture seule, local uniquement).
 
 ## Limites
 
@@ -38,8 +40,13 @@ Développement : `swift build`, `swift test`, `./scripts/build.sh` (assemble `bu
 - Une session déjà ouverte avant l'installation n'apparaît qu'à son prochain message.
 - Après une permission accordée, la carte reste en « Attend ta permission » jusqu'à la fin
   de l'outil : aucun hook ne signale l'accord lui-même.
-- Liste de tâches : selon la doc, les outils de tâches ne sont actifs par défaut que sur
-  certains modèles. Sinon, `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
+- Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript,
+  la carte reste en « Réfléchit » jusqu'au prochain événement.
+- Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop
+  (Claude.app figure parmi ses ancêtres).
+- Liste de tâches : les outils TaskCreate/TaskUpdate ne sont actifs par défaut que sur
+  certains modèles (constaté : absents avec Sonnet). Sinon, `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
+  Claude Code supprime les fichiers de tâches quand toute la liste est terminée : la barre disparaît.
 
 ## Préférences (menu « … »)
 

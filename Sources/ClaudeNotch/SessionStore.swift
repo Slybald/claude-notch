@@ -137,10 +137,16 @@ final class SessionStore: ObservableObject {
     private var endedIds: Set<String> = []
     private var transcripts: [String: TranscriptCursor] = [:]
     private var timer: Timer?
+    private var tickCount = 0
 
+    /// Timer à 1 s : le transcript (Esc) est relu chaque seconde, le reste toutes les 2 s.
     func start() {
-        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.tick() }
-        timer.tolerance = 0.5
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.tickCount += 1
+            self.tick(full: self.tickCount % 2 == 0)
+        }
+        timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
@@ -460,30 +466,34 @@ final class SessionStore: ObservableObject {
         transcripts[session.id] = nil
     }
 
-    // MARK: - Timer 2 s
+    // MARK: - Timer
 
-    func tick(now: Date = Date()) {
+    /// `full` : mort des PID, nettoyage et rechargement des tâches (toutes les 2 s).
+    /// Sinon seulement la lecture des transcripts des tours en cours.
+    func tick(now: Date = Date(), full: Bool = true) {
         var updated = sessions
         for (id, original) in sessions {
             var session = original
-            if session.phase != .ended, let pid = session.claudePid,
-               !ProcessInspector.isAlive(pid, startedAt: session.claudeStart) {
-                markEnded(&session, at: now)
-            }
-            if session.phase == .ended {
-                if let ended = session.endedAt, now.timeIntervalSince(ended) > Self.endedLinger {
+            if full {
+                if session.phase != .ended, let pid = session.claudePid,
+                   !ProcessInspector.isAlive(pid, startedAt: session.claudeStart) {
+                    markEnded(&session, at: now)
+                }
+                if session.phase == .ended {
+                    if let ended = session.endedAt, now.timeIntervalSince(ended) > Self.endedLinger {
+                        updated[id] = nil
+                        continue
+                    }
+                } else if session.claudePid == nil, now.timeIntervalSince(session.lastActivity) > Self.orphanTimeout {
                     updated[id] = nil
+                    transcripts[id] = nil
                     continue
                 }
-            } else if session.claudePid == nil, now.timeIntervalSince(session.lastActivity) > Self.orphanTimeout {
-                updated[id] = nil
-                transcripts[id] = nil
-                continue
             }
             if session.inTurn, scanTranscript(&session) {
                 interrupt(&session, now: now)
             }
-            if session.phase != .ended, let tasks = TaskListLoader.load(for: session), tasks != session.tasks {
+            if full, session.phase != .ended, let tasks = TaskListLoader.load(for: session), tasks != session.tasks {
                 session.tasks = tasks
             }
             updated[id] = session
