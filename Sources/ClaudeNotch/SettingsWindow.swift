@@ -545,6 +545,13 @@ private struct AppearanceSettings: View {
                     ? L("De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et "
                         + "le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours).")
                     : L("De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)."))
+                if claudeEnabled {
+                    Toggle("Alterner Claude et les autres oreilles", isOn: $prefs.alternateEars)
+                        .disabled(!prefs.showEars)
+                    SettingsNote(L("Quand Claude travaille ou vient de finir, ses oreilles et celles d'un onglet "
+                        + "(lecture en cours, minuteur) se relaient toutes les 4 s. Quand Claude attend ta réponse, "
+                        + "il reste seul."))
+                }
                 Toggle("Teinter aussi la notch repliée", isOn: $prefs.tintCollapsed)
                 SettingsNote(L("Écrans sans encoche seulement : sur une vraie encoche, elle reste noire."))
             }

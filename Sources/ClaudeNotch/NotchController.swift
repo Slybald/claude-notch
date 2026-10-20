@@ -15,6 +15,31 @@ final class NotchViewModel: ObservableObject {
     @Published var reduceMotion = false
     /// Taille réelle de la forme noire, mesurée par la vue. Sert aux zones de survol.
     var contentSize: CGSize = .zero
+    /// La fenêtre est à l'écran (le contrôleur la masque : « Masquer la notch », plein écran « masquée »).
+    @Published var isShown = true
+
+    /// Intercalaire des oreilles repliées : monte d'un cran toutes les 4 s tant que `setEarsRotation(true)`.
+    @Published private(set) var earsStep = 0
+    /// Remplaçable dans les tests : une fausse minuterie, pas de 4 s réelles.
+    var earsTimer = EarsTimer.system
+    private var cancelEarsTimer: (() -> Void)?
+
+    var isRotatingEars: Bool { cancelEarsTimer != nil }
+
+    deinit { cancelEarsTimer?() }
+
+    /// Un seul timer, créé quand il y a au moins deux contenus à alterner sous les yeux (voir
+    /// `EarsRotation.shouldRotate`), annulé sinon. Chaque démarrage repart du premier contenu (Claude).
+    func setEarsRotation(_ on: Bool) {
+        guard on != isRotatingEars else { return }
+        cancelEarsTimer?()
+        cancelEarsTimer = nil
+        if earsStep != 0 { earsStep = 0 }
+        guard on else { return }
+        cancelEarsTimer = earsTimer.every(EarsRotation.interval, EarsRotation.tolerance) { [weak self] in
+            self?.earsStep &+= 1
+        }
+    }
 }
 
 struct NotchActions {
@@ -72,7 +97,7 @@ final class NotchController {
     private var hideWork: DispatchWorkItem?
     private var suppressUntilExit = false
     private var menuTracking = false
-    private var isShown = false
+    private var isShown = false { didSet { model.isShown = isShown } }
     private var cancellables = Set<AnyCancellable>()
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     /// Compteur du presse-papiers de glisser relevé au dernier clic dans une autre app (Étagère).
@@ -157,6 +182,7 @@ final class NotchController {
         panel.contentView = drop
 
         model.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        model.isShown = isShown
         updateGeometry()
         installMouseMonitors()
         observeChanges()
@@ -190,6 +216,9 @@ final class NotchController {
             "fullScreenBehavior": prefs.fullScreenBehavior.rawValue,
             "selectedTab": model.selectedTab,
             "modules": registry.debugInfo,
+            // Contenus des oreilles repliées (identifiants seulement) et alternance en cours.
+            "earsSlots": registry.earsSlots(claude: store.indicator).map { $0.id },
+            "earsRotating": model.isRotatingEars,
             "visibility": prefs.visibility.rawValue,
             "openTrigger": prefs.openTrigger.rawValue,
             "closeOnClickOutside": prefs.closeOnClickOutside,

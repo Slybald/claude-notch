@@ -382,6 +382,7 @@ final class ShellPreferencesTests: XCTestCase {
         prefs.panelShadow = false
         prefs.animationSpeed = .fast
         prefs.showEars = false
+        prefs.alternateEars = false
         // Hors périmètre : onglets et réglages des modules.
         prefs.tabOrder = ["timer", "claude"]
         prefs.tabEnabled = ["notes": false]
@@ -416,6 +417,8 @@ final class ShellPreferencesTests: XCTestCase {
             XCTAssertEqual(current.panelShadow, fresh.panelShadow)
             XCTAssertEqual(current.animationSpeed, fresh.animationSpeed)
             XCTAssertEqual(current.showEars, fresh.showEars)
+            XCTAssertEqual(current.alternateEars, fresh.alternateEars)
+            XCTAssertTrue(current.alternateEars)
 
             XCTAssertEqual(current.tabOrder, ["timer", "claude"])
             XCTAssertEqual(current.tabEnabled, ["notes": false])

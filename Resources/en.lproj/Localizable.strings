@@ -225,6 +225,8 @@
 "Afficher les oreilles" = "Show the Ears";
 "De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours)." = "On both sides of the notch: Claude's state (raised hand, spinner, check mark) and the number of sessions, or what a tab reports (timer, now playing).";
 "De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)." = "On both sides of the notch: what a tab reports (timer, now playing).";
+"Alterner Claude et les autres oreilles" = "Alternate Claude and the Other Ears";
+"Quand Claude travaille ou vient de finir, ses oreilles et celles d'un onglet (lecture en cours, minuteur) se relaient toutes les 4 s. Quand Claude attend ta réponse, il reste seul." = "While Claude is working or has just finished, its ears and a tab's ears (now playing, timer) take turns every 4 seconds. When Claude is waiting for you, it stays alone.";
 "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide." = "New versions come from GitHub releases and are only installed if their signature is valid.";
 "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic." = "Independent project, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.";
 "Licences" = "Licenses";
