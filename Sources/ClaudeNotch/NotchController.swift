@@ -743,10 +743,10 @@ final class NotchController {
         if prefs.isHidden(at: now()) { prefs.showAgain() } else { prefs.hide(.untilReactivated, now: now()) }
     }
 
-    /// Panneau ouvert au raccourci : ← → et ⌘1…⌘9 changent d'onglet, Échap ferme et rend le clavier. Ouvert au
-    /// survol ou au clic, rien ne change (les champs des modules gardent leurs touches).
-    private func handleKey(_ event: NSEvent) -> Bool {
-        guard openedByKeyboard, model.isExpanded, panel.isKeyWindow, !isCompact,
+    /// Panneau ouvert au raccourci : ← → et ⌘1…⌘9 changent d'onglet, Échap ferme et rend le clavier (plein écran
+    /// compact compris). Ouvert au survol ou au clic, rien ne change (les champs des modules gardent leurs touches).
+    func handleKey(_ event: NSEvent) -> Bool {
+        guard openedByKeyboard, model.isExpanded, panel.isKeyWindow,
               let command = NotchKeyCommand.parse(keyCode: event.keyCode, modifiers: event.modifierFlags,
                                                   editingText: panel.firstResponder is NSText) else { return false }
         if command == .close {
@@ -754,6 +754,8 @@ final class NotchController {
             collapse()
             return true
         }
+        // Plein écran compact : pas d'onglets.
+        guard !isCompact else { return false }
         let tabs = registry.enabled.map { $0.id }
         guard let index = command.target(current: tabs.firstIndex(of: model.selectedTab) ?? 0, count: tabs.count)
         else { return false }

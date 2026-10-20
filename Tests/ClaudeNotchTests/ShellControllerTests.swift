@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 import XCTest
 @testable import ClaudeNotch
@@ -103,6 +104,33 @@ final class ShellControllerTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         XCTAssertEqual(try XCTUnwrap(NotchController.windowServerLevel(of: notch.panel)),
                        NSWindow.Level.mainMenu.rawValue + 3)
+    }
+
+    /// Panneau ouvert au raccourci : Échap le ferme et rend le clavier, plein écran compact compris ; en compact,
+    /// les flèches ne changent pas d'onglet (il n'y en a pas).
+    func testEscapeClosesKeyboardPanelEvenInCompactFullScreen() throws {
+        func key(_ code: Int, _ notch: NotchController) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                           windowNumber: notch.panel.windowNumber, context: nil, characters: "",
+                                           charactersIgnoringModifiers: "", isARepeat: false,
+                                           keyCode: UInt16(code)))
+        }
+        for compact in [false, true] {
+            let prefs = Preferences(defaults: makeEphemeralDefaults(self))
+            prefs.hapticFeedback = false
+            // Seul l'onglet Claude : aucun autre module ne démarre à l'ouverture.
+            for id in ["media", "quicksettings", "shelf", "clipboard", "timer", "notes"] { prefs.tabEnabled[id] = false }
+            let notch = controller(prefs)
+            defer { notch.panel.orderOut(nil) }
+            notch.model.isFullScreen = compact
+            notch.togglePanelFromKeyboard()
+            XCTAssertTrue(notch.model.isExpanded)
+            XCTAssertTrue(notch.panel.isKeyWindow, "le raccourci donne le clavier au panneau")
+            if compact { XCTAssertFalse(notch.handleKey(try key(kVK_RightArrow, notch)), "pas d'onglets en compact") }
+            XCTAssertTrue(notch.handleKey(try key(kVK_Escape, notch)), compact ? "compact" : "normal")
+            XCTAssertFalse(notch.model.isExpanded, compact ? "compact" : "normal")
+            XCTAssertFalse(notch.panel.isKeyWindow, "clavier rendu")
+        }
     }
 
     /// La fenêtre (fixe) contient la largeur libre maximale, ses rayons et son ombre.
