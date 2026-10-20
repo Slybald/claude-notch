@@ -147,12 +147,12 @@ final class SnapshotTests: XCTestCase {
                        size: CGSize(width: 470, height: 640))
         }
         try onboarding(OnboardingView(mode: .install, inApplications: true, launchAtLogin: true,
-                                      onInstall: { _ in nil }, onClose: {}), "onboarding")
+                                      onInstall: { _ in nil }, onClose: { _ in }), "onboarding")
         try onboarding(OnboardingView(mode: .install, inApplications: false, launchAtLogin: true,
-                                      onInstall: { _ in nil }, onClose: {}), "onboarding-dmg")
+                                      onInstall: { _ in nil }, onClose: { _ in }), "onboarding-dmg")
         let error = HookInstaller.Failure.invalidSettings("« , » ou « } » attendu, ligne 3, colonne 8")
         try onboarding(OnboardingView(mode: .update, inApplications: true, launchAtLogin: false,
-                                      error: error.localizedDescription, onInstall: { _ in nil }, onClose: {}),
+                                      error: error.localizedDescription, onInstall: { _ in nil }, onClose: { _ in }),
                        "onboarding-error")
     }
 

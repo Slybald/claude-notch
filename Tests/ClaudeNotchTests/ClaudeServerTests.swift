@@ -261,6 +261,29 @@ final class ClaudeServerTests: XCTestCase {
         XCTAssertEqual(off?.status, 204)
     }
 
+    /// Onglet Claude désactivé : événements ignorés, `/permission` et `/inbox` rendus tout de suite (fail-open), le
+    /// reste du serveur inchangé. Réactivé : tout repart.
+    func testPausedServerIgnoresHooksAndFailsOpen() throws {
+        let fixture = try ReplyServerFixture(self)
+        fixture.server.isPaused = true
+        let event = ["hook_event_name": "Stop", "session_id": "s1"]
+        let started = Date()
+        XCTAssertEqual(RawHTTP.send(port: fixture.port, fixture.post("/hook", event))?.status, 204)
+        XCTAssertEqual(RawHTTP.send(port: fixture.port, fixture.post("/permission", permission))?.status, 204)
+        XCTAssertEqual(RawHTTP.send(port: fixture.port, fixture.post("/inbox", event))?.status, 204)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2, "rien n'est tenu")
+        XCTAssertEqual(RawHTTP.send(port: fixture.port, RawHTTP.request("GET", "/state",
+                                                                        headers: [fixture.host, fixture.token]))?.status,
+                       200, "le diagnostic reste")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        XCTAssertTrue(fixture.receivedEvents.isEmpty, "aucun événement relayé")
+        XCTAssertTrue(fixture.replies.requests.isEmpty && fixture.replies.waiting.isEmpty)
+
+        fixture.server.isPaused = false
+        XCTAssertEqual(RawHTTP.send(port: fixture.port, fixture.post("/hook", event))?.status, 204)
+        XCTAssertTrue(spin { fixture.receivedEvents.count == 1 }, "réactivé : relayé")
+    }
+
     /// Le hook meurt (« No » au terminal, SIGTERM) : la connexion se ferme, la carte disparaît.
     func testClosedConnectionDropsRequest() throws {
         let fixture = try ReplyServerFixture(self)

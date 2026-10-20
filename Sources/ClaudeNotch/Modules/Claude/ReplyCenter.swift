@@ -343,8 +343,8 @@ final class ReplyCenter: ObservableObject {
         waitersChanged()
     }
 
-    /// Réglage coupé : tout est rendu au terminal.
-    private func releaseAll() {
+    /// Réglage coupé ou onglet Claude désactivé : tout est rendu au terminal.
+    func releaseAll() {
         let held = requests
         let open = waiters
         requests = []

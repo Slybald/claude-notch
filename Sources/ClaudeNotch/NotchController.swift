@@ -607,10 +607,13 @@ final class NotchController {
     /// « Masquer la notch » en cours.
     private var hiddenByUser: Bool { prefs.isHidden(at: now()) }
 
+    /// Sans l'onglet Claude, seules les oreilles des modules comptent (« Quand Claude est ouvert » vaut « Toujours »).
     private var shouldShow: Bool {
-        NotchVisibilityRule.shouldShow(prefs.visibility, NotchVisibilityRule.Inputs(
-            claudeOpen: monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions,
-            claudeActive: store.indicator != .none,
+        let claude = registry.isClaudeEnabled
+        let mode = prefs.visibility.effective(claudeEnabled: claude)
+        return NotchVisibilityRule.shouldShow(mode, NotchVisibilityRule.Inputs(
+            claudeOpen: claude && (monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions),
+            claudeActive: claude && store.indicator != .none,
             moduleEars: registry.moduleEars != nil,
             onDemand: shownOnDemand,
             expanded: model.isExpanded,

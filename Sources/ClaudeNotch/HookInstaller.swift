@@ -101,6 +101,23 @@ struct HookInstaller {
                       bundledHook: Bundle.main.url(forResource: "claude-notch-hook", withExtension: "sh"))
     }
 
+    /// Claude Code présent sur ce Mac : `~/.claude` ou `$CLAUDE_CONFIG_DIR` existe. Des hooks de Claude Notch déjà
+    /// posés vivent dans `~/.claude` : ils sont couverts.
+    static func claudeCodePresent(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        var paths = [home.appendingPathComponent(".claude").path]
+        if let custom = environment["CLAUDE_CONFIG_DIR"], !custom.isEmpty {
+            paths.append((custom as NSString).expandingTildeInPath)
+        }
+        return paths.contains { path in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
+        }
+    }
+
+    /// Détection réelle, jamais sous XCTest : un test ne dépend pas du Mac qui le lance.
+    static var claudeCodeOnThisMac: Bool { NSClassFromString("XCTestCase") == nil && claudeCodePresent() }
+
     var settingsURL: URL { configDirectory.appendingPathComponent("settings.json") }
     var hookURL: URL { configDirectory.appendingPathComponent("hooks").appendingPathComponent(Self.hookFileName) }
     /// Chemin absolu entre guillemets, comme hooks_config.py.

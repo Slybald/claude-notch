@@ -38,6 +38,16 @@ enum NotchVisibility: String, CaseIterable, Identifiable {
     case duringActivity
 
     var id: String { rawValue }
+
+    /// Onglet Claude désactivé : « Quand Claude est ouvert » n'a plus de sens, il n'est plus proposé…
+    static func choices(claudeEnabled: Bool) -> [NotchVisibility] {
+        claudeEnabled ? allCases : allCases.filter { $0 != .whenClaudeOpen }
+    }
+
+    /// … et vaut « Toujours » (le réglage est gardé pour le jour où l'onglet revient).
+    func effective(claudeEnabled: Bool) -> NotchVisibility {
+        self == .whenClaudeOpen && !claudeEnabled ? .always : self
+    }
 }
 
 /// Ce qui déplie le panneau.
@@ -139,6 +149,10 @@ final class Preferences: ObservableObject {
         /// Ancien booléen « Toujours visible », lu seulement pour la migration vers `visibility`.
         static let alwaysVisible = "alwaysVisible"
         static let visibility = "visibility.mode"
+        /// Témoin de la réparation unique du défaut de visibilité enregistré par la 1.2.0.
+        static let visibilityRepaired = "visibility.defaultFixed121"
+        /// Fenêtre de bienvenue déjà montrée (ou inutile : hooks posés par une version précédente).
+        static let welcomeShown = "onboarding.welcomeShown"
         static let hiddenUntil = "visibility.hiddenUntil"
         static let autoUpdate = "autoUpdate"
         static let openTrigger = "hover.trigger"
@@ -339,9 +353,7 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(replyFromNotch, forKey: Key.replyFromNotch) }
     }
 
-    /// `previousInstall` : une version antérieure tournait déjà sur ce Mac (nil : détection réelle, seulement pour
-    /// les réglages de l'app hors tests).
-    init(defaults: UserDefaults = .standard, previousInstall: Bool? = nil) {
+    init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         func double(_ key: String, _ fallback: Double, _ range: ClosedRange<Double>) -> Double {
             let value = defaults.object(forKey: key) as? Double ?? fallback
@@ -350,13 +362,20 @@ final class Preferences: ObservableObject {
         func choice<T: RawRepresentable>(_ key: String, _ fallback: T) -> T where T.RawValue == String {
             defaults.string(forKey: key).flatMap(T.init) ?? fallback
         }
-        let storedVisibility = defaults.string(forKey: Key.visibility).flatMap(NotchVisibility.init)
-        let initialVisibility = storedVisibility ?? Self.migratedVisibility(
-            alwaysVisible: defaults.object(forKey: Key.alwaysVisible) as? Bool,
-            previousInstall: previousInstall ?? (defaults == .standard && Self.isUpdateFromEarlierVersion()))
+        let legacyAlwaysVisible = defaults.object(forKey: Key.alwaysVisible) as? Bool
+        var initialVisibility = defaults.string(forKey: Key.visibility).flatMap(NotchVisibility.init)
+            ?? Self.migratedVisibility(alwaysVisible: legacyAlwaysVisible)
+        // Réparation unique : la 1.2.0 a enregistré « quand Claude est ouvert » d'elle-même chez qui avait déjà les
+        // hooks. Sans l'ancienne clé, ce n'était donc pas un choix : retour à « toujours ». Compromis assumé : qui
+        // l'aurait choisi exprès pendant la courte vie de la 1.2.0 est remis à « toujours » une fois.
+        if defaults.object(forKey: Key.visibilityRepaired) == nil {
+            if initialVisibility == .whenClaudeOpen, legacyAlwaysVisible == nil {
+                initialVisibility = .always
+                defaults.set(initialVisibility.rawValue, forKey: Key.visibility)
+            }
+            defaults.set(true, forKey: Key.visibilityRepaired)
+        }
         visibility = initialVisibility
-        // Décidé une fois : sinon les hooks posés au premier lancement feraient changer le défaut au lancement suivant.
-        if storedVisibility == nil { defaults.set(initialVisibility.rawValue, forKey: Key.visibility) }
         hiddenUntil = defaults.object(forKey: Key.hiddenUntil) as? Date
         autoUpdate = defaults.object(forKey: Key.autoUpdate) as? Bool ?? true
         launchAtLogin = LaunchAgent.isEnabled
@@ -394,21 +413,23 @@ final class Preferences: ObservableObject {
         replyFromNotch = defaults.bool(forKey: Key.replyFromNotch)
     }
 
-    /// Ancien « Toujours visible » : vrai → toujours, faux → quand Claude est ouvert. Jamais réglé : une mise à jour
-    /// garde le comportement validé des versions 1.1 et avant (quand Claude est ouvert), une installation neuve
-    /// montre toujours la notch (ses onglets servent sans Claude).
-    static func migratedVisibility(alwaysVisible: Bool?, previousInstall: Bool) -> NotchVisibility {
-        switch alwaysVisible {
-        case true?: return .always
-        case false?: return .whenClaudeOpen
-        case nil: return previousInstall ? .whenClaudeOpen : .always
-        }
+    /// Ancien « Toujours visible » : vrai → toujours, faux → quand Claude est ouvert, jamais réglé → toujours (les
+    /// onglets servent sans Claude).
+    static func migratedVisibility(alwaysVisible: Bool?) -> NotchVisibility {
+        alwaysVisible == false ? .whenClaudeOpen : .always
     }
 
-    /// Hooks déjà posés par une version précédente (seule trace laissée à coup sûr par la 1.1). Jamais sous XCTest.
-    private static func isUpdateFromEarlierVersion() -> Bool {
-        guard NSClassFromString("XCTestCase") == nil else { return false }
-        return [.installed, .outdated, .scriptOutdated].contains(HookInstaller.standard.status())
+    /// Bienvenue déjà montrée, ou rendue inutile par des hooks posés par une version précédente.
+    var welcomeShown: Bool {
+        get { defaults.bool(forKey: Key.welcomeShown) }
+        set { defaults.set(newValue, forKey: Key.welcomeShown) }
+    }
+
+    /// Onglet Claude, décidé une fois puis enregistré : activé seulement si Claude Code est présent sur ce Mac
+    /// (lu seulement s'il le faut). Ensuite, seul l'utilisateur le change (Réglages › Onglets).
+    func decideClaudeTab(claudeCodePresent: () -> Bool) {
+        guard tabEnabled[ModuleRegistry.claudeId] == nil else { return }
+        tabEnabled[ModuleRegistry.claudeId] = claudeCodePresent()
     }
 
     /// Largeur du panneau déplié : demi-largeur en plein écran compact, sinon la largeur choisie.

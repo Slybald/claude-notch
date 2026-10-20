@@ -1,7 +1,8 @@
 import AppKit
 import Combine
 
-/// Surveille Claude Desktop (NSWorkspace) et les processus `claude` du CLI (scan toutes les 2 s).
+/// Surveille Claude Desktop (NSWorkspace) et les processus `claude` du CLI (scan toutes les 2 s), seulement tant
+/// que l'onglet Claude est activé (`AppCore`).
 final class ClaudeMonitor: ObservableObject {
     @Published private(set) var desktopRunning = false
     @Published private(set) var desktopFrontmost = false
@@ -15,6 +16,7 @@ final class ClaudeMonitor: ObservableObject {
     private var observers: [NSObjectProtocol] = []
 
     func start() {
+        guard timer == nil else { return }
         refreshDesktop()
         let center = NSWorkspace.shared.notificationCenter
         let names: [Notification.Name] = [
@@ -36,6 +38,18 @@ final class ClaudeMonitor: ObservableObject {
         self.timer = timer
     }
 
+    /// Plus de scan ni d'observateur ; l'état retombe à « rien d'ouvert ».
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers = []
+        if desktopRunning { desktopRunning = false }
+        if desktopFrontmost { desktopFrontmost = false }
+        if !cliPids.isEmpty { cliPids = [] }
+        if !desktopPids.isEmpty { desktopPids = [] }
+    }
+
     private func refreshDesktop() {
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: ProcessInspector.desktopBundleId)
             .contains { !$0.isTerminated }
@@ -46,7 +60,8 @@ final class ClaudeMonitor: ObservableObject {
 
     private func scan() {
         scanner.scan { [weak self] cli, desktop in
-            guard let self else { return }
+            // Arrêté pendant le scan : son résultat est jeté.
+            guard let self, self.timer != nil else { return }
             if cli != self.cliPids { self.cliPids = cli }
             if desktop != self.desktopPids { self.desktopPids = desktop }
         }

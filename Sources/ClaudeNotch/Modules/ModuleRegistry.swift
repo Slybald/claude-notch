@@ -18,7 +18,6 @@ extension ModuleRegistry {
 
 /// Les onglets de la notch : ordre et activation (lus dans les réglages), cycle de vie, oreilles des modules.
 final class ModuleRegistry: ObservableObject {
-    /// Le module Claude ne se désactive pas : c'est la raison d'être de l'app.
     static let claudeId = "claude"
 
     /// Tous les modules connus, dans l'ordre par défaut.
@@ -64,15 +63,16 @@ final class ModuleRegistry: ObservableObject {
     }
 
     func isEnabled(_ id: String) -> Bool {
-        if id == Self.claudeId { return true }
         guard let module = module(id) else { return false }
         return prefs.tabEnabled[id] ?? module.isEnabledByDefault
     }
 
     func setEnabled(_ id: String, _ isOn: Bool) {
-        guard id != Self.claudeId else { return }
         prefs.tabEnabled[id] = isOn
     }
+
+    /// Onglet Claude activé : sessions, hooks, processus `claude` ; désactivé, rien de Claude ne tourne ni ne s'affiche.
+    var isClaudeEnabled: Bool { isEnabled(Self.claudeId) }
 
     /// Glisser-déposer de la fenêtre de réglages (indices dans `ordered`).
     func move(from source: IndexSet, to destination: Int) {
@@ -88,11 +88,11 @@ final class ModuleRegistry: ObservableObject {
         reconcile()
     }
 
-    /// Onglet affiché à l'ouverture : Claude s'il attend l'utilisateur (les oreilles montraient la main),
-    /// sinon le dernier utilisé ou l'onglet par défaut des réglages, s'il est encore activé.
+    /// Onglet affiché à l'ouverture : Claude s'il attend l'utilisateur (les oreilles montraient la main) et qu'il est
+    /// activé, sinon le dernier utilisé ou l'onglet par défaut des réglages s'il est encore activé, sinon le premier.
     func initialTab(claudeNeedsAttention: Bool) -> String {
         let ids = enabled.map { $0.id }
-        if claudeNeedsAttention { return Self.claudeId }
+        if claudeNeedsAttention, ids.contains(Self.claudeId) { return Self.claudeId }
         let wanted = prefs.defaultTab == Preferences.lastTabChoice ? prefs.lastTab : prefs.defaultTab
         return ids.contains(wanted) ? wanted : (ids.first ?? Self.claudeId)
     }
