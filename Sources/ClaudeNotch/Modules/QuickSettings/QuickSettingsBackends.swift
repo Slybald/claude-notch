@@ -234,22 +234,31 @@ final class SystemPowerMode: PowerModeBackend {
     private let run: SystemProcess.Runner
     private let ruleExists: () -> Bool
     private let userName: () -> String
-    /// sudo a refusé la règle pendant cette session : on ne l'essaie plus avant qu'elle soit redonnée.
+    private let defaults: UserDefaults
+    /// sudo a refusé la règle pendant cette session : on ne l'essaie plus avant qu'elle soit reposée.
     private var ruleRefused = false
 
     /// Les paramètres servent aux tests : aucun processus, aucun fichier système réels.
     init(run: @escaping SystemProcess.Runner = { SystemProcess.run($0, $1, timeout: $2) },
          ruleExists: @escaping () -> Bool = { LowPowerAuthorization.isInstalled },
-         userName: @escaping () -> String = NSUserName) {
+         userName: @escaping () -> String = NSUserName,
+         defaults: UserDefaults = .standard) {
         self.run = run
         self.ruleExists = ruleExists
         self.userName = userName
+        self.defaults = defaults
+    }
+
+    /// Poser la règle à la prochaine bascule (vrai tant que l'utilisateur ne l'a pas retirée).
+    private var autoAuthorize: Bool {
+        get { defaults.object(forKey: LowPowerAuthorization.autoAuthorizeKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: LowPowerAuthorization.autoAuthorizeKey) }
     }
 
     var isLowPowerEnabled: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }
 
     var authorization: LowPowerAuthorizationState {
-        guard ruleExists() else { return .none }
+        guard ruleExists() else { return autoAuthorize ? .onFirstUse : .none }
         return ruleRefused ? .refused : .granted
     }
 
@@ -262,11 +271,19 @@ final class SystemPowerMode: PowerModeBackend {
         }
     }
 
-    /// `pmset` exige root. Avec la règle sudoers : `sudo -n`, sans fenêtre. Sans règle, ou si sudo la refuse :
-    /// AppleScript affiche la fenêtre d'autorisation du système (Touch ID ou mot de passe). Les commandes sont des
-    /// constantes, sans texte venu de l'extérieur.
+    /// `pmset` exige root. Avec la règle sudoers : `sudo -n`, sans fenêtre. Sinon, AppleScript affiche la fenêtre
+    /// d'autorisation du système (Touch ID ou mot de passe), qui pose aussi la règle (sauf si l'utilisateur l'a
+    /// retirée) : un mot de passe au premier clic, plus jamais ensuite. Les commandes sont des constantes, sans texte
+    /// venu de l'extérieur (le nom d'utilisateur est validé par `ruleContents`).
     func setLowPower(_ on: Bool, completion: @escaping (Result<LowPowerWrite, QuickSettingsFailure>) -> Void) {
         let useRule = authorization == .granted
+        let rule = autoAuthorize ? LowPowerAuthorization.ruleContents(forUser: userName()) : nil
+        let shell = rule.map { LowPowerAuthorization.pmsetAndInstallShellCommand(lowPower: on, ruleContents: $0) }
+            ?? LowPowerAuthorization.pmsetShellCommand(lowPower: on)
+        let prompt = rule == nil
+            ? L("Claude Notch veut changer l'économie d'énergie.", table: "QuickSettings")
+            : L("Claude Notch veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage.",
+                table: "QuickSettings")
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             if useRule {
                 let output = run(LowPowerAuthorization.sudoPath, LowPowerAuthorization.sudoArguments(lowPower: on), 15)
@@ -274,11 +291,13 @@ final class SystemPowerMode: PowerModeBackend {
                     return DispatchQueue.main.async { completion(.success(.done)) }
                 }
             }
-            let result = runAsAdministrator(LowPowerAuthorization.pmsetShellCommand(lowPower: on))
+            let result = runAsAdministrator(shell, prompt: prompt)
             DispatchQueue.main.async { [self] in
-                // Le mot de passe a marché là où la règle a échoué : la règle est à redonner.
-                if useRule, case .success = result { ruleRefused = true }
-                completion(result.map { useRule ? .authorizationRefused : .done })
+                guard case .success = result else { return completion(result.map { .done }) }
+                // Règle (re)posée dans la même fenêtre : sudo sera réessayé à la prochaine bascule. Sans pose, une
+                // règle que sudo a refusée est à redonner à la main.
+                ruleRefused = rule == nil && useRule
+                completion(.success(ruleRefused ? .authorizationRefused : .done))
             }
         }
     }
@@ -290,7 +309,7 @@ final class SystemPowerMode: PowerModeBackend {
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             let result = runAsAdministrator(LowPowerAuthorization.installShellCommand(ruleContents: contents))
             DispatchQueue.main.async { [self] in
-                if case .success = result { ruleRefused = false }
+                if case .success = result { ruleRefused = false; autoAuthorize = true }
                 completion(result)
             }
         }
@@ -300,15 +319,15 @@ final class SystemPowerMode: PowerModeBackend {
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             let result = runAsAdministrator(LowPowerAuthorization.removeShellCommand)
             DispatchQueue.main.async { [self] in
-                if case .success = result { ruleRefused = false }
+                if case .success = result { ruleRefused = false; autoAuthorize = false }
                 completion(result)
             }
         }
     }
 
     /// La fenêtre d'autorisation du système, via AppleScript (hors du fil principal).
-    private func runAsAdministrator(_ shell: String) -> Result<Void, QuickSettingsFailure> {
-        let script = LowPowerAuthorization.administratorScript(running: shell)
+    private func runAsAdministrator(_ shell: String, prompt: String? = nil) -> Result<Void, QuickSettingsFailure> {
+        let script = LowPowerAuthorization.administratorScript(running: shell, prompt: prompt)
         guard let output = run("/usr/bin/osascript", ["-e", script], 120) else {
             return .failure(QuickSettingsFailure(.failed))
         }

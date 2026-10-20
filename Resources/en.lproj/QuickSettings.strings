@@ -45,7 +45,6 @@
 "Rien à restaurer" = "Nothing to restore";
 "Écran allumé" = "Screen on";
 "Écran + Concentration" = "Screen + Focus";
-"Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes." = "Low Power Mode and scenes ask for Touch ID or your password.";
 "Fermer" = "Close";
 "Ouvrir Réglages Système" = "Open System Settings";
 "Ouvrir Raccourcis" = "Open Shortcuts";
@@ -83,9 +82,6 @@
 "+%d autre" = "+%d more";
 "+%d autres" = "+%d more";
 "Active ou coupe l'économie d'énergie, sans mot de passe." = "Turns Low Power Mode on or off, without a password.";
-"Ne plus demander" = "Stop asking";
-"La redonner" = "Grant it again";
-"L'autorisation sans mot de passe ne marche plus." = "The no-password authorization no longer works.";
 "Ajoute une règle système limitée à l'activation et la désactivation de l'économie d'énergie." = "Adds a system rule limited to turning Low Power Mode on and off.";
 "Normal rétablit l'état d'avant les scènes." = "Normal restores the state from before the scenes.";
 "Redonner l'autorisation" = "Grant authorization again";
@@ -100,3 +96,7 @@
 "Autorisation : %@" = "Authorization: %@";
 "Autorisation : installation impossible." = "Authorization: can't install the rule.";
 "Autorisation : retrait impossible." = "Authorization: can't remove the rule.";
+"Claude Notch veut changer l'économie d'énergie." = "Claude Notch wants to change Low Power Mode.";
+"Claude Notch veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage." = "Claude Notch wants to change Low Power Mode. Your password will not be asked again for this setting.";
+"Touch ID ou ton mot de passe une seule fois, au premier changement." = "Touch ID or your password once, on the first change.";
+"Mot de passe demandé une seule fois, au premier changement" = "Password asked once, on the first change";

@@ -46,8 +46,12 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         }
     }
 
-    private func power(_ runner: ScriptedRunner, ruleInstalled: Bool = false, user: String = "alice") -> SystemPowerMode {
-        SystemPowerMode(run: runner.run, ruleExists: { ruleInstalled }, userName: { user })
+    /// `autoAuthorize` faux : l'utilisateur a retiré la règle, le mot de passe est demandé à chaque bascule.
+    private func power(_ runner: ScriptedRunner, ruleInstalled: Bool = false, user: String = "alice",
+                       autoAuthorize: Bool = false) -> SystemPowerMode {
+        let defaults = makeEphemeralDefaults(self)
+        defaults.set(autoAuthorize, forKey: LowPowerAuthorization.autoAuthorizeKey)
+        return SystemPowerMode(run: runner.run, ruleExists: { ruleInstalled }, userName: { user }, defaults: defaults)
     }
 
     private func write(_ mode: SystemPowerMode, _ on: Bool) throws -> Result<LowPowerWrite, QuickSettingsFailure> {
@@ -92,9 +96,15 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         let prefix = "do shell script \""
         let suffix = "\" with administrator privileges"
         guard script.hasPrefix(prefix), script.hasSuffix(suffix) else { return nil }
+        var literal = script.dropFirst(prefix.count).dropLast(suffix.count)
+        // Texte de la fenêtre d'autorisation : `" with prompt "…` après la commande (un guillemet non protégé).
+        if let prompt = literal.range(of: "\" with prompt \"", options: .backwards),
+           literal[..<prompt.lowerBound].last != "\\" {
+            literal = literal[..<prompt.lowerBound]
+        }
         var result = ""
         var escaping = false
-        for character in script.dropFirst(prefix.count).dropLast(suffix.count) {
+        for character in literal {
             if escaping {
                 switch character {
                 case "n": result.append("\n")
@@ -334,10 +344,8 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         XCTAssertEqual(try write(mode, true), .success(.done))
         XCTAssertEqual(try write(mode, false), .success(.done))
         XCTAssertTrue(runner.sudoCalls.isEmpty, "sans règle, sudo n'est pas essayé")
-        XCTAssertEqual(runner.scripts, [
-            "do shell script \"/usr/bin/pmset -a lowpowermode 1\" with administrator privileges",
-            "do shell script \"/usr/bin/pmset -a lowpowermode 0\" with administrator privileges",
-        ])
+        XCTAssertEqual(runner.scripts.map(shellCommand(inScript:)),
+                       ["/usr/bin/pmset -a lowpowermode 1", "/usr/bin/pmset -a lowpowermode 0"])
     }
 
     func testWithTheRuleNoPromptIsShown() throws {
@@ -360,7 +368,7 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
 
         XCTAssertEqual(try write(mode, true), .success(.authorizationRefused), "réussi, mais avec le mot de passe")
         XCTAssertEqual(runner.calls.map(\.path), ["/usr/bin/sudo", "/usr/bin/osascript"])
-        XCTAssertEqual(runner.scripts, ["do shell script \"/usr/bin/pmset -a lowpowermode 1\" with administrator privileges"])
+        XCTAssertEqual(runner.scripts.map(shellCommand(inScript:)), ["/usr/bin/pmset -a lowpowermode 1"])
         XCTAssertEqual(mode.authorization, .refused)
 
         XCTAssertEqual(try write(mode, false), .success(.done))
@@ -491,10 +499,69 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
 
     func testAuthorizationStateFollowsTheRuleFile() {
         var installed = false
-        let mode = SystemPowerMode(run: ScriptedRunner().run, ruleExists: { installed })
-        XCTAssertEqual(mode.authorization, .none)
+        let defaults = makeEphemeralDefaults(self)
+        let mode = SystemPowerMode(run: ScriptedRunner().run, ruleExists: { installed }, defaults: defaults)
+        XCTAssertEqual(mode.authorization, .onFirstUse, "par défaut, le premier clic pose la règle")
+        defaults.set(false, forKey: LowPowerAuthorization.autoAuthorizeKey)
+        XCTAssertEqual(mode.authorization, .none, "règle retirée par l'utilisateur")
         installed = true
         XCTAssertEqual(mode.authorization, .granted)
+    }
+
+    // MARK: - Premier clic : bascule et pose de la règle dans la même fenêtre
+
+    func testFirstToggleInstallsTheRuleInTheSamePrompt() throws {
+        let runner = ScriptedRunner()
+        let mode = power(runner, autoAuthorize: true)
+        XCTAssertEqual(mode.authorization, .onFirstUse)
+        XCTAssertEqual(try write(mode, true), .success(.done))
+        XCTAssertTrue(runner.sudoCalls.isEmpty, "pas de règle : sudo n'est pas essayé")
+        let rule = try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice"))
+        XCTAssertEqual(runner.scripts.map(shellCommand(inScript:)),
+                       [LowPowerAuthorization.pmsetAndInstallShellCommand(lowPower: true, ruleContents: rule)],
+                       "une seule fenêtre : bascule puis pose")
+        XCTAssertTrue(try XCTUnwrap(runner.scripts.first).contains("ne sera plus demandé"), "la fenêtre le dit")
+    }
+
+    func testRefusedRuleIsPutBackInTheSamePromptAndSudoIsTriedAgain() throws {
+        let runner = ScriptedRunner()
+        runner.sudoReply = Self.fail("sudo: a password is required")
+        let mode = power(runner, ruleInstalled: true, autoAuthorize: true)
+        XCTAssertEqual(try write(mode, true), .success(.done))
+        XCTAssertEqual(runner.calls.map(\.path), ["/usr/bin/sudo", "/usr/bin/osascript"])
+        XCTAssertTrue(try XCTUnwrap(runner.scripts.first.flatMap(shellCommand(inScript:))).contains(LowPowerAuthorization.visudoPath))
+        XCTAssertEqual(mode.authorization, .granted, "règle reposée : sudo sera réessayé")
+        runner.sudoReply = Self.ok()
+        XCTAssertEqual(try write(mode, false), .success(.done))
+        XCTAssertEqual(runner.sudoCalls.count, 2)
+    }
+
+    func testRevokingStopsTheAutomaticInstall() throws {
+        let runner = ScriptedRunner()
+        let mode = power(runner, autoAuthorize: true)
+        XCTAssertNoThrow(try revoke(mode).get())
+        XCTAssertEqual(mode.authorization, .none)
+        XCTAssertEqual(try write(mode, true), .success(.done))
+        XCTAssertEqual(runner.scripts.dropFirst().map(shellCommand(inScript:)), ["/usr/bin/pmset -a lowpowermode 1"],
+                       "après un retrait, plus de pose automatique")
+    }
+
+    /// Pour de vrai dans /bin/sh, sans root : `pmset` et `install` remplacés. Le code rendu est celui de la bascule,
+    /// que la pose réussisse ou échoue, et le fichier de travail ne reste pas.
+    func testToggleResultIsKeptWhateverTheInstallDoes() throws {
+        let rule = try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice"))
+        let real = LowPowerAuthorization.pmsetAndInstallShellCommand(lowPower: true, ruleContents: rule)
+        let pmset = LowPowerAuthorization.pmsetShellCommand(lowPower: true)
+        let installStep = "\(LowPowerAuthorization.installPath) -m 0440 -o root -g wheel \"$T\" \(LowPowerAuthorization.rulePath)"
+        XCTAssertTrue(real.hasPrefix(pmset))
+        let before = workFiles()
+        for (toggle, install, expected) in [("true", "true", Int32(0)), ("true", "false", 0), ("(exit 3)", "true", 3)] {
+            let dry = real.replacingOccurrences(of: pmset, with: toggle).replacingOccurrences(of: installStep, with: install)
+            XCTAssertFalse(dry.contains(LowPowerAuthorization.installPath))
+            XCTAssertFalse(dry.contains(LowPowerAuthorization.pmsetPath + " -a lowpowermode 1;"))
+            XCTAssertEqual(try shell(dry).status, expected, "bascule \(toggle), pose \(install)")
+        }
+        XCTAssertEqual(workFiles(), before)
     }
 
     func testUninstallScriptRemovesTheRule() throws {
@@ -508,11 +575,13 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
 
     func testInterfaceStates() {
         XCTAssertTrue(QuickSettingsView.asksPassword(.none))
+        XCTAssertTrue(QuickSettingsView.asksPassword(.onFirstUse))
         XCTAssertTrue(QuickSettingsView.asksPassword(.refused))
         XCTAssertFalse(QuickSettingsView.asksPassword(.granted), "ni cadenas ni note de pied")
 
         typealias Action = QuickSettingsSettingsView.AuthorizationAction
         XCTAssertEqual(QuickSettingsSettingsView.authorizationActions(.none), [Action.grant])
+        XCTAssertEqual(QuickSettingsSettingsView.authorizationActions(.onFirstUse), [Action.grant])
         XCTAssertEqual(QuickSettingsSettingsView.authorizationActions(.granted), [Action.revoke])
         XCTAssertEqual(QuickSettingsSettingsView.authorizationActions(.refused), [Action.regrant, Action.revoke])
 

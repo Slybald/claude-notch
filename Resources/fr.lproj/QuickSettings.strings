@@ -45,7 +45,6 @@
 "Rien à restaurer" = "Rien à restaurer";
 "Écran allumé" = "Écran allumé";
 "Écran + Concentration" = "Écran + Concentration";
-"Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes." = "Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes.";
 "Fermer" = "Fermer";
 "Ouvrir Réglages Système" = "Ouvrir Réglages Système";
 "Ouvrir Raccourcis" = "Ouvrir Raccourcis";
@@ -83,9 +82,6 @@
 "+%d autre" = "+%d autre";
 "+%d autres" = "+%d autres";
 "Active ou coupe l'économie d'énergie, sans mot de passe." = "Active ou coupe l'économie d'énergie, sans mot de passe.";
-"Ne plus demander" = "Ne plus demander";
-"La redonner" = "La redonner";
-"L'autorisation sans mot de passe ne marche plus." = "L'autorisation sans mot de passe ne marche plus.";
 "Ajoute une règle système limitée à l'activation et la désactivation de l'économie d'énergie." = "Ajoute une règle système limitée à l'activation et la désactivation de l'économie d'énergie.";
 "Normal rétablit l'état d'avant les scènes." = "Normal rétablit l'état d'avant les scènes.";
 "Redonner l'autorisation" = "Redonner l'autorisation";
@@ -100,3 +96,7 @@
 "Autorisation : %@" = "Autorisation : %@";
 "Autorisation : installation impossible." = "Autorisation : installation impossible.";
 "Autorisation : retrait impossible." = "Autorisation : retrait impossible.";
+"Claude Notch veut changer l'économie d'énergie." = "Claude Notch veut changer l'économie d'énergie.";
+"Claude Notch veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage." = "Claude Notch veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage.";
+"Touch ID ou ton mot de passe une seule fois, au premier changement." = "Touch ID ou ton mot de passe une seule fois, au premier changement.";
+"Mot de passe demandé une seule fois, au premier changement" = "Mot de passe demandé une seule fois, au premier changement";

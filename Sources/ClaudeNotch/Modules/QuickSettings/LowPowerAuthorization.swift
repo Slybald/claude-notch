@@ -7,7 +7,9 @@ import Foundation
 
 /// Où en est l'autorisation.
 enum LowPowerAuthorizationState: Equatable {
-    /// Pas de règle : Touch ID ou le mot de passe est demandé à chaque bascule.
+    /// Pas de règle : la prochaine bascule la pose, dans la même fenêtre d'autorisation (un mot de passe, une fois).
+    case onFirstUse
+    /// Pas de règle, retirée par l'utilisateur : Touch ID ou le mot de passe est demandé à chaque bascule.
     case none
     /// Règle en place : la bascule se fait sans mot de passe.
     case granted
@@ -25,6 +27,8 @@ enum LowPowerWrite: Equatable {
 enum LowPowerAuthorization {
     /// Sans point : sudo ignore les fichiers de sudoers.d dont le nom contient un point ou finit par `~`.
     static let rulePath = "/etc/sudoers.d/claude-notch-lowpower"
+    /// Faux après « Retirer l'autorisation » : l'app ne repose plus la règle d'elle-même.
+    static let autoAuthorizeKey = "quickSettings.lowPower.autoAuthorize"
 
     static let sudoPath = "/usr/bin/sudo"
     static let pmsetPath = "/usr/bin/pmset"
@@ -93,6 +97,12 @@ enum LowPowerAuthorization {
             + " R=$?; \(removePath) -f \"$T\"; exit $R"
     }
 
+    /// Première bascule : la même fenêtre d'autorisation change le mode et pose la règle. La pose tourne dans un
+    /// sous-shell : son échec ne change pas le résultat de la bascule (la suivante redemandera le mot de passe).
+    static func pmsetAndInstallShellCommand(lowPower on: Bool, ruleContents: String) -> String {
+        "\(pmsetShellCommand(lowPower: on)); P=$?; ( \(installShellCommand(ruleContents: ruleContents)) ); exit $P"
+    }
+
     static let removeShellCommand = "\(removePath) -f \(rulePath)"
 
     /// Le texte entre guillemets simples pour /bin/sh ; une apostrophe devient `'\''`.
@@ -102,14 +112,18 @@ enum LowPowerAuthorization {
 
     /// Script AppleScript qui lance `shell` en root (fenêtre d'autorisation du système). `shell` est mis dans un
     /// littéral AppleScript : on y double les barres obliques inverses et on protège les guillemets.
-    static func administratorScript(running shell: String) -> String {
-        let literal = shell
-            .replacingOccurrences(of: "\\", with: "\\\\")
+    /// `prompt` : texte affiché dans la fenêtre d'autorisation du système.
+    static func administratorScript(running shell: String, prompt: String? = nil) -> String {
+        let withPrompt = prompt.map { " with prompt \"\(appleScriptLiteral($0))\"" } ?? ""
+        return "do shell script \"\(appleScriptLiteral(shell))\"\(withPrompt) with administrator privileges"
+    }
+
+    private static func appleScriptLiteral(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\r", with: "\\r")
             .replacingOccurrences(of: "\t", with: "\\t")
-        return "do shell script \"\(literal)\" with administrator privileges"
     }
 
     // MARK: - Désinstallation de l'app

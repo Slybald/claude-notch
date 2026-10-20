@@ -103,10 +103,9 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         }
     }
 
-    /// Sans règle sudoers : note de pied + lien « Ne plus demander » ; règle refusée : « La redonner » ; règle en
-    /// place : plus de pied. Dans les trois largeurs, le pire cas (cinq accessoires, une erreur) reste sous 460 pt ;
-    /// la note passe sur deux lignes aux largeurs étroites (le lien lui prend la place de la fin de la première).
-    func testAuthorizationFooterFitsAndDisappearsOnceGranted() {
+    /// Plus de note de pied sur l'autorisation (la règle se pose au premier clic) : la hauteur ne dépend pas de son
+    /// état, et le pire cas (cinq accessoires, une erreur) reste sous 460 pt dans les trois largeurs.
+    func testNoAuthorizationFooterWhateverTheState() {
         for size in PanelSize.allCases {
             func height(_ state: LowPowerAuthorizationState) -> CGFloat {
                 let f = busyFixture(extraAccessories: 3)
@@ -118,14 +117,11 @@ final class QuickSettingsSnapshotTests: XCTestCase {
                 scene.harness.prefs.panelSize = size
                 return measure(scene).height
             }
-            let none = height(.none)
-            let refused = height(.refused)
             let granted = height(.granted)
-            XCTAssertLessThanOrEqual(none, 461, "\(size.rawValue) : sans règle")
-            XCTAssertLessThanOrEqual(refused, 461, "\(size.rawValue) : règle refusée")
-            XCTAssertGreaterThan(none, granted, "\(size.rawValue) : la note de pied disparaît avec la règle")
-            XCTAssertGreaterThan(refused, granted, size.rawValue)
-            XCTAssertLessThanOrEqual(none - granted, 36, "\(size.rawValue) : le pied fait deux lignes au plus")
+            XCTAssertLessThanOrEqual(granted, 461, size.rawValue)
+            for state in [LowPowerAuthorizationState.onFirstUse, .none, .refused] {
+                XCTAssertEqual(height(state), granted, "\(size.rawValue) : \(state)")
+            }
         }
     }
 
