@@ -21,7 +21,7 @@ final class NotesSnapshotTests: XCTestCase {
             ("Lire : article sur le Pomodoro", 11 * 86_400),
             ("Livre à rendre vendredi", 12 * 86_400),
             ("Mot de passe du routeur sur l'étiquette", 14 * 86_400),
-            ("Fêter les 30 ans de Léa : gâteau", 15 * 86_400),
+            ("Gâteau pour l'anniversaire de samedi", 15 * 86_400),
             ("Réunion de quartier : lundi 18h", 20 * 86_400),
             ("Plantes : arroser le ficus le dimanche", 30 * 86_400),
         ]
