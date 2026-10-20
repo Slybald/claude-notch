@@ -29,7 +29,7 @@
 "Aucun événement à venir" = "No upcoming events";
 "Afficher le lecteur" = "Show the player";
 "Oreilles pendant la lecture" = "Ears while playing";
-"Notch repliée : une onde à côté de la notch tant qu'un morceau joue et que Claude n'a rien à montrer." = "Collapsed notch: a waveform next to the notch while a track plays and Claude has nothing to show.";
+"Notch repliée : la pochette et un égaliseur de part et d'autre de la notch tant qu'un morceau joue et que Claude n'a rien à montrer." = "Collapsed notch: the artwork and an equalizer on either side of the notch while a track plays and Claude has nothing to show.";
 "État" = "Status";
 "Vérification…" = "Checking…";
 "Disponible" = "Available";

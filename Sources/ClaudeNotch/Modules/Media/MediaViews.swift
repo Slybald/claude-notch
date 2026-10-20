@@ -113,7 +113,7 @@ struct PlayerCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Button(action: module.openSourceApp) {
-                    ArtworkView(image: module.artwork, size: 64)
+                    ArtworkView(image: module.artwork, size: 60)
                 }
                 .buttonStyle(.plain)
                 .help(String(format: L("Ouvrir %@", table: "Media"), info.appName ?? info.bundleIdentifier))
@@ -454,19 +454,22 @@ struct MediaCompactView: View {
                 }
             }
             if showsCalendar {
-                let next = MediaCalendarMath.next(module.events, after: Date())
-                row {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Palette.accent)
-                        .frame(width: 20)
-                    Text(next.map(MediaFormat.upcoming) ?? L("Aucun événement à venir", table: "Media"))
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundColor(next == nil ? Palette.secondary : Palette.primary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
+                // Relu chaque minute : un événement terminé laisse la place au suivant.
+                TimelineView(.everyMinute) { context in
+                    let next = MediaCalendarMath.next(module.events, after: context.date)
+                    row {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Palette.accent)
+                            .frame(width: 20)
+                        Text(next.map(MediaFormat.upcoming) ?? L("Aucun événement à venir", table: "Media"))
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundColor(next == nil ? Palette.secondary : Palette.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .onTapGesture { if let next { module.openCalendar(at: next.start) } }
                 }
-                .onTapGesture { if let next { module.openCalendar(at: next.start) } }
             }
         }
     }
@@ -494,8 +497,8 @@ struct MediaSettingsView: View {
                 Toggle(isOn: $module.showPlayer) { Text("Afficher le lecteur", tableName: "Media") }
                 Toggle(isOn: $module.playerEars) { Text("Oreilles pendant la lecture", tableName: "Media") }
                     .disabled(!module.showPlayer)
-                SettingsNote(L("Notch repliée : une onde à côté de la notch tant qu'un morceau joue et que Claude n'a "
-                    + "rien à montrer.", table: "Media"))
+                SettingsNote(L("Notch repliée : la pochette et un égaliseur de part et d'autre de la notch tant qu'un "
+                    + "morceau joue et que Claude n'a rien à montrer.", table: "Media"))
                 LabeledContent {
                     Text(playerStatus)
                         .foregroundColor(module.playerStatus == .unavailable ? Palette.amber : .secondary)
@@ -600,7 +603,8 @@ enum MediaFormat {
 
     /// « 3:07 », « 1:02:45 ».
     static func clock(_ seconds: TimeInterval) -> String {
-        let total = Int(max(0, seconds.isFinite ? seconds : 0))
+        // Borné : `Int(1e308)` arrêterait l'app.
+        let total = seconds.isFinite ? Int(min(max(0, seconds), 1e9)) : 0
         let hours = total / 3600
         let minutes = total % 3600 / 60
         let rest = total % 60

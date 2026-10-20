@@ -106,10 +106,10 @@ final class MediaModule: NotchModule {
 
     var keepsRunningWhenCollapsed: Bool { showPlayer && playerEars && playerStatus != .unavailable }
 
-    /// Une onde à gauche de la notch tant qu'un morceau joue ; priorité sous Claude (règle des oreilles).
+    /// Pochette à gauche de la notch, égaliseur à droite, tant qu'un morceau joue ; priorité sous Claude.
     var ears: ModuleEars? {
         guard showPlayer, playerEars, nowPlaying?.isPlaying == true else { return nil }
-        return ModuleEars(symbol: "waveform", text: "", priority: 1)
+        return ModuleEars(symbol: "music.note", text: "", priority: 1, image: artwork, bars: true)
     }
 
     var licenseNotices: [LicenseNotice] {
@@ -167,7 +167,7 @@ final class MediaModule: NotchModule {
     }
 
     private func startStream(_ adapter: MediaRemoteAdapter) {
-        adapter.startStream { [weak self] line in
+        adapter.startStream(onFailure: { [weak self] in self?.streamFailed(adapter) }) { [weak self] line in
             self?.parseQueue.async {
                 guard let self, self.state.apply(line) else { return }
                 let info = self.state.info
@@ -177,8 +177,17 @@ final class MediaModule: NotchModule {
         }
     }
 
+    /// Le flux meurt en boucle : l'adaptateur est revérifié ; s'il ne répond plus, état indisponible (le module
+    /// cesse alors de tourner replié), sinon le flux repart.
+    private func streamFailed(_ adapter: MediaRemoteAdapter) {
+        nowPlaying = nil
+        artwork = nil
+        runTest(adapter)
+    }
+
+    /// Lignes en retard d'un flux arrêté ou en échec : ignorées.
     private func publish(_ info: NowPlaying?, _ newArtwork: NSImage?) {
-        guard isRunning else { return }
+        guard isRunning, playerStatus == .ready else { return }
         if info != nowPlaying { nowPlaying = info }
         if newArtwork !== artwork { artwork = newArtwork }
     }
@@ -189,7 +198,8 @@ final class MediaModule: NotchModule {
 
     /// Avance à `seconds` ; la barre y reste jusqu'à la confirmation du flux.
     func seek(to seconds: TimeInterval) {
-        guard var info = nowPlaying, info.canSeek else { return }
+        guard var info = nowPlaying, let duration = info.duration, info.canSeek else { return }
+        let seconds = min(max(0, seconds), duration)
         adapter?.run(["seek", String(Int((seconds * 1_000_000).rounded()))])
         info.elapsed = seconds
         info.timestamp = Date()

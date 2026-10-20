@@ -64,10 +64,12 @@ struct NowPlayingState {
               let title = fields["title"] as? String, !title.isEmpty else { return nil }
         if appName?.id != id { appName = (id, Self.appName(id)) }
         func seconds(_ key: String) -> TimeInterval? { (fields[key] as? NSNumber).map { $0.doubleValue / 1_000_000 } }
+        /// Durée ou position hors de 0…10⁷ s (un direct peut annoncer n'importe quoi) : inconnue.
+        func span(_ key: String) -> TimeInterval? { seconds(key).flatMap { (0...1e7).contains($0) ? $0 : nil } }
         let artist = (fields["artist"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         return NowPlaying(bundleIdentifier: id, appName: appName?.name, title: title, artist: artist,
-                          isPlaying: fields["playing"] as? Bool ?? false, duration: seconds("durationMicros"),
-                          elapsed: seconds("elapsedTimeMicros"),
+                          isPlaying: fields["playing"] as? Bool ?? false, duration: span("durationMicros"),
+                          elapsed: span("elapsedTimeMicros"),
                           timestamp: seconds("timestampEpochMicros").map { Date(timeIntervalSince1970: $0) },
                           rate: (fields["playbackRate"] as? NSNumber)?.doubleValue ?? 1)
     }
@@ -108,10 +110,32 @@ final class MediaRemoteAdapter {
     private var stream: Process?
     private var restartWork: DispatchWorkItem?
     private var restartDelay: TimeInterval = 1
-    private var quitObserver: NSObjectProtocol?
+    private var quickDeaths = 0
+    private var onFailure: (() -> Void)?
 
     static let maxRestartDelay: TimeInterval = 60
     static let testTimeout: TimeInterval = 10
+    /// Trois morts d'affilée à moins de 5 s de vie : le flux est cassé, pas seulement interrompu.
+    static let quickDeath: TimeInterval = 5
+    static let quickDeathLimit = 3
+
+    /// Enveloppe de `stream` (`sh -c watchdog sh <commande…>`) : la commande tourne en arrière-plan et un
+    /// sous-shell attend la fin de l'entrée standard, un tube dont seule l'app tient l'autre bout. L'app meurt
+    /// (SIGKILL, plantage, pkill, launchctl bootout) : le noyau ferme ce bout, `read` rend la main et la commande
+    /// est tuée. Sans cela perl survivait jusqu'à sa prochaine écriture (SIGPIPE), parfois des heures.
+    static let watchdog = """
+    exec 3<&0
+    "$@" 3<&- </dev/null &
+    child=$!
+    { read -r line <&3; kill "$child" 2>/dev/null; } >/dev/null &
+    watch=$!
+    exec 3<&-
+    trap 'kill "$child" "$watch" 2>/dev/null' TERM HUP INT
+    wait "$child"
+    status=$?
+    kill "$watch" 2>/dev/null
+    exit "$status"
+    """
 
     init(executable: URL, baseArguments: [String]) {
         self.executable = executable
@@ -164,23 +188,23 @@ final class MediaRemoteAdapter {
     }
 
     /// `stream` : chaque ligne JSON part vers `onLine` (file d'arrière-plan, dans l'ordre). Relancé avec un délai
-    /// croissant (1 s → 60 s) si le processus meurt ; `stopStream()` ou la fermeture de l'app l'arrêtent.
-    func startStream(_ onLine: @escaping (Data) -> Void) {
+    /// croissant (1 s → 60 s) si le processus meurt ; après `quickDeathLimit` morts rapides, `onFailure` (sur le
+    /// main thread) remplace la relance. `stopStream()` ou la fin de l'app (voir `watchdog`) l'arrêtent.
+    func startStream(onFailure: (() -> Void)? = nil, _ onLine: @escaping (Data) -> Void) {
         guard stream == nil, restartWork == nil else { return }
-        quitObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
-        ) { [weak self] _ in self?.stopStream() }
+        self.onFailure = onFailure
+        quickDeaths = 0
         launchStream(onLine)
     }
 
     func stopStream() {
         restartWork?.cancel()
         restartWork = nil
-        quitObserver.map(NotificationCenter.default.removeObserver)
-        quitObserver = nil
+        onFailure = nil
         guard let process = stream else { return }
         stream = nil
         (process.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
+        try? (process.standardInput as? Pipe)?.fileHandleForWriting.close()
         if process.isRunning { process.terminate() }
     }
 
@@ -189,6 +213,9 @@ final class MediaRemoteAdapter {
     private func launchStream(_ onLine: @escaping (Data) -> Void) {
         restartWork = nil
         let process = process(["stream", "--micros", "--debounce=100"])
+        process.arguments = ["-c", Self.watchdog, "sh", executable.path] + (process.arguments ?? [])
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.standardInput = Pipe()
         let pipe = Pipe()
         process.standardOutput = pipe
         // Lu seulement par le gestionnaire de lecture du tube, un appel à la fois.
@@ -223,7 +250,13 @@ final class MediaRemoteAdapter {
     private func streamEnded(_ process: Process, after lifetime: TimeInterval, _ onLine: @escaping (Data) -> Void) {
         guard process === stream else { return }
         stream = nil
+        try? (process.standardInput as? Pipe)?.fileHandleForWriting.close()
         if lifetime > Self.maxRestartDelay { restartDelay = 1 }
+        quickDeaths = lifetime < Self.quickDeath ? quickDeaths + 1 : 0
+        if quickDeaths >= Self.quickDeathLimit, let onFailure {
+            self.onFailure = nil
+            return onFailure()
+        }
         let work = DispatchWorkItem { [weak self] in self?.launchStream(onLine) }
         restartWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + restartDelay, execute: work)

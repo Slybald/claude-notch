@@ -38,30 +38,45 @@ final class FakeCalendar: CalendarSource {
 /// Faux mediaremote-adapter : un script shell qui répond aux mêmes commandes (jamais le vrai MediaRemote).
 struct FakeAdapter {
     let adapter: MediaRemoteAdapter
-    let log: URL
+    let dir: URL
+    var log: URL { dir.appendingPathComponent("commands.log") }
 
-    /// `stream` écrit `lines` puis attend (ou s'arrête si `exitAfterStream`) ; les autres commandes sont notées.
+    /// `stream` note son PID, écrit `lines` puis attend (ou s'arrête si `exitAfterStream`) ; `test` sort avec le
+    /// code de `test.status` ; toutes les commandes sont notées.
     init(_ testCase: XCTestCase, testStatus: Int = 0, lines: [String] = [], exitAfterStream: Bool = false) throws {
-        let dir = try makeTemporaryDirectory(testCase)
+        dir = try makeTemporaryDirectory(testCase)
         let script = dir.appendingPathComponent("adapter.sh")
-        log = dir.appendingPathComponent("commands.log")
         try (lines.joined(separator: "\n") + "\n").write(to: dir.appendingPathComponent("stream.jsonl"),
                                                           atomically: true, encoding: .utf8)
         try """
         DIR="$(dirname "$0")"
         echo "$*" >> "$DIR/commands.log"
         case "$1" in
-            test) exit \(testStatus) ;;
-            stream) cat "$DIR/stream.jsonl"; \(exitAfterStream ? "exit 0" : "exec sleep 30") ;;
+            test) exit "$(cat "$DIR/test.status")" ;;
+            stream) echo $$ > "$DIR/stream.pid"; cat "$DIR/stream.jsonl"; \(exitAfterStream ? "exit 0" : "exec sleep 30") ;;
         esac
         """.write(to: script, atomically: true, encoding: .utf8)
         adapter = MediaRemoteAdapter(executable: URL(fileURLWithPath: "/bin/sh"), baseArguments: [script.path])
+        setTestStatus(testStatus)
+    }
+
+    func setTestStatus(_ status: Int) {
+        try? "\(status)".write(to: dir.appendingPathComponent("test.status"), atomically: true, encoding: .utf8)
     }
 
     var commands: [String] {
         ((try? String(contentsOf: log, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
     }
+
+    /// PID du dernier `stream` lancé.
+    var streamPID: pid_t? {
+        (try? String(contentsOf: dir.appendingPathComponent("stream.pid"), encoding: .utf8))
+            .flatMap { pid_t($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    }
 }
+
+/// Le processus existe encore (un zombie compte : il disparaît quand son parent l'a attendu).
+func isAlive(_ pid: pid_t) -> Bool { kill(pid, 0) == 0 }
 
 /// Lignes de `stream --micros` (charge complète puis différence).
 enum StreamLines {
@@ -175,6 +190,21 @@ final class MediaTests: XCTestCase {
         XCTAssertEqual(MediaFormat.clock(.nan), "0:00")
     }
 
+    /// Un direct qui annonce une durée démesurée : durée inconnue (pas de barre), jamais d'arrêt de l'app.
+    func testAbsurdDurationIsIgnored() throws {
+        var state = NowPlayingState()
+        state.apply(data(StreamLines.json(["type": "data", "diff": false, "payload": [
+            "bundleIdentifier": "com.example.live", "title": "Direct", "playing": true,
+            "durationMicros": 1.7976931348623157e308, "elapsedTimeMicros": -5_000_000,
+        ]])))
+        let info = try XCTUnwrap(state.info)
+        XCTAssertNil(info.duration)
+        XCTAssertNil(info.elapsed)
+        XCTAssertFalse(info.canSeek)
+        XCTAssertEqual(MediaFormat.clock(1.7976931348623157e308), "277777:46:40", "borné, sans piège")
+        XCTAssertEqual(MediaFormat.clock(-.infinity), "0:00")
+    }
+
     // MARK: - Calendrier
 
     func testWeekAndDayEvents() throws {
@@ -238,8 +268,12 @@ final class MediaTests: XCTestCase {
         wait { lines.count >= 1 }
         XCTAssertEqual(lines.count, 1)
         XCTAssertTrue(ok.adapter.isStreaming)
+        let child = try XCTUnwrap(ok.streamPID)
+        XCTAssertTrue(isAlive(child))
         ok.adapter.stopStream()
         XCTAssertFalse(ok.adapter.isStreaming)
+        wait { !isAlive(child) }
+        XCTAssertFalse(isAlive(child), "commande arrêtée avec le flux")
 
         ok.adapter.run(["send", "2"])
         ok.adapter.run(["seek", "42000000"])
@@ -261,6 +295,30 @@ final class MediaTests: XCTestCase {
         XCTAssertEqual(fake.commands.count, count, "plus de relance après l'arrêt")
     }
 
+    /// L'app disparaît sans prévenir (SIGKILL, plantage, pkill) : le noyau ferme son bout du tube d'entrée et le
+    /// chien de garde tue la commande, au lieu de la laisser vivre jusqu'à sa prochaine écriture.
+    func testWatchdogKillsTheStreamWhenTheAppGoesAway() throws {
+        let fake = try FakeAdapter(self, lines: [StreamLines.full()])
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", MediaRemoteAdapter.watchdog, "sh", "/bin/sh"] + fake.adapter.baseArguments
+            + ["stream"]
+        let input = Pipe()
+        process.standardInput = input
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        wait { fake.streamPID != nil }
+        let child = try XCTUnwrap(fake.streamPID)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertTrue(isAlive(child), "la commande tourne tant que l'app est là")
+        XCTAssertTrue(process.isRunning)
+
+        try input.fileHandleForWriting.close()
+        wait { !isAlive(child) && !process.isRunning }
+        XCTAssertFalse(isAlive(child), "commande tuée")
+        XCTAssertFalse(process.isRunning, "chien de garde terminé")
+    }
+
     // MARK: - Module
 
     func testModulePlayerLifecycleAndEars() throws {
@@ -275,7 +333,7 @@ final class MediaTests: XCTestCase {
         wait { module.nowPlaying != nil }
         XCTAssertEqual(module.playerStatus, .ready)
         XCTAssertEqual(module.nowPlaying?.title, "Morceau")
-        XCTAssertEqual(module.ears, ModuleEars(symbol: "waveform", text: "", priority: 1))
+        XCTAssertEqual(module.ears, ModuleEars(symbol: "music.note", text: "", priority: 1, bars: true))
 
         module.playerEars = false
         XCTAssertNil(module.ears)
@@ -285,10 +343,13 @@ final class MediaTests: XCTestCase {
         module.send(.togglePlayPause)
         module.send(.next)
         module.send(.previous)
+        module.seek(to: 1e308)
+        XCTAssertEqual(module.nowPlaying?.elapsed ?? 0, 200, accuracy: 0.001, "borné par la durée")
         module.seek(to: 90)
         XCTAssertEqual(module.nowPlaying?.elapsed ?? 0, 90, accuracy: 0.001, "la barre reste où on l'a lâchée")
-        wait { fake.commands.count >= 6 }
-        XCTAssertEqual(fake.commands.dropFirst(2).sorted(), ["seek 90000000", "send 2", "send 4", "send 5"])
+        wait { fake.commands.count >= 7 }
+        XCTAssertEqual(fake.commands.dropFirst(2).sorted(),
+                       ["seek 200000000", "seek 90000000", "send 2", "send 4", "send 5"])
 
         // Lecteur masqué : flux arrêté ; réaffiché : relancé sans refaire `test`.
         module.showPlayer = false
@@ -300,6 +361,54 @@ final class MediaTests: XCTestCase {
         XCTAssertTrue(fake.adapter.isStreaming)
         module.stop()
         XCTAssertFalse(fake.adapter.isStreaming, "arrêté avec le module")
+    }
+
+    /// Le flux meurt en boucle : `test` est relancé ; s'il échoue, indisponible, et le module ne tourne plus replié.
+    func testStreamThatKeepsDyingIsRetested() throws {
+        let fake = try FakeAdapter(self, lines: [StreamLines.full()], exitAfterStream: true)
+        let module = MediaModule(defaults: makeEphemeralDefaults(self), adapter: fake.adapter,
+                                 calendar: FakeCalendar(.notDetermined))
+        module.start()
+        wait { module.playerStatus == .ready }
+        fake.setTestStatus(1)
+        wait(8) { module.playerStatus == .unavailable }
+        XCTAssertEqual(module.playerStatus, .unavailable)
+        XCTAssertNil(module.nowPlaying)
+        XCTAssertFalse(module.keepsRunningWhenCollapsed)
+        XCTAssertEqual(fake.commands.filter { $0.hasPrefix("stream") }.count, MediaRemoteAdapter.quickDeathLimit)
+        XCTAssertEqual(fake.commands.filter { $0 == "test" }.count, 2)
+        XCTAssertFalse(fake.adapter.isStreaming)
+        module.stop()
+    }
+
+    /// Au lancement, notch repliée : le registre démarre le module sans attendre l'ouverture du panneau, et les
+    /// oreilles montrent la pochette et l'égaliseur.
+    func testCollapsedAtLaunchTheRegistryStartsTheStream() throws {
+        let fake = try FakeAdapter(self, lines: [StreamLines.full(artwork: StreamLines.artwork())])
+        let module = MediaModule(defaults: makeEphemeralDefaults(self), adapter: fake.adapter,
+                                 calendar: FakeCalendar(.notDetermined))
+        let registry = ModuleRegistry(modules: [FakeModule(id: "claude"), module],
+                                      prefs: Preferences(defaults: makeEphemeralDefaults(self)))
+        XCTAssertEqual(registry.running, ["media"])
+        wait { registry.moduleEars?.image != nil }
+        let ears = try XCTUnwrap(registry.moduleEars)
+        XCTAssertNotNil(ears.image, "pochette dans l'oreille gauche")
+        XCTAssertTrue(ears.bars, "égaliseur dans l'oreille droite")
+        XCTAssertEqual(ears.priority, 1)
+        XCTAssertEqual(Array(fake.commands.prefix(2)), ["test", "stream --micros --debounce=100"])
+        module.stop()
+    }
+
+    /// La carte du lecteur tient dans la hauteur du panneau (sinon elle déborde et se désaligne du calendrier).
+    func testPlayerCardFitsThePanel() throws {
+        let fake = try FakeAdapter(self, lines: [StreamLines.full(artwork: StreamLines.artwork())])
+        let module = MediaModule(defaults: makeEphemeralDefaults(self), adapter: fake.adapter,
+                                 calendar: FakeCalendar(.notDetermined))
+        module.start()
+        wait { module.artwork != nil }
+        let host = NSHostingView(rootView: PlayerCard(module: module).frame(width: 300))
+        XCTAssertLessThanOrEqual(host.fittingSize.height, MediaPanel.height)
+        module.stop()
     }
 
     func testModuleUnavailableAdapter() throws {

@@ -104,11 +104,10 @@ final class MediaSnapshotTests: XCTestCase {
         // Plein écran compact : sessions Claude puis le résumé du lecteur.
         try render(root(notch(full, fullScreen: true, store: .working(2))), "media-fullscreen-compact", outputDir)
 
-        // Notch repliée : oreilles de lecture quand Claude ne fait rien.
+        // Notch repliée : pochette et égaliseur quand Claude ne fait rien (le registre démarre le module seul).
         let collapsed = notch(full, expanded: false)
-        collapsed.1.reconcile()
         wait { collapsed.1.moduleEars != nil }
-        XCTAssertEqual(collapsed.1.moduleEars?.symbol, "waveform")
+        XCTAssertTrue(collapsed.1.moduleEars?.bars == true && collapsed.1.moduleEars?.image != nil)
         try render(root(collapsed), "media-collapsed-ears", outputDir)
 
         // Réglages › Lecteur et licence dans À propos.
