@@ -160,6 +160,7 @@ Then drag `ClaudeNotch.app` from Applications to the Trash.
 ## Development
 
 Swift Package (no Xcode project), Swift 5.10 tools, macOS 13+.
+Code map and design decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```sh
 swift build
@@ -342,6 +343,7 @@ Jette ensuite `ClaudeNotch.app` du dossier Applications à la Corbeille.
 ### Développement
 
 Swift Package (pas de projet Xcode), swift-tools 5.10, macOS 13+.
+Carte du code et décisions de conception (en anglais) : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```sh
 swift build
