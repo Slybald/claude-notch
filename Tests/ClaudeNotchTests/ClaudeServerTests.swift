@@ -172,6 +172,11 @@ final class ClaudeServerTests: XCTestCase {
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
         XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "X-Claude-Notch-Token: \(fixture.access.token)\n")
         XCTAssertNotNil(fixture.access.token.range(of: "^[0-9a-f]{32}$", options: .regularExpression))
+        let proofFile = try XCTUnwrap(fixture.access.proofFile)
+        let proofAttributes = try FileManager.default.attributesOfItem(atPath: proofFile.path)
+        XCTAssertEqual((proofAttributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        XCTAssertEqual(try String(contentsOf: proofFile, encoding: .utf8), "\(fixture.access.proof)\n")
+        XCTAssertNotEqual(fixture.access.proof, fixture.access.token, "deux secrets distincts")
         XCTAssertNotEqual(HookAccess().token, HookAccess().token, "nouveau jeton à chaque lancement")
 
         let access = HookAccess(token: "0123456789abcdef0123456789abcdef", file: nil)
@@ -231,6 +236,7 @@ final class ClaudeServerTests: XCTestCase {
         let response = try XCTUnwrap(pending.wait() ?? nil)
         XCTAssertEqual(response.status, 200)
         XCTAssertTrue(response.headers.contains("Content-Type: application/json"))
+        XCTAssertTrue(response.headers.contains("X-Claude-Notch-Proof: \(fixture.access.proof)"), "l'app prouve que c'est elle")
         let output = try XCTUnwrap(JSONSerialization.jsonObject(with: response.body) as? NSDictionary)
         XCTAssertEqual(output, ["hookSpecificOutput": ["hookEventName": "PermissionRequest",
                                                        "decision": ["behavior": "allow"]]])
@@ -246,6 +252,7 @@ final class ClaudeServerTests: XCTestCase {
         let response = try XCTUnwrap(pending.wait() ?? nil)
         XCTAssertEqual(response.status, 204)
         XCTAssertTrue(response.body.isEmpty)
+        XCTAssertFalse(response.headers.contains("Proof"))
         XCTAssertLessThan(Date().timeIntervalSince(started), 2)
 
         // Réglage coupé : réponse immédiate.

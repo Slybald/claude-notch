@@ -7,42 +7,48 @@
 #                    la main (jamais d'autorisation par défaut).
 #   inbox            attente `asyncRewake` (SessionStart, Stop) d'un message envoyé depuis la notch : le texte
 #                    part sur stderr avec le code 2, ce qui réveille Claude. Sinon 0.
+# Une décision ou un message n'est appliqué que s'il porte la preuve de l'app (second fichier 0600, jamais
+# envoyé) : un autre programme qui occuperait le port, app fermée, ne décide rien.
 
 URL="http://127.0.0.1:${CLAUDE_NOTCH_PORT:-47823}"
 TOKEN="$HOME/Library/Application Support/ClaudeNotch/hook-token"
+PROOF="$HOME/Library/Application Support/ClaudeNotch/hook-proof"
 
 case "${1:-}" in
-permission)
-    [ -r "$TOKEN" ] || exit 0
-    # exec : un « No » au terminal tue curl (SIGTERM), l'app voit la connexion se fermer et retire sa carte.
-    exec curl -q -sf --noproxy "*" --connect-timeout 0.5 --max-time 598 \
-        -H @"$TOKEN" \
-        -H 'Content-Type: application/json' \
-        -H 'Expect:' \
-        -H "X-Claude-PPID: $PPID" \
-        --data-binary @- \
-        "$URL/permission"
-    ;;
-inbox)
-    [ -r "$TOKEN" ] || exit 0
-    IN=$(mktemp "${TMPDIR:-/tmp}/claude-notch.XXXXXX") || exit 0
-    OUT=$(mktemp "${TMPDIR:-/tmp}/claude-notch.XXXXXX") || { rm -f "$IN"; exit 0; }
-    trap 'rm -f "$IN" "$OUT"' EXIT
-    # Hook arrêté (fin de session, timeout) : curl part avec lui, l'app voit l'attente se fermer.
+permission | inbox)
+    [ -r "$TOKEN" ] && [ -r "$PROOF" ] || exit 0
+    WORK=$(mktemp -d "${TMPDIR:-/tmp}/claude-notch.XXXXXX") || exit 0
+    trap 'rm -rf "$WORK"' EXIT
+    # Hook arrêté (« No » au terminal, fin de session, timeout) : curl part avec lui, l'app voit la connexion se
+    # fermer et retire sa carte ou son attente.
     CURL=
     trap 'if [ -n "$CURL" ]; then kill "$CURL" 2>/dev/null; fi; exit 0' HUP INT TERM
-    cat > "$IN"
-    curl -q -sf --noproxy "*" -o "$OUT" --connect-timeout 0.5 --max-time 86000 \
+    cat > "$WORK/in"
+    if [ "$1" = permission ]; then MAX=598; else MAX=86000; fi
+    curl -q -sf --noproxy "*" -D "$WORK/head" -o "$WORK/out" --connect-timeout 0.5 --max-time "$MAX" \
         -H @"$TOKEN" \
         -H 'Content-Type: application/json' \
         -H 'Expect:' \
         -H "X-Claude-PPID: $PPID" \
-        --data-binary @"$IN" \
-        "$URL/inbox" &
+        --data-binary @"$WORK/in" \
+        "$URL/$1" &
     CURL=$!
     wait "$CURL" || exit 0
-    [ -s "$OUT" ] || exit 0
-    cat "$OUT" >&2
+    CURL=
+    [ -s "$WORK/out" ] || exit 0
+    # Comparaison par des commandes internes du shell : la preuve n'apparaît dans aucune liste de processus.
+    IFS= read -r EXPECTED < "$PROOF" && [ -n "$EXPECTED" ] || exit 0
+    CR=$(printf '\r')
+    GENUINE=
+    while IFS= read -r LINE; do
+        if [ "$LINE" = "X-Claude-Notch-Proof: $EXPECTED$CR" ]; then GENUINE=1; fi
+    done < "$WORK/head"
+    [ -n "$GENUINE" ] || exit 0
+    if [ "$1" = permission ]; then
+        cat "$WORK/out"
+        exit 0
+    fi
+    cat "$WORK/out" >&2
     exit 2
     ;;
 esac

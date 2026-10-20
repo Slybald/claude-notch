@@ -6,7 +6,8 @@ import Network
 ///
 /// Chaque requête doit porter l'en-tête Host exact (`127.0.0.1:<port>`) et aucun en-tête Origin : une page web
 /// ne parle pas au serveur, même par DNS rebinding. Sauf `/health`, elle doit aussi porter le jeton du fichier
-/// partagé avec le script (`HookAccess`). Routes : `/hook` (événements async), `/permission` et `/inbox`
+/// partagé avec le script (`HookAccess`) ; en retour, une décision ou un message porte la preuve que c'est bien
+/// l'app qui répond. Routes : `/hook` (événements async), `/permission` et `/inbox`
 /// (requêtes longues des hooks synchrones, confiées à `ReplyCenter`), `GET /state` (diagnostic). Aucune route
 /// ne permet à un client de décider : une décision n'est que la réponse à la requête d'un hook, après un clic.
 final class HookServer {
@@ -156,7 +157,7 @@ final class HookServer {
         let respond: (Data?) -> Void = { [weak self] output in
             guard let self else { return connection.cancel() }
             if let output {
-                self.reply(200, "OK", body: output, on: connection)
+                self.reply(200, "OK", body: output, proof: true, on: connection)
             } else {
                 self.reply(204, "No Content", on: connection)
             }
@@ -176,7 +177,8 @@ final class HookServer {
         let respond: (String?) -> Void = { [weak self] message in
             guard let self else { return connection.cancel() }
             if let message {
-                self.reply(200, "OK", body: Data(message.utf8), contentType: "text/plain; charset=utf-8", on: connection)
+                self.reply(200, "OK", body: Data(message.utf8), contentType: "text/plain; charset=utf-8", proof: true,
+                           on: connection)
             } else {
                 self.reply(204, "No Content", on: connection)
             }
@@ -197,10 +199,12 @@ final class HookServer {
         }
     }
 
+    /// `proof` : seulement en réponse à une requête authentifiée, sinon n'importe qui pourrait la lire.
     private func reply(_ status: Int, _ reason: String, body: Data = Data(), contentType: String = "application/json",
-                       on connection: NWConnection) {
+                       proof: Bool = false, on connection: NWConnection) {
         var head = "HTTP/1.1 \(status) \(reason)\r\nContent-Length: \(body.count)\r\nConnection: close\r\n"
         if !body.isEmpty { head += "Content-Type: \(contentType)\r\n" }
+        if proof { head += "\(HookAccess.proofHeader): \(access.proof)\r\n" }
         connection.send(content: Data((head + "\r\n").utf8) + body, completion: .contentProcessed { _ in
             connection.cancel()
         })
@@ -210,18 +214,28 @@ final class HookServer {
 /// Jeton partagé entre l'app et le script de hook : 32 caractères hexadécimaux, nouveaux à chaque lancement,
 /// écrits dans un fichier 0600 sous forme de ligne d'en-tête que le script donne à curl (`-H @fichier`, jamais
 /// en argument, donc invisible dans `ps`). Comparaison en temps constant.
+///
+/// Le jeton prouve à l'app que le client est le script ; la preuve (second secret, fichier 0600 `hook-proof`,
+/// jamais envoyée par le script) prouve au script que c'est l'app qui répond. Sans elle, un programme d'un autre
+/// compte qui occupe le port pendant que l'app est fermée verrait sa « décision » appliquée.
 struct HookAccess {
     static let headerName = "X-Claude-Notch-Token"
     static let headerKey = headerName.lowercased()
+    static let proofHeader = "X-Claude-Notch-Proof"
     /// Lu par hooks/claude-notch-hook.sh : `$HOME/Library/Application Support/ClaudeNotch/hook-token`.
     static var standardFile: URL { SharedFiles.notchDirectory.appendingPathComponent("hook-token") }
 
     let token: String
+    let proof: String
     /// nil : rien sur disque (tests qui n'ont pas besoin du script).
     let file: URL?
+    /// À côté du jeton.
+    var proofFile: URL? { file?.deletingLastPathComponent().appendingPathComponent("hook-proof") }
 
-    init(token: String = HookAccess.randomToken(), file: URL? = HookAccess.standardFile) {
+    init(token: String = HookAccess.randomToken(), proof: String = HookAccess.randomToken(),
+         file: URL? = HookAccess.standardFile) {
         self.token = token
+        self.proof = proof
         self.file = file
     }
 
@@ -239,16 +253,22 @@ struct HookAccess {
         return difference == 0
     }
 
-    /// Fichier temporaire créé en 0600 (`O_EXCL`) dans le même dossier, puis `rename` : jamais de jeton
-    /// lisible par un autre compte, ni de fichier à moitié écrit.
+    /// La preuve, puis le jeton (le script ne parle à l'app qu'une fois le jeton là).
     func writeFile() throws {
-        guard let file else { return }
-        let directory = file.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let temporary = directory.appendingPathComponent(".hook-token-\(UUID().uuidString)")
+        guard let file, let proofFile else { return }
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Self.write("\(proof)\n", to: proofFile)
+        try Self.write("\(Self.headerName): \(token)\n", to: file)
+    }
+
+    /// Fichier temporaire créé en 0600 (`O_EXCL`) dans le même dossier, puis `rename` : jamais de secret
+    /// lisible par un autre compte, ni de fichier à moitié écrit.
+    private static func write(_ text: String, to file: URL) throws {
+        let temporary = file.deletingLastPathComponent()
+            .appendingPathComponent(".\(file.lastPathComponent)-\(UUID().uuidString)")
         let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
         guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        let line = Array("\(Self.headerName): \(token)\n".utf8)
+        let line = Array(text.utf8)
         let written = line.withUnsafeBytes { Darwin.write(fd, $0.baseAddress, $0.count) }
         close(fd)
         guard written == line.count, rename(temporary.path, file.path) == 0 else {
