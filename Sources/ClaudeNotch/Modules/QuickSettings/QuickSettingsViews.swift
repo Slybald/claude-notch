@@ -680,9 +680,8 @@ struct QuickSettingsSettingsView: View {
     /// se redonne ou se retire.
     private var lowPowerSection: some View {
         Section {
+            Text(verbatim: Self.authorizationState(module.authorization))
             HStack(spacing: 10) {
-                Text(verbatim: Self.authorizationState(module.authorization))
-                Spacer(minLength: 8)
                 if module.busy.contains(.authorization) {
                     ProgressView().controlSize(.small)
                 } else {
@@ -690,6 +689,7 @@ struct QuickSettingsSettingsView: View {
                         Button(action: { run(action) }) { Text(verbatim: action.title) }
                     }
                 }
+                Spacer(minLength: 0)
             }
         } header: {
             Text("Économie d'énergie", tableName: "QuickSettings")
