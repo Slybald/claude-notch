@@ -111,13 +111,16 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   generates at each launch and writes to `~/Library/Application Support/ClaudeNotch/hook-token` (readable by
   your account only); curl reads it from that file, so it never shows in the process list. The app refuses any
   request without it, with another `Host` than `127.0.0.1:47823`, or with an `Origin` header (a web page).
+  The other way round, a decision or a message from the app carries a second secret (`hook-proof`, same
+  folder, never sent by the script): without it, the script ignores the answer, so a program that takes the
+  port while the app is closed (another account on a shared Mac) decides nothing.
 - Replies from the notch: the app only ever answers a request made by a Claude Code hook, after a click in the
   notch. No route lets another program decide in your place, and there is no "always allow". When anything
   fails (app not running, setting off, delay over), the hook hands control back to the terminal: never an
   approval by default.
 - What the app reads: the hook events, the end of the transcript of a running session (to detect Esc),
   Claude Code's task files, the process list (to find the host app).
-- What the app writes: two local logs and the token file in `~/Library/Application Support/ClaudeNotch/` (see
+- What the app writes: two local logs and the token files in `~/Library/Application Support/ClaudeNotch/` (see
   [Shared logs](#shared-logs)), the hooks in `~/.claude` when you ask for it, and during an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
   the old one. The messages you type are sent to the Claude Code session only, never stored.
@@ -136,7 +139,9 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
     for a message typed in the notch, then hands it to Claude, who starts a turn (about 3 s). During a turn, the
     message is read after the current action. Without a waiting hook (session opened before the hooks were
     updated, app restarted), the message is queued until the end of the turn. Messages are capped at
-    1,800 bytes and control characters are removed.
+    1,800 bytes and control characters are removed. Sessions without a terminal (`claude -p`, the Agent SDK,
+    IDEs, the Code tab of Claude Desktop) do not get messages from the notch: there, Claude waits for this hook
+    before reading the prompt, so the app lets it go at once (measured with Claude Code 2.1.304).
 - After an update of the app, hooks installed by a previous version are updated silently, with the usual
   timestamped backup of `settings.json`.
 - From that process ID, the app walks up the process tree to find the Claude process (to detect the end of
@@ -194,7 +199,8 @@ hooks it already receives:
 - After a permission is granted in the terminal, the card stays on "waiting for your permission" until the
   tool finishes: no hook reports the approval itself. (Granted from the notch, the card updates at once.)
 - Reply from the notch: a session opened before the hooks were updated receives replies only after it
-  restarts. Not checked with sessions in the Code tab of Claude Desktop.
+  restarts. Sessions without a terminal (Code tab of Claude Desktop, `claude -p`, SDK) cannot receive a
+  message (no **Message** button); permissions, questions and plans are not checked with them.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -376,14 +382,16 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
   génère à chaque lancement et écrit dans `~/Library/Application Support/ClaudeNotch/hook-token` (lisible par
   ton compte seulement) ; curl le lit dans ce fichier, il n'apparaît donc jamais dans la liste des processus.
   L'app refuse toute requête sans lui, avec un autre `Host` que `127.0.0.1:47823` ou avec un en-tête `Origin`
-  (une page web).
+  (une page web). Dans l'autre sens, une décision ou un message de l'app porte un second secret (`hook-proof`,
+  même dossier, jamais envoyé par le script) : sans lui, le script ignore la réponse. Un programme qui prend le
+  port pendant que l'app est fermée (un autre compte sur un Mac partagé) ne décide donc rien.
 - Réponses depuis la notch : l'app ne fait jamais que répondre à la requête d'un hook de Claude Code, après un
   clic dans la notch. Aucune route ne permet à un autre programme de décider à ta place, et il n'y a pas de
   « toujours autoriser ». Au moindre échec (app fermée, réglage coupé, délai passé), le hook rend la main au
   terminal : jamais d'autorisation par défaut.
 - Ce que l'app lit : les événements de hook, la fin du transcript d'une session en cours (pour détecter
   Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte).
-- Ce que l'app écrit : deux journaux locaux et le fichier du jeton dans
+- Ce que l'app écrit : deux journaux locaux et les fichiers du jeton dans
   `~/Library/Application Support/ClaudeNotch/` (voir [Registres partagés](#registres-partagés)), les hooks dans
   `~/.claude` quand tu le demandes et, pendant une mise à jour, le DMG dans
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
@@ -404,7 +412,9 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
     un message tapé dans la notch, puis le remet à Claude, qui démarre un tour (3 s environ). Pendant un tour,
     le message est lu après l'action en cours. Sans attente (session ouverte avant la mise à jour des hooks,
     app relancée), le message reste en file jusqu'à la fin du tour. Taille limitée à 1 800 octets, caractères
-    de contrôle retirés.
+    de contrôle retirés. Les sessions sans terminal (`claude -p`, SDK, IDE, onglet Code de Claude Desktop) ne
+    reçoivent pas de message depuis la notch : Claude y attend la fin de ce hook avant de lire le prompt, l'app
+    le libère donc tout de suite (mesuré avec Claude Code 2.1.304).
 - Après une mise à jour de l'app, des hooks posés par une version précédente sont mis à jour sans rien
   demander, avec la sauvegarde horodatée habituelle de `settings.json`.
 - À partir de ce PID, l'app remonte la chaîne de processus pour trouver le processus Claude (détection de
@@ -463,7 +473,8 @@ partir de hooks qu'elle reçoit déjà :
 - Après une permission accordée dans le terminal, la carte reste en « Attend ta permission » jusqu'à la fin
   de l'outil : aucun hook ne signale l'accord lui-même. (Accordée depuis la notch, la carte suit tout de suite.)
 - Répondre depuis la notch : une session ouverte avant la mise à jour des hooks ne reçoit les réponses
-  qu'après son redémarrage. Pas vérifié avec les sessions de l'onglet Code de Claude Desktop.
+  qu'après son redémarrage. Une session sans terminal (onglet Code de Claude Desktop, `claude -p`, SDK) ne peut
+  pas recevoir de message (pas de bouton **Écrire**) ; permissions, questions et plans pas vérifiés avec elles.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app

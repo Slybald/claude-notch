@@ -116,6 +116,11 @@ Apple Events and Bluetooth are already there) nor another module's files.
   - Free message: `SessionStart` and `Stop` hooks with `asyncRewake: true` (timeout 86400) long-poll the app; the
     message goes to stderr with exit 2 and Claude starts a turn (~3 s); during a turn it is read after the
     current tool. It comes back as a `UserPromptSubmit` `<task-notification>` with our `rewakeSummary`.
+  - Without a terminal (`-p`/`--print`, or `--input-format`/`--output-format` as passed by the SDK and the Code
+    tab of Claude Desktop, without `-p`), Claude **waits for the `asyncRewake` hooks** before reading the prompt
+    (`claude -p` never answered with a held waiter). `ReplyCenter.wait` reads the argv of `X-Claude-PPID`
+    (`KERN_PROCARGS2`) and answers 204 at once; such sessions get no **Message** button. Checked with the real
+    `claude -p` and stream-json against the real server: about 5 s, as without the hooks.
 - **Reply design**: one long connection per request; the app answers on the first of: the user's decision; the
   `PostToolUse` (same tool and input), `Stop`, `UserPromptSubmit` or `SessionEnd` of the session; the connection
   closing; the deadline (4 s if the card was never on screen, 590 s once it was, under the hook's 600 s). No
@@ -124,8 +129,14 @@ Apple Events and Bluetooth are already there) nor another module's files.
   decide: a decision only exists as the answer to a hook's request, after a click. Never "always allow".
 - **Hook token**: 32 hex, new at each launch, written (0600, `O_EXCL` + `rename`) only once the listener is
   ready, so a second instance that cannot bind never overwrites it. The script passes it with `curl -H @file`
-  (never in argv) and `-q --noproxy '*'` (no `~/.curlrc`, no proxy). `permission` mode uses `exec curl`: a
-  SIGTERM kills curl, the app sees the connection close. `inbox` mode traps TERM to kill its background curl.
+  (never in argv) and `-q --noproxy '*'` (no `~/.curlrc`, no proxy). `permission` and `inbox` modes run curl
+  in the background and trap TERM to kill it: the app sees the connection close.
+- **Proof of the app**: the token authenticates the script to the app, not the other way round. A second
+  secret (`hook-proof`, 0600, written before the token, never sent by the script) comes back in the
+  `X-Claude-Notch-Proof` header of a 200 from `/permission` or `/inbox`, only to an authenticated request. The
+  script compares it with shell builtins (never in argv) and ignores any answer without it: a program bound to
+  the port while the app is closed (any account can bind 47823) gets the request but decides nothing. While
+  the app runs, nobody else can bind the port (checked, even with `SO_REUSEPORT`).
 - **Notch keyboard**: the panel never activates the app; it becomes key only for a text field
   (`NotchKeyboard.take`) and gives the keyboard back with `orderOut` + `orderFrontRegardless` when the field
   closes or the panel collapses, otherwise the next keystrokes would be swallowed by the hidden panel.
