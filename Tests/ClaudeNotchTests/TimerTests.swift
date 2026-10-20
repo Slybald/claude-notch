@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import ClaudeNotch
 
@@ -293,6 +294,72 @@ final class TimerTests: XCTestCase {
         XCTAssertEqual(module.state.duration, 600, "le « +1 min » ne se garde pas")
     }
 
+    // MARK: Durée libre
+
+    /// Une durée tapée sans Entrée ni perte de focus est celle de « Démarrer » (le clic ne valide pas le champ).
+    func testTypedDurationIsUsedByStartWithoutAnyValidation() throws {
+        _ = NSApplication.shared
+        let rig = try TimerRig(self)
+        let module = rig.startedModule()
+        let hosting = NSHostingController(rootView: DurationControl(module: module))
+        let window = NSWindow(contentViewController: hosting)
+        window.setContentSize(NSSize(width: 220, height: 40))
+        window.isReleasedWhenClosed = false
+        addTeardownBlock { window.close() }
+        hosting.view.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        let field = try XCTUnwrap(Self.findView(NSTextField.self, in: window.contentView))
+        XCTAssertEqual(field.stringValue, "10")
+        XCTAssertTrue(window.makeFirstResponder(field))
+        let editor = try XCTUnwrap(window.firstResponder as? NSTextView, "l'éditeur du champ a le focus")
+        editor.insertText("37", replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(field.stringValue, "37")
+
+        // Pas d'Entrée, pas de sortie du champ : directement « Démarrer ».
+        module.startTimer()
+        XCTAssertEqual(module.state.status, .running)
+        XCTAssertEqual(module.state.duration, 37 * 60)
+    }
+
+    func testTypedDurationIsClampedAndEmptyInputChangesNothing() throws {
+        _ = NSApplication.shared
+        let rig = try TimerRig(self)
+        let module = rig.startedModule()
+        let hosting = NSHostingController(rootView: DurationControl(module: module))
+        let window = NSWindow(contentViewController: hosting)
+        window.setContentSize(NSSize(width: 220, height: 40))
+        window.isReleasedWhenClosed = false
+        addTeardownBlock { window.close() }
+        hosting.view.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let field = try XCTUnwrap(Self.findView(NSTextField.self, in: window.contentView))
+        XCTAssertTrue(window.makeFirstResponder(field))
+        let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
+        func type(_ text: String) {
+            editor.insertText(text, replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+            RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        }
+        type("")
+        XCTAssertEqual(module.state.simpleDuration, 600, "champ vidé : la durée ne bouge pas")
+        type("9999")
+        XCTAssertEqual(module.state.simpleDuration, 1440 * 60, "au plus 24 h")
+        type("0")
+        XCTAssertEqual(module.state.simpleDuration, 60, "au moins une minute")
+        type("12a")
+        XCTAssertEqual(module.state.simpleDuration, 12 * 60, "seuls les chiffres comptent")
+    }
+
+    private static func findView<V: NSView>(_ type: V.Type, in view: NSView?) -> V? {
+        guard let view else { return nil }
+        if let found = view as? V { return found }
+        for subview in view.subviews {
+            if let found = findView(type, in: subview) { return found }
+        }
+        return nil
+    }
+
     // MARK: Un seul rendez-vous
 
     func testOnlyOneAlignedTickWhileRunning() throws {
@@ -326,6 +393,36 @@ final class TimerTests: XCTestCase {
         // Reste 59,7 s : l'affichage change dans 0,7 s (plus une marge de 20 ms).
         let delay = try XCTUnwrap(rig.ticks.pending.first?.delay)
         XCTAssertEqual(delay, 0.72, accuracy: 0.011)
+    }
+
+    /// Reste 599,03 s après une reprise : l'affichage « 10:00 » doit passer à « 9:59 » dans 0,03 s, pas à « 9:58 ».
+    func testResumeWithATinyFractionNeverSkipsADisplayedSecond() throws {
+        let rig = try TimerRig(self)
+        let module = rig.startedModule()
+        module.startSimple(minutes: 10)
+        rig.clock.advance(0.97)
+        module.pause()
+        module.resume()
+        XCTAssertEqual(TimerFormat.clock(module.state.remaining(at: rig.clock.now)), "10:00")
+        let delay = try XCTUnwrap(rig.ticks.pending.first?.delay)
+        XCTAssertEqual(delay, 0.05, accuracy: 0.011, "visé sur la frontière, pas une seconde plus loin")
+        rig.clock.advance(delay)
+        module.tick()
+        XCTAssertEqual(TimerFormat.clock(module.state.remaining(at: rig.clock.now)), "9:59")
+    }
+
+    func testLastTickFollowsTheEndEvenWithATinyRemainder() throws {
+        let rig = try TimerRig(self)
+        let module = rig.startedModule()
+        module.startSimple(minutes: 1)
+        rig.clock.advance(59.97)
+        module.pause()
+        module.resume()
+        let delay = try XCTUnwrap(rig.ticks.pending.first?.delay)
+        XCTAssertEqual(delay, 0.05, accuracy: 0.011, "la fin n'attend pas une seconde de plus")
+        rig.clock.advance(delay)
+        module.tick()
+        XCTAssertEqual(module.state.status, .finished)
     }
 
     func testStartedButIdleSchedulesNothingAndStopIsClean() throws {
@@ -630,6 +727,24 @@ final class TimerTests: XCTestCase {
         _ = rig.makeModule().keepsRunningWhenCollapsed
         XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), "{ pas du json")
         XCTAssertEqual(try String(contentsOf: rig.fileURL.appendingPathExtension("corrupt-1"), encoding: .utf8), "encore")
+    }
+
+    /// Le fichier existe mais ne se lit pas (droits) : mis de côté, jamais écrasé comme s'il était absent.
+    func testExistingButUnreadableStateFileIsSetAsideNotOverwritten() throws {
+        let rig = try TimerRig(self)
+        try Data("{ \"version\": 1 }".utf8).write(to: rig.fileURL)
+        let aside = rig.fileURL.appendingPathExtension("corrupt")
+        XCTAssertEqual(chmod(rig.fileURL.path, 0o000), 0)
+        addTeardownBlock { chmod(aside.path, 0o600) }
+        let module = rig.makeModule()
+        XCTAssertFalse(module.keepsRunningWhenCollapsed)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rig.fileURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.path))
+        module.startSimple(minutes: 5)
+        module.saveNow()
+        XCTAssertNotNil(try? JSONSerialization.jsonObject(with: Data(contentsOf: rig.fileURL)))
+        chmod(aside.path, 0o600)
+        XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), "{ \"version\": 1 }")
     }
 
     func testNothingIsReadWhileTheModuleIsNotUsed() throws {

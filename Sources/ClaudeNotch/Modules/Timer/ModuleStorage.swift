@@ -30,8 +30,9 @@ enum ModuleDataDirectory {
 
 /// Fichier JSON d'un module : lecture tolérante, écriture atomique en 0600, débouncée, sur une file à part.
 ///
-/// - Illisible (JSON invalide, schéma inconnu) : le fichier est renommé en `<nom>.corrupt` (jamais écrasé par un
-///   état vide) et le module repart de zéro.
+/// - Illisible (JSON invalide, schéma inconnu, lecture refusée alors que le fichier existe) : le fichier est
+///   renommé en `<nom>.corrupt` (jamais écrasé par un état vide) et le module repart de zéro. Lu en partie
+///   seulement (`isPartial`) : une copie est gardée de la même façon et le reste est chargé.
 /// - `save` mémorise la dernière valeur et arme un seul délai ; à l'échéance, la valeur est encodée et écrite hors
 ///   du main thread. `flush` écrit tout de suite (et attend la fin avec `wait`) : repli du panneau, fin de l'app.
 final class SecureJSONFile<Value: Codable> {
@@ -50,18 +51,35 @@ final class SecureJSONFile<Value: Codable> {
 
     deinit { cancelTimer?() }
 
-    /// nil : pas de fichier, ou fichier illisible (mis de côté en `.corrupt`).
-    func load() -> Value? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
+    /// Où est allé le fichier mis de côté (ou sa copie) par `load` ; nil si rien n'a été écarté.
+    private(set) var asideURL: URL?
+
+    /// nil : pas de fichier, ou fichier illisible (mis de côté en `.corrupt`). `isPartial` : le contenu lu a perdu
+    /// des entrées illisibles ; le fichier d'origine est alors copié en `.corrupt` avant que la prochaine écriture
+    /// ne les efface.
+    func load(isPartial: (Value) -> Bool = { _ in false }) -> Value? {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return nil
+        } catch {
+            // Le fichier existe mais ne se lit pas (droits, verrou, erreur d'E/S) : jamais traité comme « absent ».
+            setAside(copy: false)
+            return nil
+        }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let value = try? decoder.decode(Value.self, from: data) { return value }
-        setAside()
-        return nil
+        guard let value = try? decoder.decode(Value.self, from: data) else {
+            setAside(copy: false)
+            return nil
+        }
+        if isPartial(value) { setAside(copy: true) }
+        return value
     }
 
     /// `<nom>.corrupt`, ou `<nom>.corrupt-<n>` si un précédent est déjà là : rien n'est jamais écrasé.
-    private func setAside() {
+    private func setAside(copy: Bool) {
         let manager = FileManager.default
         var target = url.appendingPathExtension("corrupt")
         var index = 1
@@ -69,7 +87,12 @@ final class SecureJSONFile<Value: Codable> {
             target = url.appendingPathExtension("corrupt-\(index)")
             index += 1
         }
-        try? manager.moveItem(at: url, to: target)
+        do {
+            if copy { try manager.copyItem(at: url, to: target) } else { try manager.moveItem(at: url, to: target) }
+            asideURL = target
+        } catch {
+            asideURL = nil
+        }
     }
 
     func save(_ value: Value) {

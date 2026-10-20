@@ -381,7 +381,12 @@ struct DurationControl: View {
         .onChange(of: minutes) { value in if !focused { draft = String(value) } }
         .onChange(of: draft) { value in
             let digits = String(value.filter(\.isNumber).prefix(4))
-            if digits != value { draft = digits }
+            guard digits == value else { draft = digits; return }
+            // Retenu au fil de la frappe : « Démarrer » part avec ce que le champ affiche, sans Entrée.
+            if let typed = Int(digits) {
+                let clamped = min(max(typed, Self.range.lowerBound), Self.range.upperBound)
+                if clamped != minutes { module.setSimpleMinutes(clamped) }
+            }
         }
         .onChange(of: focused) { isFocused in
             if isFocused {

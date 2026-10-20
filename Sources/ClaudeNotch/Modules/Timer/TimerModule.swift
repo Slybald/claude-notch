@@ -328,10 +328,11 @@ final class TimerModule: NotchModule {
         cancelTick?()
         cancelTick = nil
         guard isStarted, state.status == .running, let end = state.endDate else { return }
-        // Prochain changement d'affichage : le reste franchit un entier (l'affichage arrondit au-dessus).
+        // Prochain changement d'affichage : le reste franchit un entier (l'affichage arrondit au-dessus). Sur un
+        // entier exact, il change dans 1 s ; sinon dans la partie fractionnaire, même minuscule (jamais sautée).
         let remaining = end.timeIntervalSince(clock())
         var delay = remaining - remaining.rounded(.down)
-        if delay < 0.05 { delay += 1 }
+        if delay == 0 { delay = 1 }
         cancelTick = scheduler.after(max(0.05, delay + 0.02)) { [weak self] in self?.tick() }
     }
 
