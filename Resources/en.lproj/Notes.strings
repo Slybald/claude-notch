@@ -1,3 +1,23 @@
-/* Claude Notch: English texts of the Notes module. The key is the French text used in the code. */
+/* Claude Notch: English texts of the Quick Notes module. The key is the French text used in the code. */
+"Notes rapides" = "Quick notes";
 "Notes" = "Notes";
-"Notes rapides." = "Quick notes.";
+"Nouvelle note" = "New note";
+"Aucune note ne correspond." = "No matching notes.";
+"Annuler" = "Undo";
+"Annuler la suppression" = "Undo delete";
+"Rechercher" = "Search";
+"Désépingler" = "Unpin";
+"Épingler" = "Pin";
+"Supprimer" = "Delete";
+"Copié" = "Copied";
+"Copier tout le texte" = "Copy all text";
+"Une idée, un numéro, une commande : écris-la ici." = "An idea, a number, a command: write it here.";
+"À l'instant" = "Just now";
+"%@ caractère" = "%@ character";
+"%@ caractères" = "%@ characters";
+"Afficher dans le Finder" = "Show in Finder";
+"Fichier des notes" = "Notes file";
+"Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie." = "Plain text, up to %d notes and %@ characters per note. Saved about a second after your last keystroke, when you switch notes and when the panel collapses.";
+"Limite de %d notes atteinte" = "Limit of %d notes reached";
+"Note limitée à %d caractères" = "Note limited to %d characters";
+"Notes illisibles : copie gardée dans %@" = "Unreadable notes: copy kept in %@";

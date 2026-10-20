@@ -1,3 +1,23 @@
-/* Claude Notch : textes français du module Notes (la clé est le texte). */
+/* Claude Notch : textes français du module Notes rapides (la clé est le texte). */
+"Notes rapides" = "Notes rapides";
 "Notes" = "Notes";
-"Notes rapides." = "Notes rapides.";
+"Nouvelle note" = "Nouvelle note";
+"Aucune note ne correspond." = "Aucune note ne correspond.";
+"Annuler" = "Annuler";
+"Annuler la suppression" = "Annuler la suppression";
+"Rechercher" = "Rechercher";
+"Désépingler" = "Désépingler";
+"Épingler" = "Épingler";
+"Supprimer" = "Supprimer";
+"Copié" = "Copié";
+"Copier tout le texte" = "Copier tout le texte";
+"Une idée, un numéro, une commande : écris-la ici." = "Une idée, un numéro, une commande : écris-la ici.";
+"À l'instant" = "À l'instant";
+"%@ caractère" = "%@ caractère";
+"%@ caractères" = "%@ caractères";
+"Afficher dans le Finder" = "Afficher dans le Finder";
+"Fichier des notes" = "Fichier des notes";
+"Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie." = "Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie.";
+"Limite de %d notes atteinte" = "Limite de %d notes atteinte";
+"Note limitée à %d caractères" = "Note limitée à %d caractères";
+"Notes illisibles : copie gardée dans %@" = "Notes illisibles : copie gardée dans %@";
