@@ -18,6 +18,35 @@ jobs:
       - name: Swift version
         run: swift --version
 
+      # Signature de code stable. Avec une signature ad hoc le cdhash change à chaque build et macOS oublie les
+      # autorisations (calendrier, Bluetooth, Automation, dossiers). Le certificat auto-signé (secrets
+      # SIGNING_CERT_P12 en base64 et SIGNING_CERT_PASSWORD) donne une exigence désignée fixe : il vit dans un
+      # trousseau temporaire, supprimé en fin de job. Sans les secrets, pas de release.
+      - name: Import signing certificate
+        env:
+          SIGNING_CERT_P12: ${{ secrets.SIGNING_CERT_P12 }}
+          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_CERT_P12" ] || [ -z "$SIGNING_CERT_PASSWORD" ]; then
+            echo "::error::Secrets SIGNING_CERT_P12 et SIGNING_CERT_PASSWORD absents : release annulée (une app signée ad hoc ferait redemander toutes les autorisations)."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/claude-notch-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          echo "SIGN_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "SIGN_IDENTITY=Claude Notch Self-Signed" >> "$GITHUB_ENV"
+          printf '%s' "$SIGNING_CERT_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KEYCHAIN" -P "$SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
+          # Autorise codesign à utiliser la clé sans invite (aucune interface sur le runner).
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
       - name: Test
         run: swift test
 
@@ -29,6 +58,20 @@ jobs:
           RELEASE_CHANNEL=1 VERSION="$VERSION" scripts/build.sh
           lipo -archs build/ClaudeNotch.app/Contents/MacOS/ClaudeNotch
           test "$(/usr/libexec/PlistBuddy -c 'Print :ClaudeNotchUpdateChannel' build/ClaudeNotch.app/Contents/Info.plist)" = release
+
+      # Une exigence désignée « certificate leaf = H"…" » ne dépend que du certificat ; « cdhash » voudrait dire
+      # que la signature est ad hoc (autorisations perdues à chaque mise à jour).
+      - name: Check code signature
+        run: |
+          APP=build/ClaudeNotch.app
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          # Une signature ad hoc s'affiche « # designated => cdhash … » (exigence calculée, pas intégrée).
+          REQUIREMENT=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/^[# ]*designated => //p')
+          echo "Exigence désignée : $REQUIREMENT"
+          if echo "$REQUIREMENT" | grep -q cdhash || ! echo "$REQUIREMENT" | grep -Eq 'certificate leaf = H"[0-9a-f]{40}"'; then
+            echo "::error::Signature non stable : l'exigence désignée ne repose pas sur le certificat."
+            exit 1
+          fi
 
       - name: Build DMG
         run: scripts/make-dmg.sh
@@ -56,3 +99,9 @@ jobs:
             "build/ClaudeNotch-$VERSION.dmg.sig" \
             --title "Claude Notch $VERSION" \
             --generate-notes
+
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/signing.p12"
+          if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
