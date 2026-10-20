@@ -14,17 +14,24 @@ final class NotesRig {
     private(set) var keyboardReleases = 0
     private(set) var revealed: [URL] = []
 
+    private var modules: [NotesModule] = []
+
     init(_ test: XCTestCase) throws {
         directory = try makeTemporaryDirectory(test)
+        // Enregistré après la suppression du dossier, donc exécuté avant : une écriture lancée en fin de test ne
+        // recrée pas le dossier supprimé.
+        test.addTeardownBlock { [self] in modules.forEach { $0.saveNow() } }
     }
 
     var fileURL: URL { directory.appendingPathComponent("notes.json") }
 
     func makeModule() -> NotesModule {
-        NotesModule(directory: directory, clock: clock.read, scheduler: timers.scheduler,
-                    fileScheduler: writes.scheduler, copy: { [self] in copied.append($0) },
-                    releaseKeyboard: { [self] in keyboardReleases += 1 }, reveal: { [self] in revealed.append($0) },
-                    center: center)
+        let module = NotesModule(directory: directory, clock: clock.read, scheduler: timers.scheduler,
+                                 fileScheduler: writes.scheduler, copy: { [self] in copied.append($0) },
+                                 releaseKeyboard: { [self] in keyboardReleases += 1 },
+                                 reveal: { [self] in revealed.append($0) }, center: center)
+        modules.append(module)
+        return module
     }
 
     func startedModule() -> NotesModule {

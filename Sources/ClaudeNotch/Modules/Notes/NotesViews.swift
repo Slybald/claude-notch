@@ -12,7 +12,7 @@ struct NotesPanel: View {
 
     static let height: CGFloat = 214
 
-    private var sidebarWidth: CGFloat { min(156, max(120, (width * 0.27).rounded())) }
+    private var sidebarWidth: CGFloat { min(172, max(124, (width * 0.3).rounded())) }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -97,7 +97,7 @@ struct NotesSidebar: View {
             Button(action: module.undoDelete) {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.uturn.backward").font(.system(size: 9.5, weight: .bold))
-                    Text("Annuler la suppression", tableName: "Notes").font(.system(size: 10.5, weight: .semibold))
+                    Text("Annuler", tableName: "Notes").font(.system(size: 10.5, weight: .semibold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 9)
@@ -107,6 +107,7 @@ struct NotesSidebar: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .help(L("Annuler la suppression", table: "Notes"))
             .transition(.opacity.combined(with: .move(edge: .bottom)))
         } else if let notice = module.notice {
             Text(notice)
@@ -159,7 +160,18 @@ struct NoteRow: View {
     let pin: () -> Void
     let delete: () -> Void
 
-    @State private var hovering = false
+    @State private var hovering: Bool
+
+    /// `hovering` : état de départ, pour les rendus hors écran.
+    init(note: Note, selected: Bool, hovering: Bool = false, select: @escaping () -> Void,
+         pin: @escaping () -> Void, delete: @escaping () -> Void) {
+        self.note = note
+        self.selected = selected
+        self.select = select
+        self.pin = pin
+        self.delete = delete
+        _hovering = State(initialValue: hovering)
+    }
 
     var body: some View {
         Button(action: select) {
@@ -234,10 +246,18 @@ struct NotesEditorCard: View {
     let focusToken: Int
     let requestFocus: () -> Void
 
-    @State private var hovering = false
+    @State private var hovering: Bool
     @State private var copied = false
     /// Note vide déjà focalisée au survol : un seul focus par note, pas à chaque passage de la souris.
     @State private var hoverFocused: UUID?
+
+    /// `hovering` : état de départ, pour les rendus hors écran.
+    init(module: NotesModule, focusToken: Int, hovering: Bool = false, requestFocus: @escaping () -> Void) {
+        self.module = module
+        self.focusToken = focusToken
+        self.requestFocus = requestFocus
+        _hovering = State(initialValue: hovering)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -437,12 +457,12 @@ final class NotesNSTextView: NSTextView {
 enum NotesFormat {
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.dateTimeStyle = .numeric
+        formatter.unitsStyle = .short
+        formatter.dateTimeStyle = .named
         return formatter
     }()
 
-    /// « à l'instant », « il y a 3 min », « hier ».
+    /// « À l'instant », « il y a 3 min », « hier » (le formateur suit la langue du système).
     static func relative(_ date: Date, now: Date) -> String {
         if abs(now.timeIntervalSince(date)) < 60 { return L("À l'instant", table: "Notes") }
         return relativeFormatter.localizedString(for: date, relativeTo: now)

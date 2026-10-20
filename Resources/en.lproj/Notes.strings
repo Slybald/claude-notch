@@ -3,6 +3,7 @@
 "Notes" = "Notes";
 "Nouvelle note" = "New note";
 "Aucune note ne correspond." = "No matching notes.";
+"Annuler" = "Undo";
 "Annuler la suppression" = "Undo delete";
 "Rechercher" = "Search";
 "Désépingler" = "Unpin";

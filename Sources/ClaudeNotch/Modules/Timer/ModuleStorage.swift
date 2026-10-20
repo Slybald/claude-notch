@@ -90,8 +90,6 @@ final class SecureJSONFile<Value: Codable> {
     /// Attend la fin des écritures lancées (fin de l'app, tests).
     func wait() { io.sync {} }
 
-    var hasPendingWrite: Bool { pending != nil }
-
     private static func write(_ value: Value, to url: URL) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

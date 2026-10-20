@@ -61,8 +61,10 @@ final class SystemTimerNotifier: NSObject, TimerNotifier, UNUserNotificationCent
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        let delay = max(1, date.timeIntervalSinceNow)
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        guard date.timeIntervalSinceNow > 1 else { return }
+        // Date absolue (et non un délai) : la veille de la machine ne la décale pas.
+        let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
         center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
     }
 

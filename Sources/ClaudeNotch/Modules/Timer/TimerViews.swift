@@ -31,7 +31,7 @@ struct TimerPanel: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            if state.isActive || state.status == .finished {
+            if state.isActive {
                 TimerLabel(symbol: module.phaseSymbol, text: module.label)
             } else {
                 modePicker
@@ -138,10 +138,6 @@ struct TimerPanel: View {
                 Text(String(format: L("Fin à %@", table: "Timer"), TimerFormat.time(end)))
                     .font(.system(size: 11))
                     .foregroundColor(Palette.secondary)
-            } else {
-                Text("En pause", tableName: "Timer")
-                    .font(.system(size: 11))
-                    .foregroundColor(Palette.amber)
             }
         }
     }
@@ -202,11 +198,13 @@ struct TimerDial: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                 }
-                Text(module.caption)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundColor(Palette.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if !module.caption.isEmpty {
+                    Text(module.caption)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundColor(Palette.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
             }
             .padding(.horizontal, 12)
         }
@@ -240,7 +238,7 @@ struct SessionDots: View {
     var body: some View {
         let state = module.state
         let total = module.sessionsBeforeLongBreak
-        let today = state.sessions(on: module.now, calendar: .current)
+        let today = state.sessions(on: module.now, calendar: module.calendar)
         let current = state.isActive && state.phase == .focus ? state.cycle : -1
         HStack(spacing: 6) {
             HStack(spacing: 4) {
@@ -490,7 +488,8 @@ struct TimerCompactView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.card))
-        .onAppear { DispatchQueue.main.async { module.panelOpened() } }
+        .onAppear { DispatchQueue.main.async { module.viewAppeared() } }
+        .onDisappear { module.viewDisappeared() }
     }
 }
 
@@ -502,7 +501,8 @@ struct TimerTabIcon: View {
     var body: some View {
         Image(systemName: module.state.isActive ? module.phaseSymbol : module.symbol)
             .font(.system(size: 12, weight: .semibold))
-            .onAppear { DispatchQueue.main.async { module.panelOpened() } }
+            .onAppear { DispatchQueue.main.async { module.viewAppeared() } }
+            .onDisappear { module.viewDisappeared() }
     }
 }
 
@@ -530,13 +530,13 @@ extension TimerModule {
             : String(format: L("Minuteur · %@", table: "Timer"), TimerFormat.duration(state.duration))
     }
 
-    /// Sous le grand chiffre.
+    /// Sous le grand chiffre ; rien pendant le décompte, l'en-tête dit déjà la phase.
     var caption: String {
         switch state.status {
         case .paused: return L("En pause", table: "Timer")
         case .finished: return L("Terminé", table: "Timer")
         case .idle: return state.mode == .pomodoro ? phaseName(state.phase) : L("Prêt", table: "Timer")
-        case .running: return state.mode == .pomodoro ? phaseName(state.phase) : L("Minuteur", table: "Timer")
+        case .running: return ""
         }
     }
 
@@ -562,12 +562,14 @@ struct TimerSettingsView: View {
                                range: TimerModule.shortBreakRange)
                 MinutesStepper(title: L("Pause longue", table: "Timer"), value: $module.longBreakMinutes,
                                range: TimerModule.longBreakRange)
-                Stepper(value: $module.sessionsBeforeLongBreak, in: TimerModule.sessionsRange) {
-                    LabeledContent {
+                LabeledContent {
+                    HStack(spacing: 8) {
                         Text(verbatim: "\(module.sessionsBeforeLongBreak)").monospacedDigit().foregroundColor(.secondary)
-                    } label: {
-                        Text("Sessions avant la pause longue", tableName: "Timer")
+                        Stepper("", value: $module.sessionsBeforeLongBreak, in: TimerModule.sessionsRange)
+                            .labelsHidden()
                     }
+                } label: {
+                    Text("Sessions avant la pause longue", tableName: "Timer")
                 }
                 Toggle(isOn: $module.autoStartBreaks) { Text("Lancer les pauses automatiquement", tableName: "Timer") }
                 SettingsNote(L("Les pauses démarrent seules ; la concentration attend que tu la lances.", table: "Timer"))
@@ -618,12 +620,13 @@ private struct MinutesStepper: View {
     let range: ClosedRange<Int>
 
     var body: some View {
-        Stepper(value: $value, in: range) {
-            LabeledContent {
+        LabeledContent {
+            HStack(spacing: 8) {
                 Text(TimerFormat.duration(TimeInterval(value * 60))).monospacedDigit().foregroundColor(.secondary)
-            } label: {
-                Text(title)
+                Stepper("", value: $value, in: range).labelsHidden()
             }
+        } label: {
+            Text(title)
         }
     }
 }

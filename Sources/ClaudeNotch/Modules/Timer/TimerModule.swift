@@ -74,11 +74,13 @@ final class TimerModule: NotchModule {
     private let scheduler: ModuleScheduler
     private let notifier: TimerNotifier
     private let playSound: (String) -> Void
-    private let calendar: Calendar
+    let calendar: Calendar
     private let center: NotificationCenter
 
     private var loaded = false
     private var isStarted = false
+    /// Vues du minuteur à l'écran (icône d'onglet, résumé compact) : le panneau est ouvert.
+    private var openViews = 0
     private var cancelTick: (() -> Void)?
     private var cancelFinishedEars: (() -> Void)?
     private var terminateObserver: NSObjectProtocol?
@@ -175,6 +177,7 @@ final class TimerModule: NotchModule {
 
     func stop() {
         isStarted = false
+        openViews = 0
         cancelTick?()
         cancelTick = nil
         cancelFinishedEars?()
@@ -295,6 +298,15 @@ final class TimerModule: NotchModule {
     }
 
     /// La notch s'ouvre (icône d'onglet ou résumé compact à l'écran) : l'oreille « Terminé » a servi.
+    func viewAppeared() {
+        openViews += 1
+        panelOpened()
+    }
+
+    func viewDisappeared() {
+        openViews = max(0, openViews - 1)
+    }
+
     func panelOpened() {
         guard finishedEarsUntil != nil else { return }
         cancelFinishedEars?()
@@ -338,7 +350,8 @@ final class TimerModule: NotchModule {
         // La notification de la phase terminée est remise par le système : on la laisse partir.
         scheduledNotification = nil
         if !ended.silent, !soundName.isEmpty { playSound(soundName) }
-        if state.status == .finished { showFinishedEars() }
+        // Panneau ouvert : le résultat est sous les yeux, pas d'oreille « Terminé » au repli qui suit.
+        if state.status == .finished, openViews == 0 { showFinishedEars() }
         commit()
     }
 

@@ -92,23 +92,33 @@ final class TimerRig {
     let directory: URL
     let defaults: UserDefaults
     private(set) var sounds: [String] = []
+    func recordSound(_ name: String) { sounds.append(name) }
+    func track(_ module: TimerModule) { modules.append(module) }
     let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         return calendar
     }()
 
+    private var modules: [TimerModule] = []
+
     init(_ test: XCTestCase) throws {
         directory = try makeTemporaryDirectory(test)
         defaults = makeEphemeralDefaults(test)
+        // Enregistré après la suppression du dossier, donc exécuté avant : une écriture lancée en fin de test ne
+        // recrée pas le dossier supprimé.
+        test.addTeardownBlock { [self] in modules.forEach { $0.saveNow() } }
     }
 
     var fileURL: URL { directory.appendingPathComponent("timer.json") }
 
     func makeModule() -> TimerModule {
-        TimerModule(defaults: defaults, directory: directory, clock: clock.read, scheduler: ticks.scheduler,
-                    notifier: notifier, playSound: { [self] in sounds.append($0) }, calendar: calendar, center: center,
-                    fileScheduler: writes.scheduler)
+        let module = TimerModule(defaults: defaults, directory: directory, clock: clock.read,
+                                 scheduler: ticks.scheduler, notifier: notifier,
+                                 playSound: { [self] in sounds.append($0) }, calendar: calendar, center: center,
+                                 fileScheduler: writes.scheduler)
+        modules.append(module)
+        return module
     }
 
     /// Module démarré, comme par le registre.
@@ -184,6 +194,25 @@ final class TimerTests: XCTestCase {
         XCTAssertEqual(module.state.status, .finished, "l'onglet montre encore « terminé »")
     }
 
+    func testNoFinishedEarsWhenThePanelIsOpenAtTheEnd() throws {
+        let rig = try TimerRig(self)
+        let module = rig.startedModule()
+        module.startSimple(minutes: 1)
+        module.viewAppeared()
+        ended(module, rig)
+        XCTAssertEqual(rig.sounds, ["Glass"], "le son est joué quand même")
+        XCTAssertNil(module.ears, "le résultat est déjà à l'écran")
+        XCTAssertFalse(module.keepsRunningWhenCollapsed)
+        module.viewDisappeared()
+
+        // Panneau fermé : l'oreille s'affiche, puis l'ouverture suivante l'éteint.
+        module.startTimer()
+        ended(module, rig)
+        XCTAssertNotNil(module.ears)
+        module.viewAppeared()
+        XCTAssertNil(module.ears)
+    }
+
     func testFinishedEarsExpireAfterAMinute() throws {
         let rig = try TimerRig(self)
         let module = rig.startedModule()
@@ -208,6 +237,49 @@ final class TimerTests: XCTestCase {
     func testSoundIsSilentWhenNameIsEmptyOrUnknown() {
         TimerSound.play("")
         TimerSound.play("Pas un son")
+    }
+
+    /// Les noms proposés dans les réglages existent sur ce Mac.
+    func testEverySystemSoundOfTheSettingsExists() {
+        for name in TimerSound.names {
+            XCTAssertNotNil(NSSound(named: NSSound.Name(name)), name)
+        }
+        XCTAssertTrue(TimerSound.names.contains(TimerSound.defaultName))
+    }
+
+    /// Le vrai planificateur (GCD) : un minuteur d'une minute sur une horloge accélérée ×30 se termine tout seul,
+    /// avec un seul son, et ne laisse aucun rendez-vous derrière lui.
+    func testRealSchedulerRunsTheTimerToItsEnd() throws {
+        let rig = try TimerRig(self)
+        let start = Date()
+        let base = rig.clock.now
+        let module = TimerModule(defaults: rig.defaults, directory: rig.directory,
+                                 clock: { base.addingTimeInterval(Date().timeIntervalSince(start) * 30) },
+                                 scheduler: .system, notifier: rig.notifier,
+                                 playSound: { [rig] name in rig.recordSound(name) }, calendar: rig.calendar,
+                                 center: rig.center, fileScheduler: rig.writes.scheduler)
+        rig.track(module)
+        module.start()
+        addTeardownBlock { module.stop() }
+        module.startSimple(minutes: 1)
+        let deadline = Date().addingTimeInterval(6)
+        while module.state.status == .running, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        XCTAssertEqual(module.state.status, .finished)
+        XCTAssertEqual(rig.sounds, ["Glass"])
+        XCTAssertEqual(module.ears?.text, "Terminé")
+        RunLoop.main.run(until: Date().addingTimeInterval(1.2))
+        XCTAssertEqual(rig.sounds.count, 1, "un seul son, plus aucun décompte")
+    }
+
+    func testSystemSchedulerFiresOnceAndCanBeCancelled() {
+        var fired = 0
+        _ = ModuleScheduler.system.after(0.05) { fired += 1 }
+        let cancel = ModuleScheduler.system.after(0.05) { fired += 10 }
+        cancel()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertEqual(fired, 1)
     }
 
     func testRestartFromFinishedRunsTheSameDuration() throws {
