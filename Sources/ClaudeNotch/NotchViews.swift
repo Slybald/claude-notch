@@ -176,26 +176,101 @@ struct CollapsedEars: View {
     }
 }
 
-/// Oreilles d'un module (minuteur, lecture en cours…) : symbole à gauche, texte court à droite.
+/// Oreilles d'un module (minuteur, lecture en cours…) : symbole ou image à gauche, texte court ou barres à droite.
 struct ModuleEarsView: View {
     let ears: ModuleEars
     let notchSize: CGSize
 
     var body: some View {
         HStack(spacing: 0) {
-            Image(systemName: ears.symbol)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Palette.accent)
-                .frame(width: NotchController.earWidth)
+            Group {
+                if let image = ears.image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 18, height: 18)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                } else {
+                    Image(systemName: ears.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Palette.accent)
+                }
+            }
+            .frame(width: NotchController.earWidth)
             Color.clear.frame(width: notchSize.width)
-            Text(ears.text)
-                .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                .foregroundColor(.white.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(width: NotchController.earWidth)
+            Group {
+                if ears.bars {
+                    EqualizerBars()
+                } else {
+                    Text(ears.text)
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
+            .frame(width: NotchController.earWidth)
         }
         .frame(height: notchSize.height)
+    }
+}
+
+/// Barres d'égaliseur des oreilles, animées par Core Animation comme `AnimatedGlyphView` (rien par image côté app).
+struct EqualizerBars: NSViewRepresentable {
+    func makeNSView(context: Context) -> EqualizerView { EqualizerView() }
+    func updateNSView(_ view: EqualizerView, context: Context) {}
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: EqualizerView, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
+    }
+}
+
+final class EqualizerView: NSView {
+    private static let barWidth: CGFloat = 2.5
+    private static let gap: CGFloat = 2
+    private static let height: CGFloat = 12
+    /// Hauteur au repos (rendus hors écran) et durée d'un aller, différentes par barre pour un mouvement irrégulier.
+    private static let rest: [CGFloat] = [0.55, 0.9, 0.4, 0.75]
+    private static let periods: [CFTimeInterval] = [0.42, 0.31, 0.47, 0.36]
+
+    private let bars = rest.map { _ in CALayer() }
+
+    init() {
+        super.init(frame: NSRect(origin: .zero, size: Self.size))
+        wantsLayer = true
+        bars.forEach { layer?.addSublayer($0) }
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    private static var size: NSSize {
+        NSSize(width: CGFloat(rest.count) * (barWidth + gap) - gap, height: height)
+    }
+
+    override var intrinsicContentSize: NSSize { Self.size }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (index, bar) in bars.enumerated() {
+            bar.removeAllAnimations()
+            bar.backgroundColor = NSColor(Palette.accent).cgColor
+            bar.cornerRadius = Self.barWidth / 2
+            bar.frame = NSRect(x: CGFloat(index) * (Self.barWidth + Self.gap), y: 0, width: Self.barWidth,
+                               height: Self.height)
+            bar.transform = CATransform3DMakeScale(1, Self.rest[index], 1)
+            guard window != nil else { continue }
+            let level = CABasicAnimation(keyPath: "transform.scale.y")
+            level.fromValue = 0.25
+            level.toValue = 1
+            level.duration = Self.periods[index]
+            level.autoreverses = true
+            level.repeatCount = .infinity
+            level.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            level.isRemovedOnCompletion = false
+            bar.add(level, forKey: "level")
+        }
+        CATransaction.commit()
     }
 }
 

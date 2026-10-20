@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import SwiftUI
 
@@ -9,6 +10,10 @@ struct ModuleEars: Equatable {
     var text: String
     /// Départage les modules entre eux : le plus grand gagne, à égalité l'ordre des onglets.
     var priority: Int = 0
+    /// Oreille gauche : image à la place du symbole (pochette), petite et arrondie.
+    var image: NSImage? = nil
+    /// Oreille droite : barres d'égaliseur animées à la place du texte.
+    var bars = false
 }
 
 /// Notice d'un composant tiers, affichée dans Réglages › À propos › Licences.

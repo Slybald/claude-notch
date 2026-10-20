@@ -1,0 +1,3 @@
+Source : https://github.com/ungive/mediaremote-adapter
+Commit : 0e82bf1c44ec39554fbfc402ec88a48c6ae2a0fd (branche master, vendorisé le 2026-10-20)
+Copié sans modification : LICENSE, bin/, include/, src/. Compilé par scripts/build.sh.
