@@ -127,6 +127,7 @@ final class AppCore {
             "untrackedCli": monitor.cliPids.subtracting(store.trackedPids).count,
         ]
         state["ears"] = store.earsText
+        state["sessionTimer"] = store.isTicking
         state["notch"] = notch?.debugInfo
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged

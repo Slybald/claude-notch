@@ -131,7 +131,9 @@ struct Session: Identifiable, Equatable {
 
 /// État de toutes les sessions suivies, alimenté par les hooks et un timer de 2 s.
 final class SessionStore: ObservableObject {
-    @Published private(set) var sessions: [String: Session] = [:]
+    @Published private(set) var sessions: [String: Session] = [:] {
+        didSet { updateTimer() }
+    }
 
     static let doneFlashDuration: TimeInterval = 5
     static let endedLinger: TimeInterval = 10
@@ -142,17 +144,32 @@ final class SessionStore: ObservableObject {
     private var transcripts: [String: TranscriptCursor] = [:]
     private var timer: Timer?
     private var tickCount = 0
+    private var started = false
+
+    /// Le timer tourne (diagnostic, tests).
+    var isTicking: Bool { timer != nil }
 
     /// Timer à 1 s : le transcript (Esc) est relu chaque seconde, le reste toutes les 2 s.
+    /// Seulement tant qu'il y a des sessions : sans session, rien à surveiller, aucun réveil.
     func start() {
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.tickCount += 1
-            self.tick(full: self.tickCount % 2 == 0)
+        started = true
+        updateTimer()
+    }
+
+    private func updateTimer() {
+        if started, !sessions.isEmpty, timer == nil {
+            let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                self.tickCount += 1
+                self.tick(full: self.tickCount % 2 == 0)
+            }
+            timer.tolerance = 0.2
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        } else if sessions.isEmpty, let timer {
+            timer.invalidate()
+            self.timer = nil
         }
-        timer.tolerance = 0.2
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
     }
 
     // MARK: - Lecture pour la vue

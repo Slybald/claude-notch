@@ -22,6 +22,19 @@ final class StateMachineTests: XCTestCase {
 
     private var session: Session { store.sessions[sid]! }
 
+    /// Sans session, le timer d'une seconde s'arrête : aucun réveil inutile.
+    func testTimerRunsOnlyWithSessions() {
+        store.start()
+        XCTAssertFalse(store.isTicking)
+        send("SessionStart", ["source": "startup"])
+        XCTAssertTrue(store.isTicking)
+        send("SessionEnd", ["reason": "exit"])
+        XCTAssertTrue(store.isTicking, "session terminée encore affichée")
+        store.tick(now: Date().addingTimeInterval(SessionStore.endedLinger + 1))
+        XCTAssertTrue(store.sessions.isEmpty)
+        XCTAssertFalse(store.isTicking)
+    }
+
     func testPermissionWithoutToolUseId() {
         send("SessionStart", ["source": "startup", "model": "claude-sonnet-5-5"])
         XCTAssertEqual(session.phase, .ready)
