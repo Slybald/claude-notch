@@ -6,6 +6,8 @@ import Foundation
 /// Une tuile de la grille (sert aussi de clé « en cours » pour le retour visuel).
 enum QuickTile: Hashable {
     case wifi, bluetooth, focus, lowPower, caffeine, scene
+    /// Pose ou retrait de l'autorisation sans mot de passe.
+    case authorization
 }
 
 /// Durée de la caféine.
@@ -103,6 +105,8 @@ struct QuickSettingsFailure: Error, Equatable {
         case failed
         /// L'écriture a réussi mais l'état relu n'a pas changé.
         case unchanged
+        /// Le nom d'utilisateur ne peut pas être écrit sans risque dans la règle sudoers : rien n'est installé.
+        case invalidUser
     }
 
     var kind: Kind
