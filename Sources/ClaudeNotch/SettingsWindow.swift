@@ -454,7 +454,7 @@ private struct AppearanceSettings: View {
     var body: some View {
         SettingsPane {
             Section("Aperçu") {
-                NotchAppearancePreview(prefs: prefs)
+                NotchAppearancePreview(prefs: prefs, claudeEnabled: claudeEnabled)
                     .padding(.vertical, 4)
             }
             Section("Couleur d'accent") {
@@ -571,6 +571,8 @@ private struct AppearanceSettings: View {
 /// dégradé, pour juger l'opacité ; la bande du haut reste opaque comme sur la vraie notch.
 struct NotchAppearancePreview: View {
     @ObservedObject var prefs: Preferences
+    /// Sans l'onglet Claude, l'onglet actif de l'aperçu est le lecteur.
+    var claudeEnabled = true
 
     static let scale: CGFloat = 0.5
     static let height: CGFloat = 150
@@ -615,16 +617,17 @@ struct NotchAppearancePreview: View {
     private var header: some View {
         HStack(spacing: 5) {
             HStack(spacing: 3) {
-                Image(systemName: "sparkle")
+                Image(systemName: claudeEnabled ? "sparkle" : "play.fill")
                     .foregroundColor(prefs.accent)
-                Text(verbatim: "Claude")
+                if claudeEnabled { Text(verbatim: "Claude") }
             }
             .font(.system(size: 7, weight: .semibold))
             .foregroundColor(.white)
             .padding(.horizontal, 5)
             .frame(height: 12)
             .background(Capsule().fill(Color.white.opacity(0.12)))
-            ForEach(["play.fill", "switch.2", "tray", "doc.on.clipboard", "timer"], id: \.self) { symbol in
+            ForEach((claudeEnabled ? ["play.fill"] : []) + ["switch.2", "tray", "doc.on.clipboard", "timer"],
+                    id: \.self) { symbol in
                 Image(systemName: symbol)
                     .font(.system(size: 7, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
