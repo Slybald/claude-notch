@@ -174,20 +174,34 @@ final class HookSetup: ObservableObject {
                 return
             }
             LaunchAgent.setEnabled(false)
-
-            let done = NSAlert()
-            done.messageText = L("Claude Notch est désinstallé")
-            done.informativeText = hooks
-                ? L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. "
-                    + "Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage.")
-                : L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications.")
-            done.addButton(withTitle: L("Afficher dans le Finder"))
-            done.addButton(withTitle: L("Quitter"))
-            if done.runModal() == .alertFirstButtonReturn {
-                NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+            // Règle « économie d'énergie sans mot de passe » (Réglages rapides) : retirée aussi ; sans règle, rien
+            // n'est demandé.
+            LowPowerAuthorization.remove { result in
+                if case .failure = result, LowPowerAuthorization.isInstalled {
+                    let alert = NSAlert()
+                    alert.alertStyle = .warning
+                    alert.messageText = L("La règle d'économie d'énergie reste en place")
+                    alert.informativeText = L("Pour la retirer : sudo rm /etc/sudoers.d/claude-notch-lowpower")
+                    alert.runModal()
+                }
+                Self.finishUninstall(hooks: hooks)
             }
-            NSApp.terminate(nil)
         }
+    }
+
+    private static func finishUninstall(hooks: Bool) {
+        let done = NSAlert()
+        done.messageText = L("Claude Notch est désinstallé")
+        done.informativeText = hooks
+            ? L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. "
+                + "Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage.")
+            : L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications.")
+        done.addButton(withTitle: L("Afficher dans le Finder"))
+        done.addButton(withTitle: L("Quitter"))
+        if done.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+        }
+        NSApp.terminate(nil)
     }
 
     // MARK: - Outils

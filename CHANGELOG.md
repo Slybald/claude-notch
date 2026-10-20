@@ -25,6 +25,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Hooks are still updated silently after an update, but only for people who already had them, with the Claude
   tab on. The window no longer asks for the hooks at every launch.
 
+- Low Power Mode no longer asks for the administrator password at every switch. **Settings › Quick Settings**
+  (or "Don't ask again" in the tab) adds, once, a system rule that only allows `pmset -a lowpowermode 0|1`
+  (`/etc/sudoers.d/claude-notch-lowpower`, checked by `visudo` before it is installed, written by root only).
+  Switches then go through `sudo -n`; if the rule stops working, the password is asked again and the app offers
+  to set it back. "Remove the authorization" and uninstalling (app or script) remove it.
+
 ### Fixed
 
 - 1.2.0 saved **When Claude Is Open** on its own for people who already had the hooks. It is set back to

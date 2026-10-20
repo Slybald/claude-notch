@@ -219,8 +219,9 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
 - **Desktop, Documents, Downloads**: only for the optional companion tools (see [Tools section](#tools-section)).
 - Wi-Fi: the network name is not read, so Location is not requested. If macOS refuses to change the Wi-Fi state,
   the tile says so.
-- Low Power Mode asks for your administrator password or Touch ID each time it changes. macOS requires it for
-  `pmset`.
+- Low Power Mode needs administrator rights (`pmset`). By default macOS asks for your password or Touch ID at each
+  change; "Don't ask again" adds, once, a system rule limited to turning this mode on and off
+  (`/etc/sudoers.d/claude-notch-lowpower`), removed by "Remove the authorization" or by uninstalling.
 
 ## How it works
 
@@ -313,8 +314,8 @@ hooks it already receives:
 - Player: the track comes from `mediaremote-adapter`, an open-source helper (BSD-3-Clause) that runs through Apple's
   `/usr/bin/perl`, because since macOS 15.4 MediaRemote no longer answers third-party apps. If the helper cannot
   run, the tab shows "Now playing unavailable" and a **Try Again** button.
-- Low Power Mode asks for your administrator password or Touch ID at each change. The tile is hidden on Macs that
-  do not offer this mode.
+- Low Power Mode asks for your administrator password or Touch ID at each change, unless you allow it once
+  ("Don't ask again"). The tile is hidden on Macs that do not offer this mode.
 - Focus: macOS offers no API to read or set Focus. The tile runs a shortcut that you create in the Shortcuts app
   (the tile explains how). The state it shows is the one set by your last click.
 - Bluetooth uses a private API of `IOBluetooth`, loaded at runtime. Apple may change it without notice.
@@ -612,8 +613,10 @@ lancement.
   [Section outils](#section-outils)).
 - Wi-Fi : le nom du réseau n'est pas lu, donc la localisation n'est pas demandée. Si macOS refuse de changer l'état
   du Wi-Fi, la tuile l'indique.
-- L'économie d'énergie demande ton mot de passe administrateur ou Touch ID à chaque changement : macOS l'exige pour
-  `pmset`.
+- L'économie d'énergie exige les droits administrateur (`pmset`). Par défaut, macOS demande ton mot de passe ou
+  Touch ID à chaque changement ; « Ne plus demander » pose une fois une règle système limitée à l'activation et la
+  désactivation de ce mode (`/etc/sudoers.d/claude-notch-lowpower`), retirée par « Retirer l'autorisation » ou à la
+  désinstallation.
 
 ### Fonctionnement
 
@@ -708,8 +711,8 @@ partir de hooks qu'elle reçoit déjà :
 - Lecteur : le morceau vient de `mediaremote-adapter`, un utilitaire open source (BSD-3-Clause) qui passe par
   `/usr/bin/perl` d'Apple, car depuis macOS 15.4 MediaRemote ne répond plus aux apps tierces. Si l'utilitaire ne
   démarre pas, l'onglet affiche « Lecture en cours indisponible » et un bouton **Réessayer**.
-- Économie d'énergie : demande le mot de passe administrateur ou Touch ID à chaque changement. La tuile est masquée
-  sur les Mac qui n'ont pas ce mode.
+- Économie d'énergie : demande le mot de passe administrateur ou Touch ID à chaque changement, sauf si tu l'autorises
+  une fois (« Ne plus demander »). La tuile est masquée sur les Mac qui n'ont pas ce mode.
 - Concentration : macOS n'offre aucun moyen de lire ni de régler la Concentration depuis une app. La tuile lance un
   raccourci que tu crées dans l'app Raccourcis (la tuile explique comment). L'état affiché est celui de ton dernier
   clic.

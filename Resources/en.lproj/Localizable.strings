@@ -321,3 +321,5 @@
 "Confidentialité" = "Privacy";
 "Invisible dans les captures et le partage d'écran" = "Hidden from Screenshots and Screen Sharing";
 "Tu vois toujours la notch ; captures, enregistrements et partages d'écran ne la montrent pas (selon l'app qui capture)." = "You still see the notch; screenshots, recordings and screen sharing don't show it (depending on the capturing app).";
+"La règle d'économie d'énergie reste en place" = "The Low Power Mode rule is still in place";
+"Pour la retirer : sudo rm /etc/sudoers.d/claude-notch-lowpower" = "To remove it: sudo rm /etc/sudoers.d/claude-notch-lowpower";
