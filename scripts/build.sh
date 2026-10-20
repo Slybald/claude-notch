@@ -62,6 +62,55 @@ if [ "${RELEASE_CHANNEL:-}" = 1 ]; then
 fi
 cp "$ROOT/hooks/claude-notch-hook.sh" "$APP/Contents/Resources/claude-notch-hook.sh"
 chmod 755 "$APP/Contents/Resources/claude-notch-hook.sh"
+
+# Lecture en cours : mediaremote-adapter (Vendor/mediaremote-adapter, BSD-3-Clause, commit noté dans COMMIT).
+# Depuis macOS 15.4, MediaRemote ne répond qu'aux binaires d'Apple : /usr/bin/perl lance le script, qui charge
+# ce framework (l'app ne le lie pas) ; le client de test sert à la commande « test ». Universels, signés avec
+# l'app plus bas (codesign --deep).
+MRA="$ROOT/Vendor/mediaremote-adapter"
+FRAMEWORK="$APP/Contents/Frameworks/MediaRemoteAdapter.framework"
+mkdir -p "$FRAMEWORK/Versions/A/Resources" "$APP/Contents/Helpers"
+CLANG_FLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=13.0 -O2 -fobjc-arc"
+# shellcheck disable=SC2086
+clang $CLANG_FLAGS -dynamiclib -fvisibility=default -I "$MRA/include" -I "$MRA/src" \
+    -framework Foundation -framework AppKit -framework UniformTypeIdentifiers \
+    -install_name @rpath/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter \
+    -o "$FRAMEWORK/Versions/A/MediaRemoteAdapter" "$MRA"/src/adapter/*.m "$MRA"/src/private/*.m "$MRA"/src/utility/*.m
+# shellcheck disable=SC2086
+clang $CLANG_FLAGS -Wno-gnu-folding-constant -I "$MRA/src/test" -framework Foundation -framework MediaPlayer \
+    -o "$APP/Contents/Helpers/MediaRemoteAdapterTestClient" "$MRA"/src/test/*.m
+ln -s A "$FRAMEWORK/Versions/Current"
+ln -s Versions/Current/MediaRemoteAdapter "$FRAMEWORK/MediaRemoteAdapter"
+ln -s Versions/Current/Resources "$FRAMEWORK/Resources"
+cat > "$FRAMEWORK/Versions/A/Resources/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>MediaRemoteAdapter</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.slybald.claudenotch.mediaremote-adapter</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>MediaRemoteAdapter</string>
+	<key>CFBundlePackageType</key>
+	<string>FMWK</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.0</string>
+</dict>
+</plist>
+PLIST
+cp "$MRA/bin/mediaremote-adapter.pl" "$APP/Contents/Resources/mediaremote-adapter.pl"
+for BINARY in "$FRAMEWORK/MediaRemoteAdapter" "$APP/Contents/Helpers/MediaRemoteAdapterTestClient"; do
+    for arch in arm64 x86_64; do
+        lipo "$BINARY" -verify_arch "$arch" || { echo "Architecture $arch absente de $BINARY" >&2; exit 1; }
+    done
+done
+
 # Traductions (en.lproj, fr.lproj) : macOS affiche le français sur un système en français, l'anglais ailleurs.
 for LPROJ in "$ROOT"/Resources/*.lproj; do
     plutil -lint -s "$LPROJ"/*.strings
