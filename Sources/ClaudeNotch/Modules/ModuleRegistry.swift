@@ -55,6 +55,8 @@ final class ModuleRegistry: ObservableObject {
                 .sink { [weak self] _ in self?.reconcile() }
                 .store(in: &cancellables)
         }
+        // Au lancement, notch repliée : les modules qui tournent replié (oreilles, minuteur) démarrent tout de suite.
+        reconcile()
     }
 
     func module(_ id: String) -> (any NotchModule)? {
