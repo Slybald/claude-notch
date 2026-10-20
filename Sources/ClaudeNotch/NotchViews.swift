@@ -134,7 +134,8 @@ struct NotchRootView: View {
         .onPreferenceChange(NotchSizeKey.self) { size in model.contentSize = size }
         .animation(motion, value: expanded)
         .animation(motion, value: showsEars)
-        .animation(Self.slideAnimation, value: currentSlot?.id)
+        // Seulement pendant l'alternance : l'arrivée des oreilles garde son ressort.
+        .animation(Self.slideAnimation, value: slots.count >= 2 ? currentSlot?.id : nil)
         .animation(motion, value: compact)
         .animation(motion, value: model.selectedTab)
     }
