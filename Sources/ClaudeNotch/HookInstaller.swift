@@ -32,6 +32,13 @@ struct HookInstaller {
         "PostCompact",
     ]
     static let timeout = "10"
+    /// Hook PermissionRequest synchrone : sous le timeout, l'app rend toujours la main (~590 s au plus).
+    static let permissionTimeout = "600"
+    /// Attente `asyncRewake` d'un message : 24 h.
+    static let inboxTimeout = "86400"
+    /// Lus par Claude avec le message (même texte que hooks_config.py).
+    static let rewakeMessage = "Message from the user, sent from Claude Notch:"
+    static let rewakeSummary = "Message from Claude Notch"
 
     enum Status: Equatable {
         case notInstalled
@@ -101,7 +108,7 @@ struct HookInstaller {
 
     // MARK: - Actions
 
-    /// Copie le script de hook (755) puis ajoute nos 16 entrées à settings.json.
+    /// Copie le script de hook (755) puis ajoute nos entrées à settings.json (un groupe par événement).
     /// settings.json est validé avant toute écriture : en cas d'erreur, rien n'est touché.
     @discardableResult
     func install() throws -> Outcome {
@@ -162,8 +169,11 @@ struct HookInstaller {
             return .unreadable(Failure.hooksNotObject.localizedDescription)
         }
         if ours.isEmpty { return .notInstalled }
-        let entriesCurrent = Set(ours.keys) == Set(Self.events)
-            && ours.values.allSatisfy { $0.count == 1 && isExpectedEntry($0[0]) }
+        let expected = Self.entries(command: hookCommand)
+        let entriesCurrent = Set(ours.keys) == Set(Self.events) && ours.allSatisfy { event, hooks in
+            let wanted = expected[event] ?? []
+            return hooks.count == wanted.count && zip(hooks, wanted).allSatisfy(Self.sameObject)
+        }
         guard entriesCurrent else { return .outdated }
         return hookScriptIsCurrent ? .installed : .scriptOutdated
     }
@@ -208,6 +218,7 @@ struct HookInstaller {
         case .object(let members)?: hooks = .object(members)
         default: throw Failure.hooksNotObject
         }
+        let ours = entries(command: command)
         for event in events {
             var groups: [OrderedJSON]
             switch hooks[event] {
@@ -215,12 +226,35 @@ struct HookInstaller {
             case .array(let items)?: groups = items
             default: throw Failure.eventNotList(event)
             }
-            groups.append(.object([OrderedJSON.Member(key: "hooks", value: .array([entry(command: command)]))]))
+            groups.append(.object([OrderedJSON.Member(key: "hooks", value: .array(ours[event] ?? []))]))
             hooks[event] = .array(groups)
         }
         settings["hooks"] = hooks
     }
 
+    /// Nos hooks par événement, dans l'ordre écrit : le relais async partout ; pour « Répondre depuis la notch »,
+    /// le hook PermissionRequest synchrone (sans `onFailure` : un échec rend la main au terminal) et l'attente
+    /// `asyncRewake` de SessionStart et Stop.
+    static func entries(command: String) -> [String: [OrderedJSON]] {
+        let relay = entry(command: command)
+        let permission = OrderedJSON.object([
+            OrderedJSON.Member(key: "type", value: .string("command")),
+            OrderedJSON.Member(key: "command", value: .string(command + " permission")),
+            OrderedJSON.Member(key: "timeout", value: .number(permissionTimeout)),
+        ])
+        let inbox = OrderedJSON.object([
+            OrderedJSON.Member(key: "type", value: .string("command")),
+            OrderedJSON.Member(key: "command", value: .string(command + " inbox")),
+            OrderedJSON.Member(key: "asyncRewake", value: .bool(true)),
+            OrderedJSON.Member(key: "timeout", value: .number(inboxTimeout)),
+            OrderedJSON.Member(key: "rewakeMessage", value: .string(rewakeMessage)),
+            OrderedJSON.Member(key: "rewakeSummary", value: .string(rewakeSummary)),
+        ])
+        let extra = ["SessionStart": [inbox], "PermissionRequest": [permission], "Stop": [inbox]]
+        return Dictionary(uniqueKeysWithValues: events.map { ($0, [relay] + (extra[$0] ?? [])) })
+    }
+
+    /// Relais async d'un événement.
     static func entry(command: String) -> OrderedJSON {
         .object([
             OrderedJSON.Member(key: "type", value: .string("command")),
@@ -252,13 +286,12 @@ struct HookInstaller {
 
     // MARK: - État
 
-    /// Exactement notre entrée, à l'ordre des clés près.
-    private func isExpectedEntry(_ hook: OrderedJSON) -> Bool {
-        hook.members?.count == 4
-            && hook["type"] == .string("command")
-            && hook["command"] == .string(hookCommand)
-            && hook["async"] == .bool(true)
-            && hook["timeout"] == .number(Self.timeout)
+    /// Mêmes clés et mêmes valeurs, à l'ordre des clés près.
+    private static func sameObject(_ hook: OrderedJSON, _ wanted: OrderedJSON) -> Bool {
+        guard let members = hook.members, let expected = wanted.members, members.count == expected.count else {
+            return false
+        }
+        return expected.allSatisfy { hook[$0.key] == $0.value }
     }
 
     /// Script présent, exécutable et identique à celui de l'app (s'il est connu).

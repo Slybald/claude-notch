@@ -27,6 +27,10 @@ Interface available in English and French (follows the system language). Screens
   `active sessions·running subagents`, for example `1·6`, or the progress of the task list (`2/5`).
 - **Permissions**: the card shows what Claude is asking for (`Terminal · rm -rf build`, the file to edit,
   the question asked).
+- **Reply from the notch** (Settings › Claude, off by default): allow or deny a permission (with an optional
+  reason for Claude), answer a question (single or multiple choice, or your own text), approve a plan or ask
+  for changes, and send a message to a session (hover its card: **Message**). The terminal dialog stays usable
+  at the same time: the first answer wins. Never "always allow" from the notch. Return sends, Esc closes.
 - **Tasks**: progress bar and current task of Claude Code's task list; the chevron unfolds the whole list.
 - **Subagents**: number of subagents running in each session.
 - **Click to go back**: clicking a card brings the host app to the front (Terminal, iTerm2, Ghostty, VS Code,
@@ -103,18 +107,43 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   outgoing requests are the update check to `api.github.com` and the download of new versions from GitHub
   (see [Updates](#updates)).
 - The app listens on `127.0.0.1:47823` only, on the loopback interface: it cannot be reached from the network.
-- The hook script only talks to that local address, with `curl`.
+- The hook script only talks to that local address, with `curl`. Every request carries a token that the app
+  generates at each launch and writes to `~/Library/Application Support/ClaudeNotch/hook-token` (readable by
+  your account only); curl reads it from that file, so it never shows in the process list. The app refuses any
+  request without it, with another `Host` than `127.0.0.1:47823`, or with an `Origin` header (a web page).
+  The other way round, a decision or a message from the app carries a second secret (`hook-proof`, same
+  folder, never sent by the script): without it, the script ignores the answer, so a program that takes the
+  port while the app is closed (another account on a shared Mac) decides nothing.
+- Replies from the notch: the app only ever answers a request made by a Claude Code hook, after a click in the
+  notch. No route lets another program decide in your place, and there is no "always allow". When anything
+  fails (app not running, setting off, delay over), the hook hands control back to the terminal: never an
+  approval by default.
 - What the app reads: the hook events, the end of the transcript of a running session (to detect Esc),
   Claude Code's task files, the process list (to find the host app).
-- What the app writes: two local logs in `~/Library/Application Support/ClaudeNotch/` (see
+- What the app writes: two local logs and the token files in `~/Library/Application Support/ClaudeNotch/` (see
   [Shared logs](#shared-logs)), the hooks in `~/.claude` when you ask for it, and during an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
-  the old one.
+  the old one. The messages you type are sent to the Claude Code session only, never stored.
 
 ## How it works
 
 - Each hook event is relayed by `curl` to `http://127.0.0.1:47823/hook`, along with the hook's parent process
-  ID and a few environment variables. The hooks are declared `async: true`: they add no latency to Claude.
+  ID and a few environment variables. These hooks are declared `async: true`: they add no latency to Claude.
+- Two more kinds of hooks serve "Reply from the notch":
+  - `PermissionRequest` also runs the script synchronously (`permission` mode, 600 s timeout). The terminal
+    dialog shows up at the same time and stays usable; the first answer wins. The app holds the request until
+    you click, and otherwise answers "no decision": after 4 s if you have not opened its card in the notch,
+    after about 590 s if you have, as soon as the tool runs or the turn moves on, or when you answer in the
+    terminal. With the setting off, the hook returns at once.
+  - `SessionStart` and `Stop` start a waiting hook (`inbox` mode, `asyncRewake`): it waits in the background
+    for a message typed in the notch, then hands it to Claude, who starts a turn (about 3 s). During a turn, the
+    message is read after the current action. Without a waiting hook (session opened before the hooks were
+    updated, app restarted), the message is queued until the end of the turn. Messages are capped at
+    1,800 bytes and control characters are removed. Sessions without a terminal (`claude -p`, the Agent SDK,
+    IDEs, the Code tab of Claude Desktop) do not get messages from the notch: there, Claude waits for this hook
+    before reading the prompt, so the app lets it go at once (measured with Claude Code 2.1.304).
+- After an update of the app, hooks installed by a previous version are updated silently, with the usual
+  timestamped backup of `settings.json`.
 - From that process ID, the app walks up the process tree to find the Claude process (to detect the end of
   the session) and the host app (Terminal, iTerm2, Ghostty, VS Code, Claude Desktop…). A session with Claude
   Desktop among its ancestors is a Desktop session; the click opens it with
@@ -123,7 +152,8 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
 - Interrupting with Esc fires no hook: during a turn, the app reads the end of the transcript every second and
   switches the session back to "ready" when it finds the interruption.
 - Diagnostics: `GET http://127.0.0.1:47823/state` returns the state of the sessions and of the notch as JSON
-  (read only, local only).
+  (read only, local only, with the token:
+  `curl -H @"$HOME/Library/Application Support/ClaudeNotch/hook-token" http://127.0.0.1:47823/state`).
 
 ## Tools section
 
@@ -166,8 +196,11 @@ hooks it already receives:
 - Chat conversations in Claude Desktop do not go through hooks: for them, only "Claude Desktop open /
   frontmost" is shown.
 - A session opened before the hooks were installed only appears at its next message.
-- After a permission is granted, the card stays on "waiting for your permission" until the tool finishes:
-  no hook reports the approval itself.
+- After a permission is granted in the terminal, the card stays on "waiting for your permission" until the
+  tool finishes: no hook reports the approval itself. (Granted from the notch, the card updates at once.)
+- Reply from the notch: a session opened before the hooks were updated receives replies only after it
+  restarts. Sessions without a terminal (Code tab of Claude Desktop, `claude -p`, SDK) cannot receive a
+  message (no **Message** button); permissions, questions and plans are not checked with them.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -264,6 +297,11 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
   (`2/5`).
 - **Permissions** : la carte montre ce que Claude demande (`Terminal · rm -rf build`, le fichier à modifier,
   la question posée).
+- **Répondre depuis la notch** (Réglages › Claude, désactivé par défaut) : autoriser ou refuser une
+  permission (avec un motif facultatif pour Claude), répondre à une question (choix unique ou multiple, ou
+  texte libre), approuver un plan ou demander des changements, et écrire à une session (survole sa carte :
+  **Écrire**). Le dialogue du terminal reste utilisable en même temps : la première réponse gagne. Jamais de
+  « toujours autoriser » depuis la notch. Entrée envoie, Échap ferme.
 - **Tâches** : barre de progression et tâche en cours de la liste de Claude Code ; le chevron déplie la liste.
 - **Sous-agents** : nombre de sous-agents en cours dans chaque session.
 - **Clic → retour à la session** : un clic sur une carte ramène l'app hôte au premier plan (Terminal, iTerm2,
@@ -340,19 +378,45 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
   statistiques. Ses seules requêtes sortantes sont la recherche de mise à jour sur `api.github.com` et le
   téléchargement des nouvelles versions depuis GitHub (voir [Mises à jour](#mises-à-jour)).
 - L'app n'écoute que sur `127.0.0.1:47823`, sur l'interface de bouclage : elle est injoignable depuis le réseau.
-- Le script de hook ne parle qu'à cette adresse locale, avec `curl`.
+- Le script de hook ne parle qu'à cette adresse locale, avec `curl`. Chaque requête porte un jeton que l'app
+  génère à chaque lancement et écrit dans `~/Library/Application Support/ClaudeNotch/hook-token` (lisible par
+  ton compte seulement) ; curl le lit dans ce fichier, il n'apparaît donc jamais dans la liste des processus.
+  L'app refuse toute requête sans lui, avec un autre `Host` que `127.0.0.1:47823` ou avec un en-tête `Origin`
+  (une page web). Dans l'autre sens, une décision ou un message de l'app porte un second secret (`hook-proof`,
+  même dossier, jamais envoyé par le script) : sans lui, le script ignore la réponse. Un programme qui prend le
+  port pendant que l'app est fermée (un autre compte sur un Mac partagé) ne décide donc rien.
+- Réponses depuis la notch : l'app ne fait jamais que répondre à la requête d'un hook de Claude Code, après un
+  clic dans la notch. Aucune route ne permet à un autre programme de décider à ta place, et il n'y a pas de
+  « toujours autoriser ». Au moindre échec (app fermée, réglage coupé, délai passé), le hook rend la main au
+  terminal : jamais d'autorisation par défaut.
 - Ce que l'app lit : les événements de hook, la fin du transcript d'une session en cours (pour détecter
   Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte).
-- Ce que l'app écrit : deux journaux locaux dans `~/Library/Application Support/ClaudeNotch/` (voir
-  [Registres partagés](#registres-partagés)), les hooks dans `~/.claude` quand tu le demandes et, pendant une
-  mise à jour, le DMG dans `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la
-  nouvelle app à la place de l'ancienne.
+- Ce que l'app écrit : deux journaux locaux et les fichiers du jeton dans
+  `~/Library/Application Support/ClaudeNotch/` (voir [Registres partagés](#registres-partagés)), les hooks dans
+  `~/.claude` quand tu le demandes et, pendant une mise à jour, le DMG dans
+  `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
+  l'ancienne. Les messages que tu tapes partent à la session Claude Code seulement, sans être enregistrés.
 
 ### Fonctionnement
 
 - Chaque événement de hook est relayé par `curl` vers `http://127.0.0.1:47823/hook`, avec le PID du
-  processus parent du hook et quelques variables d'environnement. Les hooks sont déclarés `async: true` :
+  processus parent du hook et quelques variables d'environnement. Ces hooks sont déclarés `async: true` :
   aucune latence pour Claude.
+- Deux autres sortes de hooks servent à « Répondre depuis la notch » :
+  - `PermissionRequest` lance aussi le script en synchrone (mode `permission`, timeout de 600 s). Le dialogue
+    du terminal s'affiche en même temps et reste utilisable ; la première réponse gagne. L'app tient la
+    demande jusqu'à ton clic, sinon elle répond « pas de décision » : après 4 s si tu n'as pas ouvert sa carte
+    dans la notch, après 590 s environ si tu l'as ouverte, dès que l'outil tourne ou que le tour avance, ou
+    quand tu réponds au terminal. Réglage coupé, le hook rend la main tout de suite.
+  - `SessionStart` et `Stop` lancent une attente (mode `inbox`, `asyncRewake`) : elle attend en arrière-plan
+    un message tapé dans la notch, puis le remet à Claude, qui démarre un tour (3 s environ). Pendant un tour,
+    le message est lu après l'action en cours. Sans attente (session ouverte avant la mise à jour des hooks,
+    app relancée), le message reste en file jusqu'à la fin du tour. Taille limitée à 1 800 octets, caractères
+    de contrôle retirés. Les sessions sans terminal (`claude -p`, SDK, IDE, onglet Code de Claude Desktop) ne
+    reçoivent pas de message depuis la notch : Claude y attend la fin de ce hook avant de lire le prompt, l'app
+    le libère donc tout de suite (mesuré avec Claude Code 2.1.304).
+- Après une mise à jour de l'app, des hooks posés par une version précédente sont mis à jour sans rien
+  demander, avec la sauvegarde horodatée habituelle de `settings.json`.
 - À partir de ce PID, l'app remonte la chaîne de processus pour trouver le processus Claude (détection de
   fin de session) et l'app hôte (Terminal, iTerm2, Ghostty, VS Code, Claude Desktop…). Une session qui a
   Claude Desktop parmi ses ancêtres est une session Desktop ; le clic l'ouvre avec
@@ -361,7 +425,8 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
 - Une interruption par Esc ne déclenche aucun hook : pendant un tour, l'app relit la fin du transcript chaque
   seconde et repasse la session en « Prête » si elle y trouve l'interruption.
 - Diagnostic : `GET http://127.0.0.1:47823/state` renvoie l'état des sessions et de la notch en JSON
-  (lecture seule, local uniquement).
+  (lecture seule, local uniquement, avec le jeton :
+  `curl -H @"$HOME/Library/Application Support/ClaudeNotch/hook-token" http://127.0.0.1:47823/state`).
 
 ### Section outils
 
@@ -405,8 +470,11 @@ partir de hooks qu'elle reçoit déjà :
 - Les conversations « chat » de Claude Desktop ne passent pas par les hooks : seul l'état « Claude Desktop
   ouvert / au premier plan » est affiché pour elles.
 - Une session ouverte avant l'installation des hooks n'apparaît qu'à son prochain message.
-- Après une permission accordée, la carte reste en « Attend ta permission » jusqu'à la fin de l'outil : aucun
-  hook ne signale l'accord lui-même.
+- Après une permission accordée dans le terminal, la carte reste en « Attend ta permission » jusqu'à la fin
+  de l'outil : aucun hook ne signale l'accord lui-même. (Accordée depuis la notch, la carte suit tout de suite.)
+- Répondre depuis la notch : une session ouverte avant la mise à jour des hooks ne reçoit les réponses
+  qu'après son redémarrage. Une session sans terminal (onglet Code de Claude Desktop, `claude -p`, SDK) ne peut
+  pas recevoir de message (pas de bouton **Écrire**) ; permissions, questions et plans pas vérifiés avec elles.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app

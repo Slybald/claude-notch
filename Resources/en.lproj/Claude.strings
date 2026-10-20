@@ -1,0 +1,49 @@
+/* Claude Notch: English texts of the Claude module (reply from the notch). The key is the French text used in the code. */
+
+/* Permission, question, plan */
+"Autoriser %@ ?" = "Allow %@?";
+"Autoriser" = "Allow";
+"Refuser" = "Deny";
+"Pourquoi refuser ? (facultatif)" = "Why deny? (optional)";
+"Texte coupé : lis-le en entier dans la session" = "Text cut off: read it in full in the session";
+"Autre réponse…" = "Other answer…";
+"Répondre" = "Answer";
+"Plan à valider" = "Plan to review";
+"Changements à demander…" = "Changes to ask for…";
+"Demander des changements" = "Request Changes";
+"Approuver" = "Approve";
+"Réponds dans %@" = "Answer in %@";
+
+/* Message */
+"Écrire" = "Message";
+"Envoyer un message à Claude" = "Send a message to Claude";
+"Message à Claude…" = "Message to Claude…";
+"Envoyer (Entrée)" = "Send (Return)";
+"Fermer (Échap)" = "Close (Esc)";
+"Claude le lira après l'action en cours" = "Claude will read it after the current action";
+"Claude le lira tout de suite" = "Claude will read it right away";
+"En file : il partira à la fin du tour" = "Queued: it will go at the end of the turn";
+"trop long, il sera coupé" = "too long, it will be cut";
+"%d message en file : il partira à la fin du tour" = "%d message queued: it will go at the end of the turn";
+"%d messages en file : ils partiront à la fin du tour" = "%d messages queued: they will go at the end of the turn";
+"Annuler" = "Cancel";
+"message envoyé depuis la notch" = "message sent from the notch";
+
+/* Feedback */
+"Autorisé" = "Allowed";
+"Refusé" = "Denied";
+"Réponse envoyée" = "Answer sent";
+"Plan approuvé" = "Plan approved";
+"Changements demandés" = "Changes requested";
+"Message envoyé" = "Message sent";
+"Message remis à Claude" = "Message delivered to Claude";
+"File pleine : attends la fin du tour" = "Queue full: wait for the end of the turn";
+"Trop tard : déjà réglé ailleurs" = "Too late: already handled elsewhere";
+"Déjà réglé dans la session" = "Already handled in the session";
+"Délai dépassé : réponds dans la session" = "Timed out: answer in the session";
+
+/* Settings */
+"Autoriser ou refuser une permission, répondre à une question, valider un plan ou écrire à Claude (survole une carte : « Écrire ») sans quitter la notch. Le dialogue du terminal reste utilisable : la première réponse gagne." = "Allow or deny a permission, answer a question, approve a plan or write to Claude (hover a card: “Message”) without leaving the notch. The terminal dialog stays usable: the first answer wins.";
+"La notch garde une demande 4 s, ou jusqu'à ta réponse si tu ouvres sa carte ; sinon le terminal garde la main. Jamais de « toujours autoriser » depuis la notch. Désactivé, les hooks rendent la main tout de suite." = "The notch holds a request for 4 s, or until you answer if you open its card; otherwise the terminal keeps control. Never “always allow” from the notch. When off, the hooks hand control back right away.";
+"Hooks à mettre à jour pour répondre depuis la notch" = "Hooks need an update to reply from the notch";
+"Une session ouverte avant la mise à jour des hooks reçoit les réponses après son redémarrage." = "A session opened before the hooks were updated gets replies after it restarts.";

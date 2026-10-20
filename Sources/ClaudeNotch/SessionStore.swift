@@ -273,7 +273,10 @@ final class SessionStore: ObservableObject {
         case "UserPromptSubmit":
             beginTurn(&session, now: now)
             session.phase = .thinking
-            if event.isTaskNotification {
+            if let message = event.notchMessage {
+                session.lastPrompt = message.isEmpty
+                    ? L("message envoyé depuis la notch", table: "Claude") : ToolDescriber.firstLine(message, max: 90)
+            } else if event.isTaskNotification {
                 session.lastPrompt = L("résultat d'un agent en arrière-plan")
             } else if let prompt = event.prompt {
                 session.lastPrompt = ToolDescriber.firstLine(prompt, max: 90)
@@ -386,6 +389,24 @@ final class SessionStore: ObservableObject {
 
         sessions[id] = session
         if reloadTasks { scheduleTaskReload(id) }
+    }
+
+    /// Réponse donnée depuis la notch : la carte quitte « Attend ta permission » sans attendre la fin de l'outil.
+    /// Autorisé : l'outil tourne. Refusé : il ne tournera pas, Claude reprend la main.
+    func resolveAttention(_ id: String, allowed: Bool, now: Date = Date()) {
+        guard var session = sessions[id], session.phase.needsAttention else { return }
+        let toolId = session.attentionToolId
+        session.attentionToolId = nil
+        session.attentionText = nil
+        if allowed, let tool = session.activeTools.first(where: { $0.id == toolId }) ?? session.activeTools.last {
+            session.phase = .tool
+            session.currentTool = tool.description
+        } else {
+            if let toolId { session.activeTools.removeAll { $0.id == toolId } }
+            session.phase = .thinking
+        }
+        session.lastActivity = now
+        sessions[id] = session
     }
 
     private func handlePreToolUse(_ event: HookEvent, session: inout Session, now: Date) {

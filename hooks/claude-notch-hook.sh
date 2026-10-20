@@ -1,6 +1,57 @@
 #!/bin/sh
-# Relaie un événement de hook Claude Code vers Claude Notch (http://127.0.0.1:47823/hook).
-# Lancé en `async: true` : n'ajoute aucune latence à Claude. Sort toujours avec 0.
+# Hook Claude Code de Claude Notch : parle à l'app sur http://127.0.0.1:47823, avec le jeton qu'elle écrit dans
+# un fichier 0600 (passé à curl par -H @fichier, jamais en argument). Trois modes :
+#   (sans argument)  relaie l'événement vers /hook. Lancé en `async: true` : aucune latence. Sort avec 0.
+#   permission       PermissionRequest synchrone : la décision prise dans la notch (JSON) part sur la sortie
+#                    standard. Sans décision, app arrêtée ou réglage coupé : rien, le dialogue du terminal garde
+#                    la main (jamais d'autorisation par défaut).
+#   inbox            attente `asyncRewake` (SessionStart, Stop) d'un message envoyé depuis la notch : le texte
+#                    part sur stderr avec le code 2, ce qui réveille Claude. Sinon 0.
+# Une décision ou un message n'est appliqué que s'il porte la preuve de l'app (second fichier 0600, jamais
+# envoyé) : un autre programme qui occuperait le port, app fermée, ne décide rien.
+
+URL="http://127.0.0.1:${CLAUDE_NOTCH_PORT:-47823}"
+TOKEN="$HOME/Library/Application Support/ClaudeNotch/hook-token"
+PROOF="$HOME/Library/Application Support/ClaudeNotch/hook-proof"
+
+case "${1:-}" in
+permission | inbox)
+    [ -r "$TOKEN" ] && [ -r "$PROOF" ] || exit 0
+    WORK=$(mktemp -d "${TMPDIR:-/tmp}/claude-notch.XXXXXX") || exit 0
+    trap 'rm -rf "$WORK"' EXIT
+    # Hook arrêté (« No » au terminal, fin de session, timeout) : curl part avec lui, l'app voit la connexion se
+    # fermer et retire sa carte ou son attente.
+    CURL=
+    trap 'if [ -n "$CURL" ]; then kill "$CURL" 2>/dev/null; fi; exit 0' HUP INT TERM
+    cat > "$WORK/in"
+    if [ "$1" = permission ]; then MAX=598; else MAX=86000; fi
+    curl -q -sf --noproxy "*" -D "$WORK/head" -o "$WORK/out" --connect-timeout 0.5 --max-time "$MAX" \
+        -H @"$TOKEN" \
+        -H 'Content-Type: application/json' \
+        -H 'Expect:' \
+        -H "X-Claude-PPID: $PPID" \
+        --data-binary @"$WORK/in" \
+        "$URL/$1" &
+    CURL=$!
+    wait "$CURL" || exit 0
+    CURL=
+    [ -s "$WORK/out" ] || exit 0
+    # Comparaison par des commandes internes du shell : la preuve n'apparaît dans aucune liste de processus.
+    IFS= read -r EXPECTED < "$PROOF" && [ -n "$EXPECTED" ] || exit 0
+    CR=$(printf '\r')
+    GENUINE=
+    while IFS= read -r LINE; do
+        if [ "$LINE" = "X-Claude-Notch-Proof: $EXPECTED$CR" ]; then GENUINE=1; fi
+    done < "$WORK/head"
+    [ -n "$GENUINE" ] || exit 0
+    if [ "$1" = permission ]; then
+        cat "$WORK/out"
+        exit 0
+    fi
+    cat "$WORK/out" >&2
+    exit 2
+    ;;
+esac
 
 TMP=$(mktemp "${TMPDIR:-/tmp}/claude-notch.XXXXXX") || exit 0
 trap 'rm -f "$TMP"' EXIT
@@ -8,7 +59,8 @@ trap 'exit 0' HUP INT TERM
 cat > "$TMP"
 
 send() {
-    curl -s -o /dev/null --connect-timeout 0.5 --max-time 2 \
+    curl -q -s --noproxy "*" -o /dev/null --connect-timeout 0.5 --max-time 2 \
+        -H @"$TOKEN" \
         -H 'Content-Type: application/json' \
         -H 'Expect:' \
         -H "X-Claude-PPID: $PPID" \
@@ -19,11 +71,11 @@ send() {
         -H "X-Config-Dir: ${CLAUDE_CONFIG_DIR:-}" \
         -H "X-Host-Session-Id: ${CLAUDE_CODE_HOST_SESSION_ID:-}" \
         --data-binary @"$TMP" \
-        http://127.0.0.1:47823/hook
+        "$URL/hook" 2>/dev/null
 }
 
 if ! send; then
-    # App fermée : on la relance au début d'une session ou d'un tour, puis on réessaie.
+    # App fermée (ou jeton pas encore écrit) : on la relance au début d'une session ou d'un tour, puis on réessaie.
     if grep -Eq '"hook_event_name"[[:space:]]*:[[:space:]]*"(SessionStart|UserPromptSubmit)"' "$TMP"; then
         open -g -b io.github.slybald.claudenotch >/dev/null 2>&1 || exit 0
         i=0

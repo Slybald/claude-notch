@@ -67,6 +67,16 @@ struct HookEvent {
     var prompt: String? { string("prompt") }
     /// Le résultat d'un agent d'arrière-plan revient comme un faux prompt `<task-notification>…`.
     var isTaskNotification: Bool { prompt?.hasPrefix("<task-notification>") ?? false }
+    /// Message envoyé depuis la notch (hook `asyncRewake`) : il revient aussi en `<task-notification>`, avec notre
+    /// résumé, le texte venant après `rewakeMessage`. Chaîne vide si le texte est introuvable.
+    var notchMessage: String? {
+        guard isTaskNotification, let prompt,
+              prompt.contains("<summary>\(HookInstaller.rewakeSummary)</summary>") else { return nil }
+        guard let start = prompt.range(of: HookInstaller.rewakeMessage) else { return "" }
+        var text = prompt[start.upperBound...]
+        if let end = text.range(of: "</system-reminder>") { text = text[..<end.lowerBound] }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     /// Stop, SubagentStop, StopFailure
     var lastAssistantMessage: String? { string("last_assistant_message") }
     /// SessionStart : startup / resume / clear / compact

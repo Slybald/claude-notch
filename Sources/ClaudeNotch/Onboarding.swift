@@ -21,19 +21,28 @@ final class HookSetup: ObservableObject {
 
     var isInApplications: Bool { AppIdentity.isInApplicationsFolder(Bundle.main.bundlePath) }
 
-    /// Au lancement : la fenêtre s'ouvre si les hooks manquent, sont anciens ou si settings.json est illisible.
-    /// Après une mise à jour de l'app, seul le script embarqué a changé : il est réinstallé sans rien demander.
+    /// Au lancement : la fenêtre s'ouvre si les hooks manquent ou si settings.json est illisible.
+    /// Hooks déjà installés par une version précédente (entrées ou script) : mis à jour sans rien demander,
+    /// l'accord a été donné à l'installation (sauvegarde horodatée de settings.json, comme toujours). La fenêtre
+    /// ne s'ouvre que si cette mise à jour échoue.
     func showOnboardingIfNeeded() {
         refresh()
-        if status == .scriptOutdated {
-            do {
-                try installer.updateScript()
-            } catch {
-                NSLog("ClaudeNotch : mise à jour du script de hook impossible (%@).", error.localizedDescription)
-            }
-            refresh()
-        }
+        silentUpdate()
         if status != .installed { showOnboarding() }
+    }
+
+    /// `.scriptOutdated` : seul le script est réécrit. `.outdated` : entrées et script.
+    func silentUpdate() {
+        do {
+            switch status {
+            case .scriptOutdated: try installer.updateScript()
+            case .outdated: try installer.install()
+            default: return
+            }
+        } catch {
+            NSLog("ClaudeNotch : mise à jour des hooks impossible (%@).", error.localizedDescription)
+        }
+        refresh()
     }
 
     // MARK: - Fenêtre de premier lancement

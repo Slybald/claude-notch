@@ -7,11 +7,11 @@ organised and why some choices were made, so they are not undone by accident.
 
 - `swift build`: must produce **zero warnings** (the only tolerated one is the toolchain's
   "x86_64 architecture is deprecated" during the universal build).
-- `swift test`: all green; 6 diagnostic tests are skipped unless their environment variables are set.
+- `swift test`: all green; 7 diagnostic tests are skipped unless their environment variables are set.
 - Offscreen PNG renders: `CLAUDE_NOTCH_SNAPSHOT_DIR=/some/dir swift test --filter SnapshotTests` (notch, tabs,
-  compact mode, settings window). Known artifact: under the notch's `clipShape`, SF Symbols come out white in
-  these renders (`layer.render` and `cacheDisplay` alike); a window-server capture of the same view shows them
-  tinted, as on screen.
+  compact mode, settings window, reply cards in `ClaudeSnapshotTests`). Known artifact: under the notch's
+  `clipShape`, SF Symbols come out white in these renders (`layer.render` and `cacheDisplay` alike); a
+  window-server capture of the same view shows them tinted, as on screen.
 - Memory and CPU of the notch view: `CLAUDE_NOTCH_FOOTPRINT=1 swift test --filter FootprintTests`.
 - `scripts/build.sh` (universal app in `build/`, ad hoc signed unless `SIGN_KEYCHAIN` and `SIGN_IDENTITY` are
   set; `VERSION=x.y.z` sets the version, `RELEASE_CHANNEL=1` marks a release build), `scripts/make-dmg.sh`
@@ -20,14 +20,17 @@ organised and why some choices were made, so they are not undone by accident.
 - Release: push a `vX.Y.Z` tag; `.github/workflows/release.yml` imports the signing certificate into a temporary
   keychain, builds the app with `RELEASE_CHANNEL=1`, checks its code signature, makes the DMG, signs it with the
   `UPDATE_SIGNING_KEY` secret and creates the release (DMG, `.sha256`, `.sig`).
-- Live diagnostics of the running app: `GET http://127.0.0.1:47823/state` (sessions, notch, tools, jobs,
-  version, updater; `notch` gives the window level seen by the window server, the Space, occlusion, screen,
-  front app, full-screen state, tab and running modules).
+- Live diagnostics of the running app: `GET http://127.0.0.1:47823/state` with the hook token
+  (`curl -H @"$HOME/Library/Application Support/ClaudeNotch/hook-token" …`): sessions, notch, tools, jobs,
+  version, updater, replies (counts only); `notch` gives the window level seen by the window server, the Space,
+  occlusion, screen, front app, full-screen state, tab and running modules.
 
 ## Code map (`Sources/ClaudeNotch/`)
 
 - `HookServer`: minimal HTTP server on 127.0.0.1:47823. It resolves the process context *before* replying,
-  while the hook process is still alive. `HookEvent`: tolerant JSON reading, every field optional.
+  while the hook process is still alive. Exact `Host`, no `Origin`, token (`HookAccess`) on every route but
+  `/health`; `/permission` and `/inbox` are long requests handed to `ReplyCenter`. `HookEvent`: tolerant JSON
+  reading, every field optional.
 - `ProcessInspector`: walks the ancestors of the hook's `$PPID` to find the Claude process, the host app
   (outermost `.app` bundle) and the source (CLI or Desktop). `ClaudeMonitor`: is Claude Desktop running,
   which `claude` processes are alive (2 s scan).
@@ -36,7 +39,8 @@ organised and why some choices were made, so they are not undone by accident.
   session cards), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
-  per module: `Claude/` (sessions, compact summary, Claude settings), and the empty `Media/`,
+  per module: `Claude/` (sessions, compact summary, Claude settings; `ReplyCenter` and `ReplyViews` for
+  replies from the notch), and the empty `Media/`,
   `QuickSettings/`, `Shelf/`, `Clipboard/`, `Timer/`, `Notes/`.
 - `Preferences`: every setting (UserDefaults, observable, values clamped). `SettingsWindow`: the settings
   window (SwiftUI in an `NSWindow`, sidebar) and the main menu (⌘, ⌘W, editing).
@@ -82,7 +86,8 @@ Apple Events and Bluetooth are already there) nor another module's files.
 - **Settings** (`Preferences`): one `@Published` property per setting, stored in UserDefaults under a namespaced
   key (`hover.openDelay`, `tabs.order`, `appearance.accent`…), read back clamped. A module stores its own
   settings under `<id>.<name>`. The accent color is read through `Palette.accent`; the notch view is rebuilt
-  when it changes. "Reply from the notch" is stored but not wired yet.
+  when it changes. "Reply from the notch" (`claude.replyFromNotch`, off by default): off, the reply hooks get
+  an immediate "no decision".
 - **Localization per table**: `L("…", table: "Media")` or `Text("…", tableName: "Media")`; without a table,
   `Localizable`. `LocalizationTests` checks every table: each key used in the code is translated in its table, no
   unused keys, French identity, same format specifiers, same tables in `en.lproj` and `fr.lproj`.
@@ -94,6 +99,47 @@ Apple Events and Bluetooth are already there) nor another module's files.
   (ignored); a background agent's result comes back as a `UserPromptSubmit` starting with
   `<task-notification>`; the hook's `$PPID` is the claude process; the native CLI process is named after its
   version (e.g. `2.1.296`) and is recognised by its path.
+- **Reply from the notch, facts measured on Claude Code 2.1.304** (spike of 50 sessions, then replayed against
+  the real server and script):
+  - `PermissionRequest` hook run synchronously (timeout 600, **no `onFailure`**: a failure is fail-open, even
+    exit 2 does not deny): the terminal dialog is shown at the same time and stays usable; the first answer
+    wins. "No" in the terminal sends SIGTERM to the hook; "Yes" runs the tool and the hook's late answer is
+    ignored. Parallel tool calls ask one permission at a time.
+  - Output: `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}`, or
+    `deny` with a `message` that becomes the tool result (Claude goes on).
+  - AskUserQuestion is answered through the same hook (not PreToolUse, which hides the question in the
+    terminal): `allow` + `updatedInput` = original `tool_input` + `answers` {exact question text: label};
+    multiple choice = labels joined by ", "; free text accepted.
+  - ExitPlanMode: `allow` alone is **ignored**; approval = `allow` + `updatedInput` (original input) +
+    `updatedPermissions` `[{"type":"setMode","mode":"acceptEdits","destination":"session"}]`; `deny` +
+    `message` = keep planning.
+  - Free message: `SessionStart` and `Stop` hooks with `asyncRewake: true` (timeout 86400) long-poll the app; the
+    message goes to stderr with exit 2 and Claude starts a turn (~3 s); during a turn it is read after the
+    current tool. It comes back as a `UserPromptSubmit` `<task-notification>` with our `rewakeSummary`.
+  - Without a terminal (`-p`/`--print`, or `--input-format`/`--output-format` as passed by the SDK and the Code
+    tab of Claude Desktop, without `-p`), Claude **waits for the `asyncRewake` hooks** before reading the prompt
+    (`claude -p` never answered with a held waiter). `ReplyCenter.wait` reads the argv of `X-Claude-PPID`
+    (`KERN_PROCARGS2`) and answers 204 at once; such sessions get no **Message** button. Checked with the real
+    `claude -p` and stream-json against the real server: about 5 s, as without the hooks.
+- **Reply design**: one long connection per request; the app answers on the first of: the user's decision; the
+  `PostToolUse` (same tool and input), `Stop`, `UserPromptSubmit` or `SessionEnd` of the session; the connection
+  closing; the deadline (4 s if the card was never on screen, 590 s once it was, under the hook's 600 s). No
+  decision = 204. One waiter per session (a new one closes the old with 204), FIFO queue (10 messages), waiters
+  closed when their claude PID exits (kqueue `DispatchSourceProcess`, no polling). No route lets a client
+  decide: a decision only exists as the answer to a hook's request, after a click. Never "always allow".
+- **Hook token**: 32 hex, new at each launch, written (0600, `O_EXCL` + `rename`) only once the listener is
+  ready, so a second instance that cannot bind never overwrites it. The script passes it with `curl -H @file`
+  (never in argv) and `-q --noproxy '*'` (no `~/.curlrc`, no proxy). `permission` and `inbox` modes run curl
+  in the background and trap TERM to kill it: the app sees the connection close.
+- **Proof of the app**: the token authenticates the script to the app, not the other way round. A second
+  secret (`hook-proof`, 0600, written before the token, never sent by the script) comes back in the
+  `X-Claude-Notch-Proof` header of a 200 from `/permission` or `/inbox`, only to an authenticated request. The
+  script compares it with shell builtins (never in argv) and ignores any answer without it: a program bound to
+  the port while the app is closed (any account can bind 47823) gets the request but decides nothing. While
+  the app runs, nobody else can bind the port (checked, even with `SO_REUSEPORT`).
+- **Notch keyboard**: the panel never activates the app; it becomes key only for a text field
+  (`NotchKeyboard.take`) and gives the keyboard back with `orderOut` + `orderFrontRegardless` when the field
+  closes or the panel collapses, otherwise the next keystrokes would be swallowed by the hidden panel.
 - **Esc**: no hook fires. During a turn the transcript is read every second; only a `type: user` line whose
   text starts with `[Request interrupted by user` counts, not a mere quotation of that text.
 - **~0 % CPU when collapsed**: no fast timer and no file reads while the panel is collapsed. The spinner and the
@@ -177,7 +223,9 @@ Apple Events and Bluetooth are already there) nor another module's files.
   instance would quit at once.
 - **Hooks after an update**: when the entries in `settings.json` are current and only the bundled hook script
   changed (`HookInstaller.Status.scriptOutdated`), the script is rewritten silently at launch and
-  `settings.json` is not touched.
+  `settings.json` is not touched. When our entries come from a previous version (`.outdated`), entries and
+  script are reinstalled silently too (timestamped backup); the onboarding window only opens if that fails or
+  if the hooks were never installed.
 
 ## Conventions
 
