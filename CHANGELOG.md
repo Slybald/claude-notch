@@ -29,14 +29,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Reply from the notch** (Settings › Claude, off by default): allow or deny a permission, answer a question,
   approve a plan or ask for changes, and send a message to a session. The terminal stays usable; the first
   answer wins.
-- Notch settings: visibility (always, while Claude is open, during an activity), temporary hiding (1 hour, until
-  tomorrow, until turned back on), opening on hover or click, optional global shortcuts (open/close the panel,
-  hide/show the notch), custom panel width, background color, shadow, animation speed, screen choice with a
-  virtual notch on screens without one, and hiding the notch from screenshots and screen sharing. Reset to
-  defaults.
+- Notch settings: show the notch always, while Claude is open or during activity; hide it for an hour, until
+  tomorrow morning or until turned back on (also from a right click on the notch); open on hover or on click,
+  close on a click outside; two optional global shortcuts (open the panel with the keyboard, hide the notch);
+  screen choice (built-in, main, under the mouse or by name) with a virtual notch on screens without one; free
+  panel width, background color, shadow, animation speed (simple fade with Reduce Motion); hide the notch from
+  screenshots and screen sharing; reset to defaults. Opening the app again while it runs shows a hidden notch
+  and the settings.
 - Full screen: when an app is full screen on the notch's screen, the expanded panel becomes compact (half
   width, running sessions only), stays normal, or the notch hides, as set in Settings.
-- Settings window (**…** menu › **Settings…**, ⌘,): open at login, hover delays, haptic feedback, full-screen
+- Settings window (**…** menu › **Settings…**, ⌘,): open at login, visibility, hover delays, haptic feedback, full-screen
   behavior, tabs, accent color, panel size, background opacity, ears, Claude, updates, about and licenses.
 - `GET /state`: window level seen by the window server, Space, occlusion, screen, front app, full-screen state,
   tab and running modules.

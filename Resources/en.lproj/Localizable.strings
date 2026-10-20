@@ -1,7 +1,6 @@
 /* Claude Notch: English. The key is the French text used in the code (see Sources/ClaudeNotch/Localization.swift). */
 
 /* Panel menu */
-"Toujours visible" = "Always Visible";
 "Lancer à l'ouverture de session" = "Open at Login";
 "Effacer les sessions terminées" = "Clear Ended Sessions";
 "Quitter Claude Notch" = "Quit Claude Notch";
@@ -185,8 +184,6 @@
 "Apparence" = "Appearance";
 "Mises à jour" = "Updates";
 "À propos" = "About";
-"Sinon, la notch ne s'ouvre que lorsque Claude tourne (CLI ou Claude Desktop)." = "Otherwise, the notch only opens while Claude is running (CLI or Claude Desktop).";
-"Survol" = "Hover";
 "Délai d'ouverture" = "Open Delay";
 "Délai de fermeture" = "Close Delay";
 "%d ms" = "%d ms";
@@ -232,3 +229,79 @@
 "Coller" = "Paste";
 "Tout sélectionner" = "Select All";
 "Fenêtre" = "Window";
+
+/* Notch settings: visibility, hiding, opening, shortcuts, display */
+"Afficher la notch" = "Show the Notch";
+"Masquer la notch" = "Hide the Notch";
+"Toujours" = "Always";
+"Quand Claude est ouvert" = "When Claude Is Open";
+"Pendant une activité" = "During Activity";
+"Pendant 1 heure" = "For 1 Hour";
+"Jusqu'à demain" = "Until Tomorrow";
+"Jusqu'à réactivation" = "Until I Turn It Back On";
+"Notch masquée jusqu'à réactivation" = "Notch hidden until you turn it back on";
+"Notch masquée jusqu'à demain, %@" = "Notch hidden until tomorrow, %@";
+"Pour la réafficher : rouvrir Claude Notch" = "To show it again: open Claude Notch again";
+"Pour la réafficher : %@ ou rouvrir Claude Notch" = "To show it again: %@ or open Claude Notch again";
+"Notch masquée jusqu'à %@" = "Notch hidden until %@";
+"Aucun" = "None";
+"⌃⌥Espace" = "⌃⌥Space";
+"Visibilité" = "Visibility";
+"La notch reste toujours à l'écran." = "The notch always stays on screen.";
+"Tant que Claude Desktop ou une session Claude Code est ouverte." = "While Claude Desktop or a Claude Code session is open.";
+"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "When Claude is working or waiting for you, or a tab reports something (timer, playback). When idle, open Claude Notch again to get back to these settings.";
+"Réafficher" = "Show Again";
+"Aussi par le raccourci, ou en rouvrant Claude Notch." = "Also with the shortcut, or by opening Claude Notch again.";
+"Masquer" = "Hide";
+"Ouverture" = "Opening";
+"Ouvrir le panneau" = "Open the Panel";
+"Au survol" = "On Hover";
+"Au clic" = "On Click";
+"Fermer au clic à l'extérieur" = "Close on Click Outside";
+"Le panneau reste ouvert tant que tu ne cliques pas ailleurs." = "The panel stays open until you click elsewhere.";
+"Le panneau se ferme quand la souris le quitte." = "The panel closes when the pointer leaves it.";
+"Raccourcis" = "Shortcuts";
+"Ouvrir ou fermer le panneau" = "Open or Close the Panel";
+"Masquer ou réafficher la notch" = "Hide or Show the Notch";
+"Partout, sans autorisation. Panneau ouvert au clavier : ← → ou ⌘1…9 pour les onglets, Échap pour fermer." = "Anywhere, no permission needed. Panel opened from the keyboard: ← → or ⌘1…9 for tabs, Esc to close.";
+"Déjà pris par une autre app : choisis-en un autre." = "Already taken by another app: pick another one.";
+"Écran" = "Display";
+"Écran de la notch" = "Notch Display";
+"Écran intégré (avec encoche)" = "Built-in Display (with Notch)";
+"Écran principal" = "Main Display";
+"Écran sous la souris" = "Display with the Pointer";
+"%@ (débranché)" = "%@ (disconnected)";
+"Sans encoche, une encoche virtuelle est dessinée en haut au centre." = "Without a notch, a virtual notch is drawn at the top center.";
+"Rétablir les réglages par défaut…" = "Restore Defaults…";
+"Les onglets, leurs données et les hooks ne changent pas." = "Tabs, their data and the hooks stay as they are.";
+"Rétablir les réglages par défaut ?" = "Restore default settings?";
+"Réinitialiser" = "Reset";
+"Visibilité, ouverture, raccourcis, écran, taille, couleurs et animations reviennent à leurs valeurs d'origine." = "Visibility, opening, shortcuts, display, size, colors and animations go back to their original values.";
+
+/* Notch settings: appearance and privacy */
+"Aperçu" = "Preview";
+"Personnalisée" = "Custom";
+"Largeur" = "Width";
+"%d pt" = "%d pt";
+"En plein écran compact, le panneau garde sa demi-largeur." = "In compact full screen, the panel keeps its half width.";
+"Fond" = "Background";
+"Couleur du fond" = "Background Color";
+"Noir" = "Black";
+"Graphite" = "Graphite";
+"Bleu nuit" = "Midnight Blue";
+"Personnalisé" = "Custom";
+"Fond libre" = "Custom Background";
+"Une couleur claire est assombrie : le texte du panneau reste lisible." = "A light color is darkened so the panel's text stays readable.";
+"Ombre du panneau" = "Panel Shadow";
+"Animations" = "Animations";
+"Vitesse" = "Speed";
+"Rapide" = "Fast";
+"Normale" = "Normal";
+"Douce" = "Gentle";
+"« Réduire les animations » est activé dans macOS : simple fondu." = "“Reduce motion” is on in macOS: simple fade.";
+"Ouverture, fermeture et changement d'onglet." = "Opening, closing and switching tabs.";
+"Teinter aussi la notch repliée" = "Tint the Collapsed Notch Too";
+"Écrans sans encoche seulement : sur une vraie encoche, elle reste noire." = "Displays without a notch only: on a real notch, it stays black.";
+"Confidentialité" = "Privacy";
+"Invisible dans les captures et le partage d'écran" = "Hidden from Screenshots and Screen Sharing";
+"Tu vois toujours la notch ; captures, enregistrements et partages d'écran ne la montrent pas (selon l'app qui capture)." = "You still see the notch; screenshots, recordings and screen sharing don't show it (depending on the capturing app).";

@@ -15,6 +15,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HookSetup.shared.showOnboardingIfNeeded()
     }
 
+    /// App rouverte (Finder, Spotlight) alors qu'elle tourne : sans icône dans le Dock ni la barre des menus, c'est
+    /// le chemin de retour. Une notch masquée réapparaît et les réglages s'ouvrent (« Pendant une activité » au
+    /// repos, aucun raccourci). Le `open -g` du hook n'arrive ici que si un envoi échoue app ouverte : serveur pas
+    /// encore prêt, juste après le lancement.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        core.prefs.showAgain()
+        core.openSettings()
+        return true
+    }
+
     /// Une instance de cette version tourne déjà : elle suffit.
     private func isAnotherInstanceRunning() -> Bool {
         let me = ProcessInfo.processInfo.processIdentifier
@@ -89,10 +99,16 @@ final class AppCore {
         updater.isBusy = { [store] in store.hasBusySessions }
         updater.start()
 
+        // Relancer l'app vaut réactivation (seuls les masquages à durée survivent au relancement).
+        if prefs.hiddenUntil == .distantFuture { prefs.showAgain() }
         let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
         notch.start()
         self.notch = notch
         MainMenu.install(openSettings: { [weak notch] in notch?.openSettings() })
+    }
+
+    func openSettings() {
+        notch?.openSettings()
     }
 
     /// Instantané lisible de l'état, servi par `GET /state` (diagnostic local).

@@ -96,6 +96,7 @@ enum SettingsSection: Hashable {
     case general
     case tabs
     case appearance
+    case privacy
     case module(String)
     case updates
     case about
@@ -139,6 +140,7 @@ struct SettingsView: View {
             Label("Général", systemImage: "gearshape").tag(SettingsSection.general)
             Label("Onglets", systemImage: "rectangle.split.3x1").tag(SettingsSection.tabs)
             Label("Apparence", systemImage: "paintpalette").tag(SettingsSection.appearance)
+            Label("Confidentialité", systemImage: "hand.raised").tag(SettingsSection.privacy)
             ForEach(moduleSections) { section in
                 Label(section.title, systemImage: section.symbol).tag(SettingsSection.module(section.id))
             }
@@ -156,6 +158,7 @@ struct SettingsView: View {
         case .general: GeneralSettings(prefs: prefs)
         case .tabs: TabsSettings(prefs: prefs, registry: registry)
         case .appearance: AppearanceSettings(prefs: prefs)
+        case .privacy: PrivacySettings(prefs: prefs)
         case .module(let id): registry.module(id)?.makeSettingsView()
         case .updates: UpdateSettings(updater: updater, prefs: prefs)
         case .about: AboutSettings(registry: registry, updater: updater)
@@ -191,18 +194,50 @@ struct SettingsNote: View {
 
 private struct GeneralSettings: View {
     @ObservedObject var prefs: Preferences
+    @ObservedObject var hotKeys: HotKeyCenter = .shared
+    @State private var confirmReset = false
+
+    /// Écrans branchés, numérotés s'ils portent le même nom (le choix par nom les liste).
+    private var screenNames: [String] { NotchScreenPicker.labels(NSScreen.screens.map(ScreenCandidate.init)) }
+    private func now() -> Date { Date() }
 
     var body: some View {
         SettingsPane {
             Section {
                 Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
-                Toggle("Toujours visible", isOn: $prefs.alwaysVisible)
-                SettingsNote(L("Sinon, la notch ne s'ouvre que lorsque Claude tourne (CLI ou Claude Desktop)."))
             }
-            Section("Survol") {
-                delaySlider(L("Délai d'ouverture"), value: $prefs.openDelay, range: Preferences.openDelayRange)
-                delaySlider(L("Délai de fermeture"), value: $prefs.closeDelay, range: Preferences.closeDelayRange)
+            Section("Visibilité") {
+                Picker("Afficher la notch", selection: $prefs.visibility) {
+                    ForEach(NotchVisibility.allCases) { mode in
+                        Text(NotchMoreMenu.title(mode)).tag(mode)
+                    }
+                }
+                SettingsNote(visibilityNote)
+                hideRow
+            }
+            Section("Ouverture") {
+                Picker("Ouvrir le panneau", selection: $prefs.openTrigger) {
+                    Text("Au survol").tag(OpenTrigger.hover)
+                    Text("Au clic").tag(OpenTrigger.click)
+                }
+                .pickerStyle(.segmented)
+                if prefs.openTrigger == .hover {
+                    delaySlider(L("Délai d'ouverture"), value: $prefs.openDelay, range: Preferences.openDelayRange)
+                }
+                Toggle("Fermer au clic à l'extérieur", isOn: $prefs.closeOnClickOutside)
+                if !prefs.closeOnClickOutside {
+                    delaySlider(L("Délai de fermeture"), value: $prefs.closeDelay, range: Preferences.closeDelayRange)
+                }
+                SettingsNote(prefs.closeOnClickOutside
+                    ? L("Le panneau reste ouvert tant que tu ne cliques pas ailleurs.")
+                    : L("Le panneau se ferme quand la souris le quitte."))
                 Toggle("Retour haptique à l'ouverture", isOn: $prefs.hapticFeedback)
+            }
+            Section("Raccourcis") {
+                hotKeyPicker(L("Ouvrir ou fermer le panneau"), selection: $prefs.toggleHotKey, slot: .togglePanel)
+                hotKeyPicker(L("Masquer ou réafficher la notch"), selection: $prefs.hideHotKey, slot: .toggleHidden)
+                SettingsNote(L("Partout, sans autorisation. Panneau ouvert au clavier : ← → ou ⌘1…9 pour les "
+                    + "onglets, Échap pour fermer."))
             }
             Section("Plein écran") {
                 Picker("Quand une app est en plein écran", selection: $prefs.fullScreenBehavior) {
@@ -212,6 +247,94 @@ private struct GeneralSettings: View {
                 }
                 SettingsNote(L("Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de "
                     + "chaque onglet). Les oreilles restent les mêmes."))
+            }
+            Section("Écran") {
+                Picker("Écran de la notch", selection: $prefs.screenChoice) {
+                    Text("Écran intégré (avec encoche)").tag(ScreenChoice.builtin)
+                    Text("Écran principal").tag(ScreenChoice.main)
+                    Text("Écran sous la souris").tag(ScreenChoice.mouse)
+                    Divider()
+                    ForEach(namedChoices, id: \.self) { name in
+                        Text(screenNames.contains(name) ? name : String(format: L("%@ (débranché)"), name)).tag(name)
+                    }
+                }
+                SettingsNote(L("Sans encoche, une encoche virtuelle est dessinée en haut au centre."))
+            }
+            Section {
+                HStack {
+                    Spacer()
+                    Button("Rétablir les réglages par défaut…") { confirmReset = true }
+                }
+            } footer: {
+                SettingsNote(L("Les onglets, leurs données et les hooks ne changent pas."))
+            }
+        }
+        .alert(L("Rétablir les réglages par défaut ?"), isPresented: $confirmReset) {
+            Button("Réinitialiser", role: .destructive) { prefs.resetNotchSettings() }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text(L("Visibilité, ouverture, raccourcis, écran, taille, couleurs et animations reviennent à leurs "
+                + "valeurs d'origine."))
+        }
+    }
+
+    private var visibilityNote: String {
+        switch prefs.visibility {
+        case .always: return L("La notch reste toujours à l'écran.")
+        case .whenClaudeOpen: return L("Tant que Claude Desktop ou une session Claude Code est ouverte.")
+        case .duringActivity:
+            return L("Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). "
+                + "Au repos, rouvre Claude Notch pour retrouver ces réglages.")
+        }
+    }
+
+    /// Masquée : rappel et « Réafficher » ; sinon, les durées proposées.
+    @ViewBuilder
+    private var hideRow: some View {
+        if let until = prefs.hiddenUntil, until > now() {
+            LabeledContent {
+                Button("Réafficher") { prefs.showAgain() }
+            } label: {
+                Label(HiddenNotice.text(until: until, now: now()), systemImage: "eye.slash")
+                    .foregroundColor(Palette.amber)
+            }
+            SettingsNote(L("Aussi par le raccourci, ou en rouvrant Claude Notch."))
+        } else {
+            LabeledContent {
+                Menu {
+                    ForEach(HideDuration.allCases) { duration in
+                        Button(NotchController.title(duration)) { prefs.hide(duration, now: now()) }
+                    }
+                } label: {
+                    Text("Masquer")
+                }
+                .fixedSize()
+            } label: {
+                Text("Masquer la notch")
+            }
+        }
+    }
+
+    /// Écrans nommés : ceux qui sont branchés, plus celui choisi s'il est débranché.
+    private var namedChoices: [String] {
+        var names = screenNames
+        let fixed = [ScreenChoice.builtin, ScreenChoice.main, ScreenChoice.mouse]
+        if !fixed.contains(prefs.screenChoice), !names.contains(prefs.screenChoice) { names.append(prefs.screenChoice) }
+        return names
+    }
+
+    private func hotKeyPicker(_ title: String, selection: Binding<HotKeyChoice>,
+                              slot: HotKeyCenter.Slot) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(title, selection: selection) {
+                ForEach(HotKeyChoice.allCases) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            }
+            if hotKeys.unavailable.contains(slot) {
+                Text("Déjà pris par une autre app : choisis-en un autre.")
+                    .font(.system(size: 11))
+                    .foregroundColor(Palette.amber)
             }
         }
     }
@@ -294,8 +417,38 @@ private struct AppearanceSettings: View {
                 set: { color in if let hex = color.hexString { prefs.accentHex = hex } })
     }
 
+    private var customBackground: Binding<Color> {
+        Binding(get: { Color(hex: prefs.customBackgroundHex) ?? .black },
+                set: { color in if let hex = color.hexString { prefs.customBackgroundHex = hex } })
+    }
+
+    /// Taille prédéfinie (`PanelSize.rawValue`) ou « custom » (largeur libre).
+    private var sizeChoice: Binding<String> {
+        Binding(get: { prefs.customPanelWidth == nil ? prefs.panelSize.rawValue : Self.customSize },
+                set: { value in
+                    if let size = PanelSize(rawValue: value) {
+                        prefs.panelSize = size
+                        prefs.customPanelWidth = nil
+                    } else if prefs.customPanelWidth == nil {
+                        // Le curseur part de la largeur affichée jusque-là.
+                        prefs.customPanelWidth = Double(prefs.panelSize.width)
+                    }
+                })
+    }
+
+    private var customWidth: Binding<Double> {
+        Binding(get: { prefs.customPanelWidth ?? Double(prefs.panelSize.width) },
+                set: { prefs.customPanelWidth = $0 })
+    }
+
+    private static let customSize = "custom"
+
     var body: some View {
         SettingsPane {
+            Section("Aperçu") {
+                NotchAppearancePreview(prefs: prefs)
+                    .padding(.vertical, 4)
+            }
             Section("Couleur d'accent") {
                 HStack(spacing: 10) {
                     ForEach(Preferences.accentPresets, id: \.self) { hex in
@@ -311,12 +464,48 @@ private struct AppearanceSettings: View {
                 .padding(.vertical, 2)
             }
             Section("Panneau") {
-                Picker("Taille du panneau", selection: $prefs.panelSize) {
-                    Text("Compacte").tag(PanelSize.compact)
-                    Text("Standard").tag(PanelSize.standard)
-                    Text("Large").tag(PanelSize.large)
+                Picker("Taille du panneau", selection: sizeChoice) {
+                    Text("Compacte").tag(PanelSize.compact.rawValue)
+                    Text("Standard").tag(PanelSize.standard.rawValue)
+                    Text("Large").tag(PanelSize.large.rawValue)
+                    Text("Personnalisée").tag(Self.customSize)
                 }
                 .pickerStyle(.segmented)
+                if prefs.customPanelWidth != nil {
+                    LabeledContent {
+                        HStack(spacing: 10) {
+                            Slider(value: customWidth, in: Preferences.customWidthRange, step: Preferences.customWidthStep)
+                                .frame(width: 200)
+                            Text(String(format: L("%d pt"), Int(customWidth.wrappedValue)))
+                                .monospacedDigit()
+                                .foregroundColor(.secondary)
+                                .frame(width: 56, alignment: .trailing)
+                        }
+                    } label: {
+                        Text("Largeur")
+                    }
+                }
+                SettingsNote(L("En plein écran compact, le panneau garde sa demi-largeur."))
+            }
+            Section("Fond") {
+                Picker("Couleur du fond", selection: $prefs.panelBackground) {
+                    Text("Noir").tag(PanelBackground.black)
+                    Text("Graphite").tag(PanelBackground.graphite)
+                    Text("Bleu nuit").tag(PanelBackground.midnight)
+                    Text("Personnalisé").tag(PanelBackground.custom)
+                }
+                .pickerStyle(.segmented)
+                if prefs.panelBackground == .custom {
+                    LabeledContent {
+                        ColorPicker(selection: customBackground, supportsOpacity: false) {
+                            Text("Fond libre")
+                        }
+                        .labelsHidden()
+                    } label: {
+                        Text("Fond libre")
+                    }
+                    SettingsNote(L("Une couleur claire est assombrie : le texte du panneau reste lisible."))
+                }
                 LabeledContent {
                     HStack(spacing: 10) {
                         Slider(value: $prefs.backgroundOpacity, in: Preferences.opacityRange, step: 0.01)
@@ -329,11 +518,25 @@ private struct AppearanceSettings: View {
                 } label: {
                     Text("Opacité du fond")
                 }
+                Toggle("Ombre du panneau", isOn: $prefs.panelShadow)
+            }
+            Section("Animations") {
+                Picker("Vitesse", selection: $prefs.animationSpeed) {
+                    Text("Rapide").tag(AnimationSpeed.fast)
+                    Text("Normale").tag(AnimationSpeed.normal)
+                    Text("Douce").tag(AnimationSpeed.gentle)
+                }
+                .pickerStyle(.segmented)
+                SettingsNote(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                    ? L("« Réduire les animations » est activé dans macOS : simple fondu.")
+                    : L("Ouverture, fermeture et changement d'onglet."))
             }
             Section("Notch repliée") {
                 Toggle("Afficher les oreilles", isOn: $prefs.showEars)
                 SettingsNote(L("De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et "
                     + "le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours)."))
+                Toggle("Teinter aussi la notch repliée", isOn: $prefs.tintCollapsed)
+                SettingsNote(L("Écrans sans encoche seulement : sur une vraie encoche, elle reste noire."))
             }
         }
     }
@@ -351,6 +554,115 @@ private struct AppearanceSettings: View {
         }
         .buttonStyle(.plain)
         .padding(4)
+    }
+}
+
+/// Mini-rendu du panneau déplié avec les réglages courants : largeur, fond, opacité, ombre, accent. Sur un
+/// dégradé, pour juger l'opacité ; la bande du haut reste opaque comme sur la vraie notch.
+struct NotchAppearancePreview: View {
+    @ObservedObject var prefs: Preferences
+
+    static let scale: CGFloat = 0.5
+    static let height: CGFloat = 150
+    private static let band: CGFloat = 12
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            LinearGradient(colors: [Color(red: 0.2, green: 0.36, blue: 0.66), Color(red: 0.8, green: 0.45, blue: 0.58)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            // Barre des menus du « bureau ».
+            Color.white.opacity(0.22).frame(height: Self.band)
+            panel
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: Self.height)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Aperçu"))
+    }
+
+    private var panel: some View {
+        let color = prefs.panelColor
+        return VStack(alignment: .leading, spacing: 5) {
+            Color.clear.frame(height: Self.band)
+            header
+            card(progress: 0.6)
+            card(progress: 1)
+        }
+        .padding(.horizontal, 7)
+        .padding(.bottom, 7)
+        .frame(width: prefs.expandedWidth(compact: false) * Self.scale)
+        .padding(.horizontal, 6)
+        .background(ZStack(alignment: .top) {
+            Rectangle().fill(color.opacity(prefs.backgroundOpacity))
+            color.frame(height: Self.band)
+        })
+        .clipShape(NotchShape(topRadius: 6, bottomRadius: 12))
+        .shadow(color: .black.opacity(prefs.panelShadow ? 0.45 : 0), radius: 7, y: 3)
+    }
+
+    private var header: some View {
+        HStack(spacing: 5) {
+            HStack(spacing: 3) {
+                Image(systemName: "sparkle")
+                    .foregroundColor(prefs.accent)
+                Text(verbatim: "Claude")
+            }
+            .font(.system(size: 7, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 5)
+            .frame(height: 12)
+            .background(Capsule().fill(Color.white.opacity(0.12)))
+            ForEach(["play.fill", "switch.2", "tray", "doc.on.clipboard", "timer"], id: \.self) { symbol in
+                Image(systemName: symbol)
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            Spacer(minLength: 4)
+            Image(systemName: "ellipsis")
+                .font(.system(size: 7, weight: .semibold))
+                .foregroundColor(.white.opacity(0.8))
+        }
+    }
+
+    private func card(progress: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(progress < 1 ? prefs.accent : Palette.green)
+                .frame(width: 5, height: 5)
+            VStack(alignment: .leading, spacing: 3) {
+                Capsule().fill(Color.white.opacity(0.8)).frame(width: 60, height: 3)
+                Capsule().fill(Color.white.opacity(0.3)).frame(width: 100, height: 3)
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.1))
+                        Capsule().fill(prefs.accent).frame(width: proxy.size.width * progress)
+                    }
+                }
+                .frame(height: 3)
+            }
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.card))
+    }
+}
+
+// MARK: - Confidentialité
+
+private struct PrivacySettings: View {
+    @ObservedObject var prefs: Preferences
+
+    var body: some View {
+        SettingsPane {
+            Section {
+                Toggle("Invisible dans les captures et le partage d'écran", isOn: $prefs.hideFromCapture)
+            } footer: {
+                SettingsNote(L("Tu vois toujours la notch ; captures, enregistrements et partages d'écran ne la montrent "
+                    + "pas (selon l'app qui capture)."))
+            }
+        }
     }
 }
 
