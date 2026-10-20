@@ -341,6 +341,8 @@ struct ClaudeSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     SettingsNote(L("Permissions, questions et plans depuis la notch ; la première réponse gagne.",
                                    table: "Claude"))
+                    SettingsNote(L("Carte pas ouverte sous 4 s : le terminal garde la main. Jamais de « toujours autoriser ».",
+                                   table: "Claude"))
                     if prefs.replyFromNotch {
                         SettingsNote(L("Redémarre les sessions ouvertes avant la mise à jour des hooks.", table: "Claude"))
                     }

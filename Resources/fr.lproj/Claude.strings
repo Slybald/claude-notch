@@ -44,6 +44,7 @@
 
 /* Réglages */
 "Permissions, questions et plans depuis la notch ; la première réponse gagne." = "Permissions, questions et plans depuis la notch ; la première réponse gagne.";
+"Carte pas ouverte sous 4 s : le terminal garde la main. Jamais de « toujours autoriser »." = "Carte pas ouverte sous 4 s : le terminal garde la main. Jamais de « toujours autoriser ».";
 "Hooks à mettre à jour pour répondre depuis la notch" = "Hooks à mettre à jour pour répondre depuis la notch";
 "Réponses" = "Réponses";
 "Redémarre les sessions ouvertes avant la mise à jour des hooks." = "Redémarre les sessions ouvertes avant la mise à jour des hooks.";
