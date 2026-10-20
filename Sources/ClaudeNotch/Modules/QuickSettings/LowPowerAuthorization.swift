@@ -31,6 +31,8 @@ enum LowPowerAuthorization {
     static let visudoPath = "/usr/sbin/visudo"
     static let installPath = "/usr/bin/install"
     static let removePath = "/bin/rm"
+    static let mktempPath = "/usr/bin/mktemp"
+    static let printfPath = "/usr/bin/printf"
 
     static var isInstalled: Bool { FileManager.default.fileExists(atPath: rulePath) }
 
@@ -73,11 +75,22 @@ enum LowPowerAuthorization {
         "\(pmsetPath) -a lowpowermode \(on ? 1 : 0)"
     }
 
-    /// Valide la règle, puis seulement l'installe : rien n'entre dans sudoers.d sans que `visudo -c` ait réussi
-    /// (un fichier faux dans sudoers.d peut casser sudo pour tout le monde).
-    static func installShellCommand(temporaryFile: String) -> String {
-        let file = shellQuote(temporaryFile)
-        return "\(visudoPath) -cf \(file) && \(installPath) -m 0440 -o root -g wheel \(file) \(rulePath)"
+    /// Modèle du fichier de travail de root : `mktemp` le crée en 0600, propriété de root, dans /tmp (sticky bit :
+    /// personne d'autre ne peut le modifier, le remplacer ni le renommer).
+    static let workFileTemplate = "/tmp/claude-notch.XXXXXX"
+
+    /// Commande lancée en root. Aucun fichier côté utilisateur : root crée lui-même son fichier de travail, y écrit
+    /// la règle (les lignes passent par `printf`, chacune entre apostrophes), la valide, puis seulement l'installe.
+    /// Rien n'entre dans sudoers.d sans que `visudo -c` ait réussi (un fichier faux peut casser sudo pour tout le
+    /// monde), et le fichier vérifié est celui qui est installé : un autre processus de l'utilisateur ne peut pas le
+    /// changer entre les deux. Le fichier de travail est supprimé dans tous les cas, et la commande rend le code
+    /// de visudo ou d'install.
+    static func installShellCommand(ruleContents: String) -> String {
+        let lines = ruleContents.split(separator: "\n").map { shellQuote(String($0)) }.joined(separator: " ")
+        return "T=$(\(mktempPath) \(workFileTemplate)) || exit 1; \(printfPath) '%s\\n' \(lines) > \"$T\""
+            + " && \(visudoPath) -cf \"$T\""
+            + " && \(installPath) -m 0440 -o root -g wheel \"$T\" \(rulePath);"
+            + " R=$?; \(removePath) -f \"$T\"; exit $R"
     }
 
     static let removeShellCommand = "\(removePath) -f \(rulePath)"
@@ -97,29 +110,6 @@ enum LowPowerAuthorization {
             .replacingOccurrences(of: "\r", with: "\\r")
             .replacingOccurrences(of: "\t", with: "\\t")
         return "do shell script \"\(literal)\" with administrator privileges"
-    }
-
-    // MARK: - Fichier temporaire
-
-    /// Écrit `contents` dans un dossier privé (0700) créé pour l'occasion, fichier en 0600. Root le lit pour
-    /// `visudo` et `install`.
-    static func writeTemporaryRule(_ contents: String) throws -> URL {
-        var template = Array((NSTemporaryDirectory() as NSString).appendingPathComponent("claude-notch-XXXXXX").utf8CString)
-        guard mkdtemp(&template) != nil else { throw CocoaError(.fileWriteUnknown) }
-        let directory = URL(fileURLWithPath: String(cString: template), isDirectory: true)
-        let file = directory.appendingPathComponent("claude-notch-lowpower")
-        guard FileManager.default.createFile(atPath: file.path, contents: Data(contents.utf8),
-                                             attributes: [.posixPermissions: 0o600]) else {
-            rmdir(directory.path)
-            throw CocoaError(.fileWriteUnknown)
-        }
-        return file
-    }
-
-    /// Supprime le fichier puis son dossier (`rmdir` ne retire qu'un dossier vide).
-    static func discardTemporaryRule(_ file: URL) {
-        try? FileManager.default.removeItem(at: file)
-        rmdir(file.deletingLastPathComponent().path)
     }
 
     // MARK: - Désinstallation de l'app

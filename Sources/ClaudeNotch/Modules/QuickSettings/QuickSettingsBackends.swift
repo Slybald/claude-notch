@@ -234,19 +234,16 @@ final class SystemPowerMode: PowerModeBackend {
     private let run: SystemProcess.Runner
     private let ruleExists: () -> Bool
     private let userName: () -> String
-    private let temporaryRule: (String) throws -> URL
     /// sudo a refusé la règle pendant cette session : on ne l'essaie plus avant qu'elle soit redonnée.
     private var ruleRefused = false
 
     /// Les paramètres servent aux tests : aucun processus, aucun fichier système réels.
     init(run: @escaping SystemProcess.Runner = { SystemProcess.run($0, $1, timeout: $2) },
          ruleExists: @escaping () -> Bool = { LowPowerAuthorization.isInstalled },
-         userName: @escaping () -> String = NSUserName,
-         temporaryRule: @escaping (String) throws -> URL = LowPowerAuthorization.writeTemporaryRule) {
+         userName: @escaping () -> String = NSUserName) {
         self.run = run
         self.ruleExists = ruleExists
         self.userName = userName
-        self.temporaryRule = temporaryRule
     }
 
     var isLowPowerEnabled: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }
@@ -290,11 +287,8 @@ final class SystemPowerMode: PowerModeBackend {
         guard let contents = LowPowerAuthorization.ruleContents(forUser: userName()) else {
             return completion(.failure(QuickSettingsFailure(.invalidUser)))
         }
-        let file: URL
-        do { file = try temporaryRule(contents) } catch { return completion(.failure(QuickSettingsFailure(.failed))) }
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let result = runAsAdministrator(LowPowerAuthorization.installShellCommand(temporaryFile: file.path))
-            LowPowerAuthorization.discardTemporaryRule(file)
+            let result = runAsAdministrator(LowPowerAuthorization.installShellCommand(ruleContents: contents))
             DispatchQueue.main.async { [self] in
                 if case .success = result { ruleRefused = false }
                 completion(result)

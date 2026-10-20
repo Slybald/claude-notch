@@ -4,7 +4,8 @@ import XCTest
 /// Autorisation « sans mot de passe » de l'économie d'énergie (règle sudoers) : contenu de la règle, commandes,
 /// choix entre `sudo -n` et la fenêtre d'autorisation, installation, retrait, états de l'interface.
 /// Aucun test n'exécute sudo, AppleScript ou une commande privilégiée, ni n'écrit dans /etc : les accès sont des
-/// doubles. Seuls `visudo -c` (lecture, sans droits) et /bin/sh (sur des `printf`) tournent pour de vrai.
+/// doubles. Seuls tournent pour de vrai, sans droits root, /bin/sh, mktemp, printf et `visudo -c` (lecture) sur
+/// la commande d'installation, dont `install` est remplacé par une copie dans un dossier d'essai.
 final class QuickSettingsAuthorizationTests: XCTestCase {
     // MARK: - Doubles et outils
 
@@ -25,8 +26,6 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
 
         var sudoReply: SystemProcess.Output? = QuickSettingsAuthorizationTests.ok()
         var osascriptReply: SystemProcess.Output? = QuickSettingsAuthorizationTests.ok()
-        /// Appelé avec le script AppleScript, avant la réponse : le test regarde alors l'état du disque.
-        var onOsascript: ((String) -> Void)?
         private let lock = NSLock()
         private var recorded: [Call] = []
 
@@ -40,7 +39,6 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
             case LowPowerAuthorization.sudoPath:
                 return sudoReply
             case "/usr/bin/osascript":
-                onOsascript?(arguments[1])
                 return osascriptReply
             default:
                 return QuickSettingsAuthorizationTests.fail("programme inattendu : \(path)")
@@ -48,10 +46,8 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         }
     }
 
-    private func power(_ runner: ScriptedRunner, ruleInstalled: Bool = false, user: String = "alice",
-                       temporaryRule: @escaping (String) throws -> URL = LowPowerAuthorization.writeTemporaryRule)
-        -> SystemPowerMode {
-        SystemPowerMode(run: runner.run, ruleExists: { ruleInstalled }, userName: { user }, temporaryRule: temporaryRule)
+    private func power(_ runner: ScriptedRunner, ruleInstalled: Bool = false, user: String = "alice") -> SystemPowerMode {
+        SystemPowerMode(run: runner.run, ruleExists: { ruleInstalled }, userName: { user })
     }
 
     private func write(_ mode: SystemPowerMode, _ on: Bool) throws -> Result<LowPowerWrite, QuickSettingsFailure> {
@@ -130,16 +126,37 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
 
     private func text(_ data: Data) -> String { String(decoding: data, as: UTF8.self) }
 
-    /// Un dossier au nom hostile (espace, apostrophe, guillemet, barre oblique inverse, `$`, accent, accent grave).
-    private func hostileTemporaryRule(_ contents: String) throws -> URL {
+    /// Les fichiers de travail de root restés dans /tmp (une commande qui ne nettoie pas en laisserait un).
+    private func workFiles() -> Set<String> {
+        Set(((try? FileManager.default.contentsOfDirectory(atPath: "/tmp")) ?? []).filter { $0.hasPrefix("claude-notch.") })
+    }
+
+    /// Un dossier d'essai au nom hostile (espace, apostrophe, accent), supprimé en fin de test.
+    private func scratchDirectory() throws -> URL {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("Mon dossier d'essai \"x\" \\ $HOME `id` é \(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
-                                                attributes: [.posixPermissions: 0o700])
-        let file = directory.appendingPathComponent("règle d'essai")
-        XCTAssertTrue(FileManager.default.createFile(atPath: file.path, contents: Data(contents.utf8),
-                                                     attributes: [.posixPermissions: 0o600]))
-        return file
+            .appendingPathComponent("Dossier d'essai é \(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        return directory
+    }
+
+    /// Exécute pour de vrai, sans droits root, la commande d'installation de `contents` (mktemp, printf, visudo -c,
+    /// rm), mais avec l'étape `install` remplacée par `install` (et, au besoin, l'étape visudo par `visudo`) : rien
+    /// n'est installé, rien n'est écrit dans /etc. Vérifie d'abord que la commande ainsi modifiée n'en contient plus.
+    private func dryRun(_ contents: String, install: String, visudo: String? = nil) throws -> SystemProcess.Output {
+        let real = LowPowerAuthorization.installShellCommand(ruleContents: contents)
+        let installStep = "\(LowPowerAuthorization.installPath) -m 0440 -o root -g wheel \"$T\" \(LowPowerAuthorization.rulePath)"
+        let visudoStep = "\(LowPowerAuthorization.visudoPath) -cf \"$T\""
+        XCTAssertTrue(real.contains(installStep))
+        XCTAssertTrue(real.contains(visudoStep))
+        var dry = real.replacingOccurrences(of: installStep, with: install)
+        if let visudo { dry = dry.replacingOccurrences(of: visudoStep, with: visudo) }
+        XCTAssertFalse(dry.contains(LowPowerAuthorization.installPath), "l'installation réelle est retirée")
+        XCTAssertEqual(dry.components(separatedBy: LowPowerAuthorization.rulePath).count,
+                       contents.components(separatedBy: LowPowerAuthorization.rulePath).count,
+                       "le chemin de la règle ne reste que dans le texte du commentaire")
+        XCTAssertEqual(dry.components(separatedBy: ">").count, 2, "une seule redirection : vers le fichier de root")
+        return try shell(dry)
     }
 
     // MARK: - Règle sudoers
@@ -199,28 +216,63 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         }
     }
 
-    /// Preuve avec le vrai `visudo -c` (lecture seule, sans droits root) : la règle générée est syntaxiquement
-    /// valide, et visudo refuse bien une règle abîmée (sinon le test ne prouverait rien).
-    func testGeneratedRulePassesRealVisudo() throws {
+    /// Preuve avec le vrai `mktemp`, `printf` et `visudo -c` (sans droits root) : le fichier que la commande écrit
+    /// elle-même est exactement `ruleContents(forUser:)`, visudo l'accepte, et il est supprimé ensuite. L'étape
+    /// `install` est remplacée par une copie dans un dossier d'essai : rien n'est écrit dans /etc.
+    func testFileWrittenByTheCommandIsExactlyTheRuleAndPassesRealVisudo() throws {
         guard FileManager.default.isExecutableFile(atPath: LowPowerAuthorization.visudoPath) else {
             throw XCTSkip("visudo absent")
         }
+        let directory = try scratchDirectory()
         var users = ["alice", "jean.dupont", "_user-1"]
         if LowPowerAuthorization.isValidUser(NSUserName()) { users.append(NSUserName()) }
         for user in users {
-            let file = try LowPowerAuthorization.writeTemporaryRule(try XCTUnwrap(
-                LowPowerAuthorization.ruleContents(forUser: user)))
-            defer { LowPowerAuthorization.discardTemporaryRule(file) }
-            let output = try XCTUnwrap(SystemProcess.run(LowPowerAuthorization.visudoPath, ["-cf", file.path],
-                                                         timeout: 10))
+            let contents = try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: user))
+            let target = directory.appendingPathComponent("règle d'essai \(user)")
+            let before = workFiles()
+            let output = try dryRun(contents, install: "/bin/cp \"$T\" \(LowPowerAuthorization.shellQuote(target.path))")
             XCTAssertEqual(output.status, 0, "\(user) : \(text(output.stdout)) \(text(output.stderr))")
-            XCTAssertTrue(text(output.stdout).contains("parsed OK"), text(output.stdout))
+            XCTAssertTrue(text(output.stdout).contains("parsed OK"), "visudo -cf a accepté le fichier : \(text(output.stdout))")
+            XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), contents, user)
+            XCTAssertEqual(workFiles(), before, "le fichier de travail est supprimé")
         }
-        let broken = try LowPowerAuthorization.writeTemporaryRule("alice ALL=(root) NOPASSWD /usr/bin/pmset\n")
-        defer { LowPowerAuthorization.discardTemporaryRule(broken) }
-        let refused = try XCTUnwrap(SystemProcess.run(LowPowerAuthorization.visudoPath, ["-cf", broken.path],
-                                                      timeout: 10))
-        XCTAssertNotEqual(refused.status, 0)
+    }
+
+    /// Même chaîne avec une règle abîmée : visudo la refuse (sinon le test précédent ne prouverait rien), `install`
+    /// ne tourne pas, la commande rend un code d'échec, et le fichier de travail est quand même supprimé.
+    func testInstallIsSkippedWhenVisudoRefusesTheRule() throws {
+        guard FileManager.default.isExecutableFile(atPath: LowPowerAuthorization.visudoPath) else {
+            throw XCTSkip("visudo absent")
+        }
+        let before = workFiles()
+        let good = try dryRun(try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice")),
+                              install: "/usr/bin/printf INSTALLED")
+        XCTAssertEqual(good.status, 0, text(good.stderr))
+        XCTAssertTrue(text(good.stdout).hasSuffix("INSTALLED"), text(good.stdout))
+
+        let refused = try dryRun("alice ALL=(root) NOPASSWD /usr/bin/pmset\n", install: "/usr/bin/printf INSTALLED")
+        XCTAssertNotEqual(refused.status, 0, "le code de visudo est rendu")
+        XCTAssertFalse(text(refused.stdout).contains("INSTALLED"), "install ne tourne pas si visudo refuse")
+        XCTAssertEqual(workFiles(), before)
+    }
+
+    /// Le fichier que root vérifie est un fichier à lui : `mktemp` le crée en 0600 (un autre processus de
+    /// l'utilisateur ne peut donc pas le réécrire entre `visudo -c` et `install`). Le propriétaire (root) ne se
+    /// teste pas sans droits ; le mode, si.
+    func testWorkFileIsCreatedPrivateByMktemp() throws {
+        let output = try dryRun(try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice")),
+                                install: "/usr/bin/true", visudo: "/usr/bin/stat -f %Lp \"$T\"")
+        XCTAssertEqual(text(output.stdout), "600\n")
+        XCTAssertEqual(output.status, 0)
+    }
+
+    /// Chaque ligne passe par `shellQuote` puis `printf '%s\n'` : apostrophes, `$`, accent grave, guillemets,
+    /// barres obliques inverses et `%` ressortent intacts, sans rien exécuter.
+    func testRuleLinesSurviveTheShellAndPrintfUnchanged() throws {
+        let contents = "it's $HOME `id` \"x\" \\ %s %d 100%\nsecond 'line' ; touch /nonexistent\n$(id)\n"
+        let output = try dryRun(contents, install: "/usr/bin/true", visudo: "/bin/cat \"$T\"")
+        XCTAssertEqual(text(output.stdout), contents)
+        XCTAssertEqual(output.status, 0)
     }
 
     // MARK: - Commandes
@@ -253,57 +305,24 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
                        "le script de bascule avec mot de passe reste celui d'avant")
     }
 
-    func testInstallCommandChecksWithVisudoBeforeInstalling() throws {
-        let command = LowPowerAuthorization.installShellCommand(temporaryFile: "/tmp/x y/it's")
-        XCTAssertEqual(command, "/usr/sbin/visudo -cf '/tmp/x y/it'\\''s' && /usr/bin/install -m 0440 -o root -g wheel "
-            + "'/tmp/x y/it'\\''s' /etc/sudoers.d/claude-notch-lowpower")
-        let visudo = try XCTUnwrap(command.range(of: "/usr/sbin/visudo"))
-        let chain = try XCTUnwrap(command.range(of: " && "))
-        let install = try XCTUnwrap(command.range(of: "/usr/bin/install"))
-        XCTAssertTrue(visudo.lowerBound < chain.lowerBound && chain.upperBound <= install.lowerBound,
-                      "visudo -c d'abord, et install seulement s'il réussit")
-        XCTAssertEqual(command.components(separatedBy: "install").count, 2, "un seul install")
-        XCTAssertFalse(command.contains(";"), "pas de commande qui s'exécute malgré l'échec de visudo")
-    }
-
-    /// Exécute pour de vrai la chaîne `visudo … && install …`, mais avec `install` remplacé par un `printf` : rien
-    /// n'est installé. Fichier valide : visudo réussit, la suite s'exécute. Fichier invalide : elle ne s'exécute pas.
-    func testInstallIsSkippedWhenVisudoRefusesTheFile() throws {
-        guard FileManager.default.isExecutableFile(atPath: LowPowerAuthorization.visudoPath) else {
-            throw XCTSkip("visudo absent")
-        }
-        func dryRun(_ file: URL) throws -> SystemProcess.Output {
-            let command = LowPowerAuthorization.installShellCommand(temporaryFile: file.path)
-                .replacingOccurrences(of: LowPowerAuthorization.installPath, with: "/usr/bin/printf INSTALLED #")
-            XCTAssertFalse(command.contains(LowPowerAuthorization.installPath), "l'installation réelle est retirée")
-            return try shell(command)
-        }
-        let good = try hostileTemporaryRule(try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice")))
-        defer { LowPowerAuthorization.discardTemporaryRule(good) }
-        let accepted = try dryRun(good)
-        XCTAssertEqual(accepted.status, 0, text(accepted.stderr))
-        XCTAssertTrue(text(accepted.stdout).hasSuffix("INSTALLED"), text(accepted.stdout))
-
-        let bad = try hostileTemporaryRule("alice ALL=(root) NOPASSWD /usr/bin/pmset\n")
-        defer { LowPowerAuthorization.discardTemporaryRule(bad) }
-        let refused = try dryRun(bad)
-        XCTAssertNotEqual(refused.status, 0)
-        XCTAssertFalse(text(refused.stdout).contains("INSTALLED"), "install ne tourne pas si visudo refuse")
-    }
-
-    func testTemporaryRuleIsPrivateAndRemovedAfterwards() throws {
-        let file = try LowPowerAuthorization.writeTemporaryRule("contenu\n")
-        let directory = file.deletingLastPathComponent()
-        func mode(_ url: URL) throws -> Int {
-            try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
-        }
-        XCTAssertEqual(try mode(file), 0o600)
-        XCTAssertEqual(try mode(directory), 0o700)
-        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "contenu\n")
-        XCTAssertNotEqual(directory.path, NSTemporaryDirectory(), "un dossier à part, pas le dossier temporaire commun")
-        LowPowerAuthorization.discardTemporaryRule(file)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+    /// La commande lancée en root, mot pour mot : root crée son fichier (mktemp), y écrit la règle, la valide, puis
+    /// seulement l'installe, supprime son fichier et rend le code de visudo ou d'install. Aucun fichier de
+    /// l'utilisateur n'y figure.
+    func testInstallCommandIsTheExpectedChain() throws {
+        let contents = try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice"))
+        let command = LowPowerAuthorization.installShellCommand(ruleContents: contents)
+        let lines = contents.split(separator: "\n").map { LowPowerAuthorization.shellQuote(String($0)) }
+            .joined(separator: " ")
+        XCTAssertEqual(command, "T=$(/usr/bin/mktemp /tmp/claude-notch.XXXXXX) || exit 1; /usr/bin/printf '%s\\n' \(lines)"
+            + " > \"$T\" && /usr/sbin/visudo -cf \"$T\" && /usr/bin/install -m 0440 -o root -g wheel \"$T\""
+            + " /etc/sudoers.d/claude-notch-lowpower; R=$?; /bin/rm -f \"$T\"; exit $R")
+        func position(_ text: String) throws -> String.Index { try XCTUnwrap(command.range(of: text)).lowerBound }
+        XCTAssertTrue(try position("/usr/bin/mktemp") < position("/usr/bin/printf")
+            && position("/usr/bin/printf") < position("/usr/sbin/visudo")
+            && position("/usr/sbin/visudo") < position("/usr/bin/install"), "écrire, valider, puis installer")
+        XCTAssertEqual(command.components(separatedBy: "/usr/bin/install").count, 2, "un seul install")
+        XCTAssertFalse(command.contains(NSTemporaryDirectory()), "pas de fichier côté utilisateur")
+        XCTAssertFalse(command.contains("/var/folders"))
     }
 
     // MARK: - Bascule : sudo -n, puis repli sur la fenêtre d'autorisation
@@ -392,60 +411,36 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
 
     // MARK: - Installation
 
-    func testInstallRunsOneAdministratorScriptThenCleansUp() throws {
-        let runner = ScriptedRunner()
-        var seenAtPromptTime: (exists: Bool, mode: Int?, contents: String?)?
-        var path = ""
-        let mode = power(runner, user: "alice", temporaryRule: { [self] contents in
-            let file = try hostileTemporaryRule(contents)
-            path = file.path
-            return file
-        })
-        runner.onOsascript = { _ in
-            let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-            seenAtPromptTime = (FileManager.default.fileExists(atPath: path), attributes?[.posixPermissions] as? Int,
-                                try? String(contentsOfFile: path, encoding: .utf8))
-        }
+    /// Les fichiers que l'app laisserait dans le dossier temporaire de l'utilisateur : il ne doit y en avoir aucun.
+    private func userTemporaryFiles() -> Set<String> {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: NSTemporaryDirectory())) ?? []
+        return Set(names.filter { $0.hasPrefix("claude-notch") })
+    }
 
-        XCTAssertNoThrow(try authorize(mode).get())
+    func testInstallRunsOneAdministratorScriptAndLeavesNoUserFile() throws {
+        let runner = ScriptedRunner()
+        let before = userTemporaryFiles()
+        XCTAssertNoThrow(try authorize(power(runner, user: "alice")).get())
 
         XCTAssertEqual(runner.calls.count, 1, "un seul mot de passe : un seul script")
         XCTAssertTrue(runner.sudoCalls.isEmpty)
         let script = try XCTUnwrap(runner.scripts.first)
         let command = try XCTUnwrap(shellCommand(inScript: script), script)
-        XCTAssertEqual(command, LowPowerAuthorization.installShellCommand(temporaryFile: path))
-        XCTAssertEqual(command.components(separatedBy: LowPowerAuthorization.shellQuote(path)).count, 3,
-                       "le chemin entre apostrophes, deux fois (visudo et install)")
-        XCTAssertEqual(seenAtPromptTime?.exists, true)
-        XCTAssertEqual(seenAtPromptTime?.mode, 0o600)
-        XCTAssertEqual(seenAtPromptTime?.contents, LowPowerAuthorization.ruleContents(forUser: "alice"))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: path), "fichier temporaire supprimé")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: (path as NSString).deletingLastPathComponent),
-                       "et son dossier")
-
-        // Le shell reçoit bien chaque chemin comme UN argument, malgré l'espace, l'apostrophe, le guillemet, `$`…
-        let dryRun = command
-            .replacingOccurrences(of: LowPowerAuthorization.visudoPath, with: "/usr/bin/printf '[%s]'")
-            .replacingOccurrences(of: LowPowerAuthorization.installPath, with: "/usr/bin/printf '[%s]'")
-        let output = try shell(dryRun)
-        XCTAssertEqual(text(output.stdout), "[-cf][\(path)][-m][0440][-o][root][-g][wheel][\(path)]"
-            + "[/etc/sudoers.d/claude-notch-lowpower]")
+        XCTAssertEqual(command, LowPowerAuthorization.installShellCommand(
+            ruleContents: try XCTUnwrap(LowPowerAuthorization.ruleContents(forUser: "alice"))))
+        XCTAssertTrue(command.hasPrefix("T=$(/usr/bin/mktemp /tmp/claude-notch.XXXXXX) || exit 1; "),
+                      "le fichier est créé par root")
+        XCTAssertEqual(userTemporaryFiles(), before, "aucun fichier côté utilisateur")
     }
 
-    func testInstallIsRefusedForAnUnsafeUserBeforeAnythingIsWritten() throws {
+    func testInstallIsRefusedForAnUnsafeUserBeforeAnythingIsRun() throws {
         let runner = ScriptedRunner()
-        var wroteSomething = false
-        let mode = power(runner, user: "alice\nmallory ALL=(ALL) NOPASSWD: ALL", temporaryRule: { contents in
-            wroteSomething = true
-            return try LowPowerAuthorization.writeTemporaryRule(contents)
-        })
-        let result = try authorize(mode)
-        XCTAssertEqual(failure(of: result), QuickSettingsFailure(.invalidUser))
-        XCTAssertFalse(wroteSomething)
+        let mode = power(runner, user: "alice\nmallory ALL=(ALL) NOPASSWD: ALL")
+        XCTAssertEqual(failure(of: try authorize(mode)), QuickSettingsFailure(.invalidUser))
         XCTAssertTrue(runner.calls.isEmpty, "ni script ni mot de passe")
     }
 
-    func testInstallFailuresAreClassifiedAndLeaveNoTemporaryFile() throws {
+    func testInstallFailuresAreClassified() throws {
         let cases: [(stderr: String, kind: QuickSettingsFailure.Kind)] = [
             ("0:60: execution error: User canceled. (-128)", .cancelled),
             ("execution error: The administrator user name or password was incorrect. (-60005)", .denied),
@@ -454,25 +449,9 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         for (stderr, kind) in cases {
             let runner = ScriptedRunner()
             runner.osascriptReply = Self.fail(stderr)
-            var created: URL?
-            let mode = power(runner, temporaryRule: { [self] contents in
-                let file = try hostileTemporaryRule(contents)
-                created = file
-                return file
-            })
-            let result = try authorize(mode)
-            guard case .failure(let failure) = result else { return XCTFail("\(result)") }
-            XCTAssertEqual(failure.kind, kind, stderr)
-            XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(created).path), stderr)
+            let result = try authorize(power(runner))
+            XCTAssertEqual(failure(of: result)?.kind, kind, stderr)
         }
-    }
-
-    func testInstallFailsCleanlyWhenTheTemporaryFileCannotBeWritten() throws {
-        struct Boom: Error {}
-        let runner = ScriptedRunner()
-        let mode = power(runner, temporaryRule: { _ in throw Boom() })
-        XCTAssertEqual(failure(of: try authorize(mode)), QuickSettingsFailure(.failed))
-        XCTAssertTrue(runner.calls.isEmpty)
     }
 
     // MARK: - Retrait
