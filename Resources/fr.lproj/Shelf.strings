@@ -1,3 +1,35 @@
 /* Claude Notch : textes français du module Shelf (la clé est le texte). */
 "Étagère" = "Étagère";
-"Dépose des fichiers ici pour les garder sous la main." = "Dépose des fichiers ici pour les garder sous la main.";
+
+/* Onglet */
+"Glisse des fichiers sur la notch" = "Glisse des fichiers sur la notch";
+"Ils restent ici, sous la main. Rien n'est copié : l'étagère garde un lien vers chaque fichier." = "Ils restent ici, sous la main. Rien n'est copié : l'étagère garde un lien vers chaque fichier.";
+"Déposer ici" = "Déposer ici";
+"Introuvable" = "Introuvable";
+"Étagère vidée" = "Étagère vidée";
+"Annuler" = "Annuler";
+"%d élément" = "%d élément";
+"%d éléments" = "%d éléments";
+"%1$d sur %2$d sélectionné" = "%1$d sur %2$d sélectionné";
+"%1$d sur %2$d sélectionnés" = "%1$d sur %2$d sélectionnés";
+"AirDrop : la sélection, ou toute l'étagère" = "AirDrop : la sélection, ou toute l'étagère";
+
+/* Actions */
+"Ouvrir" = "Ouvrir";
+"Afficher dans le Finder" = "Afficher dans le Finder";
+"Coup d'œil" = "Coup d'œil";
+"Retirer de l'étagère" = "Retirer de l'étagère";
+"Retirer %d éléments" = "Retirer %d éléments";
+"Tout vider" = "Tout vider";
+
+/* Messages */
+"Étagère pleine : %d éléments au maximum." = "Étagère pleine : %d éléments au maximum.";
+"Certains éléments n'ont pas pu être ajoutés." = "Certains éléments n'ont pas pu être ajoutés.";
+"Impossible d'enregistrer l'étagère." = "Impossible d'enregistrer l'étagère.";
+"AirDrop n'est pas disponible." = "AirDrop n'est pas disponible.";
+
+/* Réglages */
+"Retirer un élément glissé vers une autre app" = "Retirer un élément glissé vers une autre app";
+"Vider l'étagère en quittant" = "Vider l'étagère en quittant";
+"Nombre maximal d'éléments" = "Nombre maximal d'éléments";
+"Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider l'étagère en quittant », la liste est gardée d'un lancement à l'autre." = "Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider l'étagère en quittant », la liste est gardée d'un lancement à l'autre.";
