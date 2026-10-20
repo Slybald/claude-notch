@@ -30,8 +30,9 @@ final class QuickSettingsSnapshotTests: XCTestCase {
     // MARK: - États
 
     /// Tout éteint, un Mac portable sur batterie.
-    private func idleFixture() -> QuickSettingsFixture {
+    private func idleFixture(authorization: LowPowerAuthorizationState = .none) -> QuickSettingsFixture {
         let f = QuickSettingsFixture(self)
+        f.power.authorization = authorization
         f.wifi.power = true
         f.power.lowPower = false
         f.battery.iops = [QSFakeBattery.mac(percent: 78)]
@@ -99,6 +100,32 @@ final class QuickSettingsSnapshotTests: XCTestCase {
             XCTAssertEqual(measured.width, size.width + 24, accuracy: 1, size.rawValue)
             XCTAssertLessThanOrEqual(measured.height, 461, size.rawValue)
             XCTAssertGreaterThan(measured.height, 200, size.rawValue)
+        }
+    }
+
+    /// Sans règle sudoers : note de pied + lien « Ne plus demander » ; règle refusée : « La redonner » ; règle en
+    /// place : plus de pied. Dans les trois largeurs, le pire cas (cinq accessoires, une erreur) reste sous 460 pt ;
+    /// la note passe sur deux lignes aux largeurs étroites (le lien lui prend la place de la fin de la première).
+    func testAuthorizationFooterFitsAndDisappearsOnceGranted() {
+        for size in PanelSize.allCases {
+            func height(_ state: LowPowerAuthorizationState) -> CGFloat {
+                let f = busyFixture(extraAccessories: 3)
+                f.power.authorization = state
+                f.module.viewAppeared()
+                f.wifi.failure = QuickSettingsFailure(.failed, "Operation not permitted by the system")
+                f.module.toggleWiFi()
+                let scene = scene(f)
+                scene.harness.prefs.panelSize = size
+                return measure(scene).height
+            }
+            let none = height(.none)
+            let refused = height(.refused)
+            let granted = height(.granted)
+            XCTAssertLessThanOrEqual(none, 461, "\(size.rawValue) : sans règle")
+            XCTAssertLessThanOrEqual(refused, 461, "\(size.rawValue) : règle refusée")
+            XCTAssertGreaterThan(none, granted, "\(size.rawValue) : la note de pied disparaît avec la règle")
+            XCTAssertGreaterThan(refused, granted, size.rawValue)
+            XCTAssertLessThanOrEqual(none - granted, 36, "\(size.rawValue) : le pied fait deux lignes au plus")
         }
     }
 
@@ -170,6 +197,14 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         autonomy.module.applyScene(.autonomy)
         QuickSettingsFixture.settle()
         try render(scene(autonomy).root, name: "qs-scene-autonomy", to: outputDir)
+        // Autorisation sans mot de passe : absente (cadenas + pied avec lien), en place (ni l'un ni l'autre),
+        // refusée par sudo (pied « La redonner »), et le même en panneau « Compact ».
+        for (name, state) in [("none", LowPowerAuthorizationState.none), ("granted", .granted), ("refused", .refused)] {
+            try render(scene(idleFixture(authorization: state)).root, name: "qs-auth-\(name)", to: outputDir)
+            let narrowAuth = scene(idleFixture(authorization: state))
+            narrowAuth.harness.prefs.panelSize = .compact
+            try render(narrowAuth.root, name: "qs-auth-\(name)-narrow", to: outputDir)
+        }
         try render(scene(desktopFixture()).root, name: "qs-desktop", to: outputDir)
         try render(scene(busyFixture(), fullScreen: true).root, name: "qs-fullscreen", to: outputDir)
         try render(scene(desktopFixture(), fullScreen: true).root, name: "qs-fullscreen-desktop", to: outputDir)
@@ -216,6 +251,15 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         let view = SettingsView(prefs: harness.prefs, registry: registry, updater: Updater(),
                                 selection: .module("quicksettings"))
         try render(view, name: "qs-settings", to: outputDir, size: SettingsWindow.size, background: nil)
+
+        // Section « Économie d'énergie » : mot de passe à chaque fois, autorisé, règle refusée.
+        for (name, state) in [("none", LowPowerAuthorizationState.none), ("granted", .granted), ("refused", .refused)] {
+            let fixture = idleFixture(authorization: state)
+            // Le volet seul, plus haut que la fenêtre (le formulaire y défile) : on voit la section en entier.
+            try render(QuickSettingsSettingsView(module: fixture.module, prefs: fixture.module.prefs),
+                       name: "qs-settings-auth-\(name)", to: outputDir,
+                       size: CGSize(width: SettingsWindow.size.width - 190, height: 1150), background: nil)
+        }
     }
 
     // MARK: - Outils

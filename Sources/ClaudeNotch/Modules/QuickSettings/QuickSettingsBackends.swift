@@ -29,8 +29,14 @@ protocol PowerModeBackend: AnyObject {
     /// Ce Mac a-t-il un mode économie d'énergie réglable ?
     func checkSupport(completion: @escaping (Bool) -> Void)
     var isLowPowerEnabled: Bool { get }
-    /// Écriture avec droits administrateur (Touch ID ou mot de passe à chaque fois).
-    func setLowPower(_ on: Bool, completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void)
+    /// Écriture avec droits administrateur : sans mot de passe si la règle sudoers est en place, sinon (ou si elle
+    /// ne marche plus) Touch ID ou le mot de passe.
+    func setLowPower(_ on: Bool, completion: @escaping (Result<LowPowerWrite, QuickSettingsFailure>) -> Void)
+    var authorization: LowPowerAuthorizationState { get }
+    /// Pose la règle sudoers (un mot de passe administrateur, une fois).
+    func authorize(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void)
+    /// Retire la règle sudoers (un mot de passe administrateur).
+    func revokeAuthorization(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void)
     func startMonitoring(_ onChange: @escaping () -> Void)
     func stopMonitoring()
 }
@@ -73,6 +79,9 @@ struct QuickSettingsBackends {
 /// Lance un programme et attend sa fin (à appeler hors du fil principal). Aucun shell : les arguments passent
 /// tels quels.
 enum SystemProcess {
+    /// La forme de `run`, pour que les tests y glissent un double.
+    typealias Runner = (_ path: String, _ arguments: [String], _ timeout: TimeInterval) -> Output?
+
     struct Output {
         var status: Int32
         var stdout: Data
@@ -222,34 +231,88 @@ final class SystemBluetooth: BluetoothBackend {
 
 final class SystemPowerMode: PowerModeBackend {
     private var observer: NSObjectProtocol?
+    private let run: SystemProcess.Runner
+    private let ruleExists: () -> Bool
+    private let userName: () -> String
+    /// sudo a refusé la règle pendant cette session : on ne l'essaie plus avant qu'elle soit redonnée.
+    private var ruleRefused = false
+
+    /// Les paramètres servent aux tests : aucun processus, aucun fichier système réels.
+    init(run: @escaping SystemProcess.Runner = { SystemProcess.run($0, $1, timeout: $2) },
+         ruleExists: @escaping () -> Bool = { LowPowerAuthorization.isInstalled },
+         userName: @escaping () -> String = NSUserName) {
+        self.run = run
+        self.ruleExists = ruleExists
+        self.userName = userName
+    }
 
     var isLowPowerEnabled: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }
 
+    var authorization: LowPowerAuthorizationState {
+        guard ruleExists() else { return .none }
+        return ruleRefused ? .refused : .granted
+    }
+
     /// `pmset -g custom` liste `lowpowermode` seulement sur les Mac qui le gèrent.
     func checkSupport(completion: @escaping (Bool) -> Void) {
-        DispatchQueue.global(qos: .utility).async {
-            let output = SystemProcess.run("/usr/bin/pmset", ["-g", "custom"], timeout: 5)
+        DispatchQueue.global(qos: .utility).async { [run] in
+            let output = run("/usr/bin/pmset", ["-g", "custom"], 5)
             let supported = output.map { String(decoding: $0.stdout, as: UTF8.self).contains("lowpowermode") } ?? false
             DispatchQueue.main.async { completion(supported) }
         }
     }
 
-    /// `pmset` exige root : AppleScript affiche la fenêtre d'autorisation du système (Touch ID ou mot de passe).
-    /// Le script est une constante, sans texte venu de l'extérieur.
-    func setLowPower(_ on: Bool, completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
-        let script = "do shell script \"/usr/bin/pmset -a lowpowermode \(on ? 1 : 0)\" with administrator privileges"
-        DispatchQueue.global(qos: .userInitiated).async {
-            let output = SystemProcess.run("/usr/bin/osascript", ["-e", script], timeout: 120)
-            let result: Result<Void, QuickSettingsFailure>
-            if let output, output.status == 0 {
-                result = .success(())
-            } else if let output {
-                result = .failure(Self.failure(output))
-            } else {
-                result = .failure(QuickSettingsFailure(.failed))
+    /// `pmset` exige root. Avec la règle sudoers : `sudo -n`, sans fenêtre. Sans règle, ou si sudo la refuse :
+    /// AppleScript affiche la fenêtre d'autorisation du système (Touch ID ou mot de passe). Les commandes sont des
+    /// constantes, sans texte venu de l'extérieur.
+    func setLowPower(_ on: Bool, completion: @escaping (Result<LowPowerWrite, QuickSettingsFailure>) -> Void) {
+        let useRule = authorization == .granted
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            if useRule {
+                let output = run(LowPowerAuthorization.sudoPath, LowPowerAuthorization.sudoArguments(lowPower: on), 15)
+                if let output, output.status == 0 {
+                    return DispatchQueue.main.async { completion(.success(.done)) }
+                }
             }
-            DispatchQueue.main.async { completion(result) }
+            let result = runAsAdministrator(LowPowerAuthorization.pmsetShellCommand(lowPower: on))
+            DispatchQueue.main.async { [self] in
+                // Le mot de passe a marché là où la règle a échoué : la règle est à redonner.
+                if useRule, case .success = result { ruleRefused = true }
+                completion(result.map { useRule ? .authorizationRefused : .done })
+            }
         }
+    }
+
+    func authorize(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+        guard let contents = LowPowerAuthorization.ruleContents(forUser: userName()) else {
+            return completion(.failure(QuickSettingsFailure(.invalidUser)))
+        }
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            let result = runAsAdministrator(LowPowerAuthorization.installShellCommand(ruleContents: contents))
+            DispatchQueue.main.async { [self] in
+                if case .success = result { ruleRefused = false }
+                completion(result)
+            }
+        }
+    }
+
+    func revokeAuthorization(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            let result = runAsAdministrator(LowPowerAuthorization.removeShellCommand)
+            DispatchQueue.main.async { [self] in
+                if case .success = result { ruleRefused = false }
+                completion(result)
+            }
+        }
+    }
+
+    /// La fenêtre d'autorisation du système, via AppleScript (hors du fil principal).
+    private func runAsAdministrator(_ shell: String) -> Result<Void, QuickSettingsFailure> {
+        let script = LowPowerAuthorization.administratorScript(running: shell)
+        guard let output = run("/usr/bin/osascript", ["-e", script], 120) else {
+            return .failure(QuickSettingsFailure(.failed))
+        }
+        return output.status == 0 ? .success(()) : .failure(Self.failure(output))
     }
 
     /// osascript : « execution error: User canceled. (-128) » quand on ferme la fenêtre d'autorisation.

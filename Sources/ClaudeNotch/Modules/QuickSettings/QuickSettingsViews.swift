@@ -77,9 +77,11 @@ struct QuickSettingsView: View {
         case .lowPower:
             TileView(icon: AnyView(Image(systemName: "leaf.fill")), title: L("Économie", table: "QuickSettings"),
                       detail: module.lowPower ? L("Activée", table: "QuickSettings") : L("Désactivée", table: "QuickSettings"),
-                      isOn: module.lowPower, isBusy: module.busy.contains(.lowPower), isLocked: true,
-                      action: module.toggleLowPower)
-                .help(L("Demande Touch ID ou ton mot de passe à chaque changement.", table: "QuickSettings"))
+                      isOn: module.lowPower, isBusy: module.busy.contains(.lowPower),
+                      isLocked: Self.asksPassword(module.authorization), action: module.toggleLowPower)
+                .help(Self.asksPassword(module.authorization)
+                    ? L("Demande Touch ID ou ton mot de passe à chaque changement.", table: "QuickSettings")
+                    : L("Active ou coupe l'économie d'énergie, sans mot de passe.", table: "QuickSettings"))
         case .caffeine:
             TileView(icon: AnyView(Image(systemName: "cup.and.saucer.fill")), title: L("Caféine", table: "QuickSettings"),
                       detail: caffeineDetail, isOn: module.caffeine != nil, isBusy: false, action: module.toggleCaffeine)
@@ -180,14 +182,51 @@ struct QuickSettingsView: View {
                                 action: { module.applyScene(scene) })
                 }
             }
-            // L'autorisation ne sert qu'à l'économie d'énergie : inutile de l'annoncer sur un Mac qui n'en a pas.
-            if module.lowPowerSupported {
-                Text("Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes.", tableName: "QuickSettings")
-                    .font(.system(size: 10))
-                    .foregroundColor(Palette.secondary)
-                    .padding(.horizontal, 2)
+            // L'autorisation ne sert qu'à l'économie d'énergie : inutile de l'annoncer sur un Mac qui n'en a pas, ni
+            // une fois la règle sudoers en place.
+            if module.lowPowerSupported, Self.asksPassword(module.authorization) {
+                authorizationFooter
             }
         }
+    }
+
+    /// Le mot de passe est-il demandé à chaque bascule ? Cadenas de la tuile et note de pied n'existent que dans ce
+    /// cas.
+    static func asksPassword(_ authorization: LowPowerAuthorizationState) -> Bool { authorization != .granted }
+
+    /// Sans règle : la note d'origine et un lien discret pour la poser. Règle refusée par sudo (autre utilisateur,
+    /// fichier modifié…) : on le dit et on propose de la redonner.
+    private var authorizationFooter: some View {
+        let refused = module.authorization == .refused
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Group {
+                if refused {
+                    Text("L'autorisation sans mot de passe ne marche plus.", tableName: "QuickSettings")
+                } else {
+                    Text("Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes.", tableName: "QuickSettings")
+                }
+            }
+            .font(.system(size: 10))
+            .foregroundColor(Palette.secondary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if module.busy.contains(.authorization) {
+                Spinner()
+            } else {
+                Button(action: module.grantLowPowerAuthorization) {
+                    Text(verbatim: refused ? L("La redonner", table: "QuickSettings")
+                         : L("Ne plus demander", table: "QuickSettings"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Palette.accent)
+                        .underline()
+                        .fixedSize()
+                }
+                .buttonStyle(.plain)
+                .help(QuickSettingsSettingsView.authorizationNote)
+            }
+        }
+        .padding(.horizontal, 2)
     }
 
     private func sceneSubtitle(_ scene: QuickScene) -> String {
@@ -543,10 +582,17 @@ struct QuickSettingsCompactView: View {
 
 // MARK: - Réglages
 
-/// Réglages › Réglages rapides : raccourcis de la Concentration, caféine, scènes, passage automatique.
+/// Réglages › Réglages rapides : raccourcis de la Concentration, caféine, économie d'énergie, scènes, passage
+/// automatique.
 struct QuickSettingsSettingsView: View {
     @ObservedObject var module: QuickSettingsModule
     @ObservedObject var prefs: QuickSettingsPrefs
+
+    /// Ce que fait la règle, dite avant de la demander (aussi en info-bulle dans l'onglet).
+    static var authorizationNote: String {
+        L("Ajoute une règle système limitée à l'activation et la désactivation de l'économie d'énergie.",
+          table: "QuickSettings")
+    }
 
     var body: some View {
         SettingsPane {
@@ -593,6 +639,8 @@ struct QuickSettingsSettingsView: View {
                                table: "QuickSettings"))
             }
 
+            if module.lowPowerSupported { lowPowerSection }
+
             Section {
                 Toggle(isOn: $prefs.autonomyBluetoothOff) {
                     Text("Autonomie : couper aussi le Bluetooth", tableName: "QuickSettings")
@@ -603,8 +651,10 @@ struct QuickSettingsSettingsView: View {
             } header: {
                 Text("Scènes", tableName: "QuickSettings")
             } footer: {
-                SettingsNote(L("Normal rétablit l'état d'avant les scènes ; l'économie d'énergie demande Touch ID.",
-                               table: "QuickSettings"))
+                SettingsNote(QuickSettingsView.asksPassword(module.authorization)
+                    ? L("Normal rétablit l'état d'avant les scènes ; l'économie d'énergie demande Touch ID.",
+                        table: "QuickSettings")
+                    : L("Normal rétablit l'état d'avant les scènes.", table: "QuickSettings"))
             }
 
             Section {
@@ -620,6 +670,67 @@ struct QuickSettingsSettingsView: View {
             } footer: {
                 SettingsNote(L("Une seule fois par descente, sur batterie. Désactivé par défaut.", table: "QuickSettings"))
             }
+        }
+        .onAppear { module.refreshAuthorization() }
+    }
+
+    // MARK: Économie d'énergie
+
+    /// Mot de passe à chaque fois, ou règle sudoers posée une fois. Une règle que sudo refuse (autre utilisateur…)
+    /// se redonne ou se retire.
+    private var lowPowerSection: some View {
+        Section {
+            Text(verbatim: Self.authorizationState(module.authorization))
+            HStack(spacing: 10) {
+                if module.busy.contains(.authorization) {
+                    ProgressView().controlSize(.small)
+                } else {
+                    ForEach(Self.authorizationActions(module.authorization), id: \.self) { action in
+                        Button(action: { run(action) }) { Text(verbatim: action.title) }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        } header: {
+            Text("Économie d'énergie", tableName: "QuickSettings")
+        } footer: {
+            SettingsNote(Self.authorizationNote)
+        }
+    }
+
+    private func run(_ action: AuthorizationAction) {
+        switch action {
+        case .grant, .regrant: module.grantLowPowerAuthorization()
+        case .revoke: module.revokeLowPowerAuthorization()
+        }
+    }
+
+    enum AuthorizationAction: Hashable {
+        case grant, regrant, revoke
+
+        var title: String {
+            switch self {
+            case .grant: return L("Ne plus demander le mot de passe", table: "QuickSettings")
+            case .regrant: return L("Redonner l'autorisation", table: "QuickSettings")
+            case .revoke: return L("Retirer l'autorisation", table: "QuickSettings")
+            }
+        }
+    }
+
+    /// Les boutons de la section : poser la règle, la redonner si sudo la refuse, la retirer.
+    static func authorizationActions(_ state: LowPowerAuthorizationState) -> [AuthorizationAction] {
+        switch state {
+        case .none: return [.grant]
+        case .granted: return [.revoke]
+        case .refused: return [.regrant, .revoke]
+        }
+    }
+
+    static func authorizationState(_ state: LowPowerAuthorizationState) -> String {
+        switch state {
+        case .none: return L("Mot de passe demandé à chaque fois", table: "QuickSettings")
+        case .granted: return L("Autorisé sans mot de passe", table: "QuickSettings")
+        case .refused: return L("L'autorisation ne marche plus (mot de passe demandé)", table: "QuickSettings")
         }
     }
 }

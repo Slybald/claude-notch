@@ -26,6 +26,8 @@ final class QuickSettingsModule: NotchModule {
     @Published private(set) var bluetooth: Bool?
     @Published private(set) var lowPower = false
     @Published private(set) var lowPowerSupported = false
+    /// Règle sudoers qui évite le mot de passe à chaque bascule de l'économie d'énergie.
+    @Published private(set) var authorization = LowPowerAuthorizationState.none
     /// Dernier état demandé : macOS ne permet pas de lire la Concentration.
     @Published private(set) var focus: Bool
     @Published private(set) var caffeine: CaffeineSession?
@@ -113,6 +115,7 @@ final class QuickSettingsModule: NotchModule {
         backends.power.startMonitoring { [weak self] in self?.lowPowerChanged() }
         backends.battery.startMonitoring { [weak self] in self?.refreshBattery(forceAccessories: false) }
         lowPower = backends.power.isLowPowerEnabled
+        refreshAuthorization()
         if !supportChecked {
             supportChecked = true
             backends.power.checkSupport { [weak self] supported in self?.lowPowerSupported = supported }
@@ -150,6 +153,7 @@ final class QuickSettingsModule: NotchModule {
         refreshWiFi()
         refreshBluetooth()
         lowPower = backends.power.isLowPowerEnabled
+        refreshAuthorization()
         refreshBattery(forceAccessories: true)
     }
 
@@ -177,6 +181,13 @@ final class QuickSettingsModule: NotchModule {
     private func lowPowerChanged() {
         let value = backends.power.isLowPowerEnabled
         if lowPower != value { lowPower = value }
+    }
+
+    /// Relit si la règle sudoers est en place (un simple test d'existence du fichier : il peut être retiré hors de
+    /// l'app, par le script de désinstallation par exemple). Appelé aussi par le volet de réglages.
+    func refreshAuthorization() {
+        let value = backends.power.authorization
+        if authorization != value { authorization = value }
     }
 
     /// IOPS donne la batterie du Mac (et ses accessoires s'il en liste). Sur certains Mac il ne liste ni AirPods
@@ -282,13 +293,15 @@ final class QuickSettingsModule: NotchModule {
 
     /// `completion(true)` : l'écriture a réussi. Une fenêtre d'autorisation fermée n'est pas une erreur.
     private func setLowPower(_ target: Bool, completion: @escaping (Bool) -> Void) {
-        guard !busy.contains(.lowPower) else { return completion(false) }
+        guard !busy.contains(.lowPower), !busy.contains(.authorization) else { return completion(false) }
         lowPower = target
         busy.insert(.lowPower)
         issue = nil
         backends.power.setLowPower(target) { [weak self] result in
             guard let self else { return }
             self.busy.remove(.lowPower)
+            // Si la règle sudoers a échoué, le mot de passe a été demandé : l'état passe à « refusée ».
+            self.refreshAuthorization()
             switch result {
             case .success:
                 // L'état réel arrive par la notification du système ; d'ici là on garde la valeur demandée,
@@ -313,6 +326,31 @@ final class QuickSettingsModule: NotchModule {
         }
         lowPowerWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + settleDelay * 2, execute: work)
+    }
+
+    // MARK: - Autorisation sans mot de passe
+
+    /// Pose la règle sudoers (un mot de passe administrateur, une seule fois).
+    func grantLowPowerAuthorization() {
+        changeAuthorization(about: .grantAuthorization, backends.power.authorize)
+    }
+
+    /// Retire la règle sudoers : le mot de passe est de nouveau demandé à chaque bascule.
+    func revokeLowPowerAuthorization() {
+        changeAuthorization(about: .revokeAuthorization, backends.power.revokeAuthorization)
+    }
+
+    private func changeAuthorization(about subject: Subject,
+                                     _ action: (@escaping (Result<Void, QuickSettingsFailure>) -> Void) -> Void) {
+        guard !busy.contains(.authorization), !busy.contains(.lowPower) else { return }
+        busy.insert(.authorization)
+        issue = nil
+        action { [weak self] result in
+            guard let self else { return }
+            self.busy.remove(.authorization)
+            self.refreshAuthorization()
+            if case .failure(let failure) = result, failure.kind != .cancelled { self.report(failure, about: subject) }
+        }
     }
 
     func toggleFocus() {
@@ -527,7 +565,7 @@ final class QuickSettingsModule: NotchModule {
     // MARK: - Erreurs
 
     private enum Subject {
-        case wifi, bluetooth, lowPower
+        case wifi, bluetooth, lowPower, grantAuthorization, revokeAuthorization
         case focus(String)
     }
 
@@ -563,6 +601,22 @@ final class QuickSettingsModule: NotchModule {
                 message = L("Économie d'énergie : changement impossible.", table: "QuickSettings")
             }
             issue = QuickSettingsIssue(message: message, actionTitle: systemSettings, actionURL: SystemPane.battery)
+        case .grantAuthorization, .revokeAuthorization:
+            let message: String
+            if failure.kind == .denied {
+                message = L("Autorisation : identifiants administrateur refusés.", table: "QuickSettings")
+            } else if failure.kind == .timeout {
+                message = L("Autorisation : pas de réponse à la demande d'autorisation.", table: "QuickSettings")
+            } else if failure.kind == .invalidUser {
+                message = L("Autorisation : nom d'utilisateur non pris en charge.", table: "QuickSettings")
+            } else if let detail = failure.detail {
+                message = String(format: L("Autorisation : %@", table: "QuickSettings"), detail)
+            } else if case .grantAuthorization = subject {
+                message = L("Autorisation : installation impossible.", table: "QuickSettings")
+            } else {
+                message = L("Autorisation : retrait impossible.", table: "QuickSettings")
+            }
+            issue = QuickSettingsIssue(message: message)
         case .focus(let name):
             let message: String
             if let detail = failure.detail {

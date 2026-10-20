@@ -63,6 +63,14 @@ final class QSFakePower: PowerModeBackend {
     /// Le système ne change pas d'état malgré une écriture réussie.
     var ignoresWrites = false
     var holdsCompletion = false
+    /// Règle sudoers : comme le vrai accès, une règle `.granted` que sudo n'accepte plus (`ruleWorks` faux) laisse
+    /// passer l'écriture avec le mot de passe et passe à `.refused`.
+    var authorization = LowPowerAuthorizationState.none
+    var ruleWorks = true
+    var authorizeFailure: QuickSettingsFailure?
+    var revokeFailure: QuickSettingsFailure?
+    private(set) var authorizeCalls = 0
+    private(set) var revokeCalls = 0
     private(set) var setCalls: [Bool] = []
     private(set) var supportChecks = 0
     private(set) var monitoring = false
@@ -76,17 +84,42 @@ final class QSFakePower: PowerModeBackend {
         completion(supported)
     }
 
-    func setLowPower(_ on: Bool, completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+    func setLowPower(_ on: Bool, completion: @escaping (Result<LowPowerWrite, QuickSettingsFailure>) -> Void) {
         setCalls.append(on)
         let finish = { [self] in
             if let failure {
                 completion(.failure(failure))
             } else {
                 if !ignoresWrites { lowPower = on }
+                var write = LowPowerWrite.done
+                if authorization == .granted, !ruleWorks {
+                    authorization = .refused
+                    write = .authorizationRefused
+                }
+                completion(.success(write))
+            }
+        }
+        if holdsCompletion { pending = finish } else { finish() }
+    }
+
+    func authorize(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+        authorizeCalls += 1
+        let finish = { [self] in
+            if let authorizeFailure {
+                completion(.failure(authorizeFailure))
+            } else {
+                authorization = .granted
                 completion(.success(()))
             }
         }
         if holdsCompletion { pending = finish } else { finish() }
+    }
+
+    func revokeAuthorization(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+        revokeCalls += 1
+        if let revokeFailure { return completion(.failure(revokeFailure)) }
+        authorization = .none
+        completion(.success(()))
     }
 
     func release() { pending?(); pending = nil }
