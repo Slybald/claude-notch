@@ -463,41 +463,44 @@ struct NotchTabBar: View {
 
     private func tab(_ module: any NotchModule) -> some View {
         let active = module.id == selection
-        return HStack(spacing: 5) {
-            Group {
-                if let icon = module.makeTabIcon() {
-                    icon
-                } else {
-                    Image(systemName: module.symbol)
+        return Button {
+            selection = module.id
+        } label: {
+            HStack(spacing: 5) {
+                Group {
+                    if let icon = module.makeTabIcon() {
+                        icon
+                    } else {
+                        Image(systemName: module.symbol)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                }
+                .frame(width: 17, height: 17)
+                if active {
+                    Text(module.title)
                         .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .transition(.opacity)
                 }
             }
-            .frame(width: 17, height: 17)
-            if active {
-                Text(module.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                    .fixedSize()
-                    .transition(.opacity)
+            .foregroundColor(active ? Palette.primary : .white.opacity(hovered == module.id ? 0.85 : 0.5))
+            .padding(.horizontal, active ? 8 : 5)
+            .frame(height: 22)
+            .background {
+                if active {
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                        .matchedGeometryEffect(id: "active-tab", in: namespace)
+                }
             }
+            .contentShape(Capsule())
         }
-        .foregroundColor(active ? Palette.primary : .white.opacity(hovered == module.id ? 0.85 : 0.5))
-        .padding(.horizontal, active ? 8 : 5)
-        .frame(height: 22)
-        .background {
-            if active {
-                Capsule()
-                    .fill(Color.white.opacity(0.12))
-                    .matchedGeometryEffect(id: "active-tab", in: namespace)
-            }
-        }
-        .contentShape(Capsule())
-        .onTapGesture { selection = module.id }
+        .buttonStyle(.plain)
         .onHover { inside in hover(module.id, inside) }
         .help(module.title)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(module.title)
-        .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     private func hover(_ id: String, _ inside: Bool) {
