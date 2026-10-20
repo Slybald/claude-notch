@@ -152,11 +152,14 @@ final class SystemWiFi: NSObject, WiFiBackend, CWEventDelegate {
         }
     }
 
-    private static func failure(_ error: Error) -> QuickSettingsFailure {
+    /// Refus d'autorisation : POSIX EPERM/EACCES, ou kCWOperationNotPermittedErr de CoreWLAN (« le processus n'a
+    /// pas la permission »). Le message brut du système, en anglais, n'est gardé que pour les autres échecs.
+    static func failure(_ error: Error) -> QuickSettingsFailure {
         let nsError = error as NSError
-        if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(EPERM) || nsError.code == Int(EACCES) {
-            return QuickSettingsFailure(.denied, nsError.localizedDescription)
-        }
+        let posixDenied = nsError.domain == NSPOSIXErrorDomain
+            && (nsError.code == Int(EPERM) || nsError.code == Int(EACCES))
+        let coreWLANDenied = nsError.domain == CWErrorDomain && nsError.code == Int(CWErr.cwOperationNotPermittedErr.rawValue)
+        if posixDenied || coreWLANDenied { return QuickSettingsFailure(.denied) }
         return QuickSettingsFailure(.failed, nsError.localizedDescription)
     }
 

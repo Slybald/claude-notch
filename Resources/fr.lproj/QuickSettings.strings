@@ -11,6 +11,7 @@
 "Bluetooth" = "Bluetooth";
 "Concentration" = "Concentration";
 "Économie d'énergie" = "Économie d'énergie";
+"Économie" = "Économie";
 "Caféine" = "Caféine";
 "Secteur" = "Secteur";
 "Pas de batterie" = "Pas de batterie";
@@ -37,13 +38,13 @@
 "Autonomie" = "Autonomie";
 "Normal" = "Normal";
 "Présentation" = "Présentation";
-"Économie, sans Bluetooth" = "Économie, sans Bluetooth";
+"Économie, sans BT" = "Économie, sans BT";
 "Caféine coupée" = "Caféine coupée";
-"Sans Bluetooth, sans caféine" = "Sans Bluetooth, sans caféine";
+"Sans BT, sans caféine" = "Sans BT, sans caféine";
 "Retour à l'état d'avant" = "Retour à l'état d'avant";
 "Rien à restaurer" = "Rien à restaurer";
 "Écran allumé" = "Écran allumé";
-"Écran allumé, Concentration" = "Écran allumé, Concentration";
+"Écran + Concentration" = "Écran + Concentration";
 "Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes." = "Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes.";
 "Fermer" = "Fermer";
 "Ouvrir Réglages Système" = "Ouvrir Réglages Système";
@@ -74,8 +75,10 @@
 "La caféine est visible dans les oreilles de la notch tant qu'elle est active." = "La caféine est visible dans les oreilles de la notch tant qu'elle est active.";
 "Autonomie : couper aussi le Bluetooth" = "Autonomie : couper aussi le Bluetooth";
 "Présentation : activer la Concentration" = "Présentation : activer la Concentration";
-"Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant la première scène. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan." = "Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant la première scène. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan.";
+"Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan." = "Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan.";
 "Passage automatique" = "Passage automatique";
 "Passer en Autonomie quand la batterie baisse" = "Passer en Autonomie quand la batterie baisse";
 "Seuil : %d %%" = "Seuil : %d %%";
 "Une seule fois par descente, sur batterie. La demande d'autorisation du système s'affiche à ce moment-là. Désactivé par défaut." = "Une seule fois par descente, sur batterie. La demande d'autorisation du système s'affiche à ce moment-là. Désactivé par défaut.";
+"+%d autre" = "+%d autre";
+"+%d autres" = "+%d autres";

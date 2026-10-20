@@ -1,3 +1,4 @@
+import CoreWLAN
 import Foundation
 import XCTest
 @testable import ClaudeNotch
@@ -64,6 +65,20 @@ final class QuickSettingsSystemTests: XCTestCase {
         }
         for name in ["AirPods Pro de Zoé", "Magic Keyboard", "Beats Studio"] {
             XCTAssertEqual(PowerSourceInfo.kind(ofAccessory: name), .accessory, name)
+        }
+    }
+
+    /// Les accessoires que pmset liste (clavier, souris…) ne sont pas tous des casques.
+    func testAccessorySymbolsFollowTheKindOfDevice() {
+        func symbol(_ name: String, _ kind: PowerSourceInfo.Kind = .accessory) -> String {
+            PowerSourceInfo(name: name, kind: kind, percent: 50, isCharging: false).symbol
+        }
+        XCTAssertEqual(symbol("Boîtier AirPods Pro", .chargingCase), "airpods.chargingcase")
+        for name in ["AirPods Pro de Zoé", "AirPods Max", "Beats Studio Pro", "Powerbeats Pro"] {
+            XCTAssertEqual(symbol(name), "headphones", name)
+        }
+        for name in ["Magic Keyboard", "Magic Mouse", "Magic Trackpad", "Clavier de Zoé"] {
+            XCTAssertEqual(symbol(name), "dot.radiowaves.left.and.right", name)
         }
     }
 
@@ -174,6 +189,18 @@ final class QuickSettingsSystemTests: XCTestCase {
         power.startMonitoring {}
         power.stopMonitoring()
         wait(for: [supportChecked], timeout: 5)
+    }
+
+    /// Le SDK documente le refus d'autorisation de CoreWLAN par kCWOperationNotPermittedErr (CWErrorDomain, -3930).
+    func testWiFiPermissionRefusalsAreClassifiedAsDenied() {
+        let notPermitted = NSError(domain: CWErrorDomain, code: -3930,
+                                   userInfo: [NSLocalizedDescriptionKey: "Operation not permitted by the system"])
+        XCTAssertEqual(SystemWiFi.failure(notPermitted), QuickSettingsFailure(.denied))
+        let posix = NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))
+        XCTAssertEqual(SystemWiFi.failure(posix).kind, .denied)
+        XCTAssertEqual(SystemWiFi.failure(NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES))).kind, .denied)
+        let other = NSError(domain: CWErrorDomain, code: -3931, userInfo: [NSLocalizedDescriptionKey: "boom"])
+        XCTAssertEqual(SystemWiFi.failure(other), QuickSettingsFailure(.failed, "boom"))
     }
 
     func testRealWiFiInterfaceIsOnlyRead() {

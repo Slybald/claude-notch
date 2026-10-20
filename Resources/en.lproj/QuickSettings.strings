@@ -11,6 +11,7 @@
 "Bluetooth" = "Bluetooth";
 "Concentration" = "Focus";
 "Économie d'énergie" = "Low Power Mode";
+"Économie" = "Low Power";
 "Caféine" = "Caffeine";
 "Secteur" = "Power";
 "Pas de batterie" = "No battery";
@@ -37,13 +38,13 @@
 "Autonomie" = "Battery Saver";
 "Normal" = "Normal";
 "Présentation" = "Presentation";
-"Économie, sans Bluetooth" = "Low Power, no Bluetooth";
+"Économie, sans BT" = "Low Power, no BT";
 "Caféine coupée" = "Caffeine off";
-"Sans Bluetooth, sans caféine" = "No Bluetooth, no caffeine";
+"Sans BT, sans caféine" = "No BT, no caffeine";
 "Retour à l'état d'avant" = "Back to how it was";
 "Rien à restaurer" = "Nothing to restore";
 "Écran allumé" = "Screen on";
-"Écran allumé, Concentration" = "Screen on, Focus";
+"Écran + Concentration" = "Screen + Focus";
 "Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes." = "Low Power Mode and scenes ask for Touch ID or your password.";
 "Fermer" = "Close";
 "Ouvrir Réglages Système" = "Open System Settings";
@@ -74,8 +75,10 @@
 "La caféine est visible dans les oreilles de la notch tant qu'elle est active." = "Caffeine shows in the notch ears while it is active.";
 "Autonomie : couper aussi le Bluetooth" = "Battery Saver: also turn Bluetooth off";
 "Présentation : activer la Concentration" = "Presentation: turn Focus on";
-"Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant la première scène. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan." = "Battery Saver: Low Power Mode on, caffeine off. Presentation: screen kept on, Low Power Mode off. Normal restores the state from before the first scene. Changing Low Power Mode asks for Touch ID or your password each time: macOS requires it, nothing is installed in the background.";
+"Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan." = "Battery Saver: Low Power Mode on, caffeine off. Presentation: screen kept on, Low Power Mode off. Normal restores the state from before the scenes. Changing Low Power Mode asks for Touch ID or your password each time: macOS requires it, nothing is installed in the background.";
 "Passage automatique" = "Automatic switch";
 "Passer en Autonomie quand la batterie baisse" = "Switch to Battery Saver when the battery runs low";
 "Seuil : %d %%" = "Threshold: %d%%";
 "Une seule fois par descente, sur batterie. La demande d'autorisation du système s'affiche à ce moment-là. Désactivé par défaut." = "Once per drop, on battery. The system authorization prompt appears at that moment. Off by default.";
+"+%d autre" = "+%d more";
+"+%d autres" = "+%d more";

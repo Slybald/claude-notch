@@ -41,12 +41,20 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         return f
     }
 
-    /// Tout actif : caféine, économie d'énergie, Concentration, en charge, AirPods.
-    private func busyFixture() -> QuickSettingsFixture {
+    /// Accessoires que pmset peut lister en plus des AirPods.
+    private static let extraAccessories = [
+        PowerSourceInfo(name: "Magic Keyboard", kind: .accessory, percent: 82, isCharging: false),
+        PowerSourceInfo(name: "Magic Mouse", kind: .accessory, percent: 41, isCharging: true),
+        PowerSourceInfo(name: "Magic Trackpad", kind: .accessory, percent: 95, isCharging: false),
+    ]
+
+    /// Tout actif : caféine, économie d'énergie, Concentration, en charge, AirPods (et d'autres accessoires).
+    private func busyFixture(extraAccessories: Int = 0) -> QuickSettingsFixture {
         let f = QuickSettingsFixture(self)
         f.power.lowPower = true
         f.battery.iops = [QSFakeBattery.mac(percent: 64, pluggedIn: true, charging: true, minutes: 72)]
         f.battery.pmset = [FakeBatteryFixtures.pods, FakeBatteryFixtures.case]
+            + Self.extraAccessories.prefix(extraAccessories)
         f.module.prefs.focusOnShortcut = "Concentration activer"
         f.module.prefs.focusOffShortcut = "Concentration désactiver"
         f.startAndShow()
@@ -76,20 +84,56 @@ final class QuickSettingsSnapshotTests: XCTestCase {
 
     // MARK: - Mise en page (toujours exécutée)
 
-    /// Le pire cas (toutes les tuiles, deux accessoires, un message d'erreur avec action) tient dans le panneau, à
+    /// Le pire cas (toutes les tuiles, cinq accessoires, un message d'erreur avec action) tient dans le panneau, à
     /// chaque largeur.
     func testTabFitsInThePanelInTheWorstCase() {
         for size in PanelSize.allCases {
-            let f = busyFixture()
+            let f = busyFixture(extraAccessories: 3)
             f.wifi.failure = QuickSettingsFailure(.failed, "Operation not permitted by the system")
             f.module.toggleWiFi()
             XCTAssertNotNil(f.module.issue)
+            XCTAssertEqual(f.module.accessories.count, 5)
             let scene = scene(f)
             scene.harness.prefs.panelSize = size
             let measured = measure(scene)
             XCTAssertEqual(measured.width, size.width + 24, accuracy: 1, size.rawValue)
             XCTAssertLessThanOrEqual(measured.height, 461, size.rawValue)
             XCTAssertGreaterThan(measured.height, 200, size.rawValue)
+        }
+    }
+
+    /// Au-delà de trois lignes, la carte ajoute une seule ligne « +N » : sa hauteur ne dépend plus du nombre
+    /// d'accessoires.
+    func testAccessoriesCardHasABoundedHeight() {
+        let three = measure(scene(busyFixture(extraAccessories: 1))).height
+        let five = measure(scene(busyFixture(extraAccessories: 3))).height
+        let two = measure(scene(busyFixture())).height
+        XCTAssertGreaterThan(three, two)
+        XCTAssertLessThanOrEqual(five - three, 18, "une ligne « +N » de plus, pas deux lignes d'accessoires")
+    }
+
+    /// Titres de tuile et sous-titres de scène à la largeur « Compact » (480 pt), en français et en anglais (les
+    /// tests n'ont pas les traductions : on lit les tables .strings). Mesuré dans le rendu : un titre de tuile
+    /// dispose d'environ 82 pt (réductible à 80 %), un sous-titre de scène d'environ 100 pt (réductible à 85 %).
+    func testTileAndSceneLabelsFitTheNarrowestPanel() throws {
+        let url = repositoryRoot.appendingPathComponent("Resources/en.lproj/QuickSettings.strings")
+        let english = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String])
+        func width(_ text: String, size: CGFloat, weight: NSFont.Weight) -> CGFloat {
+            (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: weight)]).width
+        }
+        for translated in [false, true] {
+            func shown(_ key: String) -> String { translated ? english[key, default: "?"] : key }
+            for key in ["Wi-Fi", "Bluetooth", "Concentration", "Économie", "Caféine", "Secteur"] {
+                XCTAssertLessThanOrEqual(width(shown(key), size: 11.5, weight: .semibold), 102, shown(key))
+            }
+            for scene in QuickScene.allCases {
+                for flags in 0..<8 {
+                    let key = QuickSettingsView.sceneSubtitle(scene, lowPowerSupported: flags & 1 != 0,
+                                                              noBluetooth: flags & 2 != 0, withFocus: flags & 4 != 0,
+                                                              canRestore: flags & 1 != 0)
+                    XCTAssertLessThanOrEqual(width(shown(key), size: 10, weight: .regular), 110, shown(key))
+                }
+            }
         }
     }
 
@@ -129,6 +173,19 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         try render(scene(desktopFixture()).root, name: "qs-desktop", to: outputDir)
         try render(scene(busyFixture(), fullScreen: true).root, name: "qs-fullscreen", to: outputDir)
         try render(scene(desktopFixture(), fullScreen: true).root, name: "qs-fullscreen-desktop", to: outputDir)
+
+        // Panneau « Compact » (480 pt), libellés les plus longs, cinq accessoires et une erreur : rien n'est tronqué.
+        let narrow = idleFixture()
+        narrow.battery.pmset = [FakeBatteryFixtures.pods, FakeBatteryFixtures.case] + Self.extraAccessories
+        narrow.module.prefs.autonomyBluetoothOff = true
+        narrow.module.prefs.presentationFocus = true
+        narrow.module.viewAppeared()
+        narrow.module.applyScene(.autonomy)
+        narrow.wifi.failure = QuickSettingsFailure(.denied)
+        narrow.module.toggleWiFi()
+        let narrowScene = scene(narrow)
+        narrowScene.harness.prefs.panelSize = .compact
+        try render(narrowScene.root, name: "qs-narrow", to: outputDir)
 
         // Oreilles de la notch repliée : caféine seule.
         let ears = QuickSettingsFixture(self)

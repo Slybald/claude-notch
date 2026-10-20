@@ -19,8 +19,9 @@ final class QuickSettingsScenesTests: XCTestCase {
         XCTAssertNil(f.module.caffeine)
         XCTAssertTrue(f.bluetooth.setCalls.isEmpty, "Bluetooth seulement si l'option est cochée")
         let snapshot = try XCTUnwrap(f.module.snapshot)
-        XCTAssertEqual(snapshot, SceneSnapshot(scene: .autonomy, lowPower: false, bluetooth: true, caffeine: true,
-                                               caffeineEnd: f.now.addingTimeInterval(1800), focus: false))
+        XCTAssertEqual(snapshot, SceneSnapshot(scene: .autonomy, lowPower: false, bluetooth: nil, caffeine: true,
+                                               caffeineEnd: f.now.addingTimeInterval(1800), focus: false),
+                       "le Bluetooth n'est ni lu ni gardé : la scène n'y touche pas")
         XCTAssertTrue(f.module.isSceneActive(.autonomy))
         XCTAssertFalse(f.module.isSceneActive(.presentation))
         XCTAssertTrue(f.module.canRestoreNormal)
@@ -88,6 +89,57 @@ final class QuickSettingsScenesTests: XCTestCase {
         settle()
         XCTAssertNil(f.module.caffeine)
         XCTAssertNil(f.module.snapshot)
+    }
+
+    /// Un réglage changé à la main entre deux scènes : « Normal » revient à cet état, pas à un instantané ancien.
+    func testSnapshotIsRetakenWhenTheMacNoLongerMatchesTheLastScene() throws {
+        let f = QuickSettingsFixture(self)
+        f.startAndShow()
+        f.module.applyScene(.presentation)
+        settle()
+        XCTAssertEqual(f.module.snapshot?.lowPower, false)
+
+        f.power.lowPower = true
+        f.power.fire()
+        XCTAssertFalse(f.module.isSceneActive(.presentation), "l'utilisateur a changé un réglage")
+        f.module.applyScene(.autonomy)
+        settle()
+        XCTAssertEqual(f.module.snapshot?.lowPower, true, "instantané repris à partir de l'état du moment")
+
+        f.module.applyScene(.normal)
+        settle()
+        XCTAssertTrue(f.power.setCalls.isEmpty, "économie d'énergie déjà réglée comme l'utilisateur la voulait")
+        XCTAssertTrue(f.module.lowPower)
+        XCTAssertNil(f.module.snapshot)
+    }
+
+    func testSnapshotIsNotRetakenWhileTheLastSceneStillMatches() throws {
+        let f = QuickSettingsFixture(self)
+        f.startAndShow()
+        f.module.startCaffeine(until: nil)
+        f.module.applyScene(.autonomy)
+        settle()
+        XCTAssertTrue(f.module.isSceneActive(.autonomy))
+        f.module.applyScene(.presentation)
+        settle()
+        let snapshot = try XCTUnwrap(f.module.snapshot)
+        XCTAssertTrue(snapshot.caffeine && !snapshot.lowPower, "toujours l'état d'avant la première scène")
+    }
+
+    /// Scène suivante qui touche au Bluetooth alors que la première n'y touchait pas : il est gardé à ce moment-là.
+    func testBluetoothIsKeptWhenALaterSceneStartsTouchingIt() throws {
+        let f = QuickSettingsFixture(self)
+        f.startAndShow()
+        f.module.applyScene(.autonomy)
+        settle()
+        XCTAssertNil(f.module.snapshot?.bluetooth)
+        f.module.prefs.autonomyBluetoothOff = true
+        f.module.applyScene(.autonomy)
+        settle()
+        XCTAssertEqual(f.module.snapshot?.bluetooth, true)
+        f.module.applyScene(.normal)
+        settle()
+        XCTAssertEqual(f.bluetooth.setCalls, [false, true])
     }
 
     // MARK: - Présentation
@@ -292,6 +344,20 @@ final class QuickSettingsScenesTests: XCTestCase {
         XCTAssertTrue(f.power.setCalls.isEmpty)
         f.battery.fire(percent: 35)
         XCTAssertEqual(f.power.setCalls, [true])
+    }
+
+    /// Le premier accès au Bluetooth affiche la demande d'autorisation du système : pas à un moment imprévu.
+    func testAutoSwitchDoesNotReadBluetoothUnlessTheSceneTouchesIt() {
+        let f = autoFixture()
+        f.battery.fire(percent: 15)
+        XCTAssertEqual(f.power.setCalls, [true])
+        XCTAssertEqual(f.bluetooth.reads, 0)
+
+        let g = autoFixture()
+        g.module.prefs.autonomyBluetoothOff = true
+        g.battery.fire(percent: 15)
+        XCTAssertEqual(g.bluetooth.reads, 1)
+        XCTAssertEqual(g.bluetooth.setCalls, [false])
     }
 
     func testAutoSwitchDoesNotStackOnAnAppliedScene() {

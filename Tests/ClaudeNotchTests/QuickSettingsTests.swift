@@ -179,6 +179,25 @@ final class QuickSettingsTests: XCTestCase {
         XCTAssertEqual(f.bluetooth.reads, 1 + 3, "lecture de l'onglet puis trois relectures au plus")
     }
 
+    /// La notch se replie (délai de fermeture de 0,25 s) avant la relecture : la tuile ne reste pas « occupée ».
+    func testStopDuringABluetoothToggleDoesNotLeaveTheTileBusy() {
+        let f = QuickSettingsFixture(self)
+        f.startAndShow()
+        f.module.toggleBluetooth()
+        XCTAssertTrue(f.module.busy.contains(.bluetooth))
+        f.module.stop()
+        XCTAssertFalse(f.module.busy.contains(.bluetooth))
+        settle()
+        XCTAssertFalse(f.module.busy.contains(.bluetooth), "la relecture annulée ne revient pas")
+
+        f.module.start()
+        f.module.viewAppeared()
+        XCTAssertFalse(f.module.busy.contains(.bluetooth))
+        XCTAssertEqual(f.module.bluetooth, false, "l'état réel est relu à la réapparition de l'onglet")
+        f.module.toggleBluetooth()
+        XCTAssertEqual(f.bluetooth.setCalls, [false, true], "un deuxième clic fonctionne")
+    }
+
     func testBluetoothCallThatCannotLeaveIsReported() {
         let f = QuickSettingsFixture(self)
         f.startAndShow()
@@ -396,7 +415,7 @@ final class QuickSettingsTests: XCTestCase {
     func testAccessoriesComeFromPmsetWhenIOPSListsNone() {
         let f = QuickSettingsFixture(self)
         f.battery.pmset = [FakeBatteryFixtures.mac, FakeBatteryFixtures.pods, FakeBatteryFixtures.case]
-        f.module.start()
+        f.startAndShow()
         XCTAssertEqual(f.battery.pmsetReads, 1)
         XCTAssertEqual(f.module.accessories.map { $0.name }, ["AirPods Pro de Zoé", "Boîtier AirPods Pro de Zoé"])
         XCTAssertEqual(f.module.mac?.percent, 78, "la batterie du Mac vient d'IOPS, pas de pmset")
@@ -409,16 +428,43 @@ final class QuickSettingsTests: XCTestCase {
         f.now = f.now.addingTimeInterval(61)
         f.battery.fire(percent: 76)
         XCTAssertEqual(f.battery.pmsetReads, 2, "au plus une fois par minute")
-        // L'onglet s'affiche : relecture tout de suite.
+        // L'onglet s'affiche à nouveau : relecture tout de suite.
         f.module.viewAppeared()
         XCTAssertEqual(f.battery.pmsetReads, 3)
+    }
+
+    /// Les accessoires ne figurent ni dans les oreilles ni dans le résumé compact : pmset ne se lance que si
+    /// l'onglet est affiché.
+    func testPmsetIsOnlyReadWhileTheTabIsShown() {
+        let f = QuickSettingsFixture(self)
+        f.battery.pmset = [FakeBatteryFixtures.pods, FakeBatteryFixtures.case]
+        f.module.prefs.autoAutonomy = true
+        f.module.start()
+        XCTAssertEqual(f.battery.pmsetReads, 0, "ouvrir la notch sur un autre onglet ne lance rien")
+        for percent in [77, 76, 75] {
+            f.now = f.now.addingTimeInterval(61)
+            f.battery.fire(percent: percent)
+        }
+        XCTAssertEqual(f.battery.pmsetReads, 0, "replié ou sans onglet : jamais")
+        XCTAssertTrue(f.module.accessories.isEmpty)
+
+        f.module.viewAppeared()
+        XCTAssertEqual(f.battery.pmsetReads, 1)
+        XCTAssertEqual(f.module.accessories.count, 2)
+        f.module.viewDisappeared()
+        f.now = f.now.addingTimeInterval(61)
+        f.battery.fire(percent: 74)
+        XCTAssertEqual(f.battery.pmsetReads, 1, "l'onglet a disparu")
+        f.module.stop()
+        f.module.start()
+        XCTAssertEqual(f.battery.pmsetReads, 1, "une réouverture sans l'onglet non plus")
     }
 
     func testPmsetProvidesEverythingWhenIOPSGivesNothing() {
         let f = QuickSettingsFixture(self)
         f.battery.iops = []
         f.battery.pmset = [FakeBatteryFixtures.mac, FakeBatteryFixtures.pods]
-        f.module.start()
+        f.startAndShow()
         XCTAssertEqual(f.module.mac?.percent, 49)
         XCTAssertEqual(f.module.accessories.count, 1)
     }

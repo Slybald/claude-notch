@@ -32,7 +32,8 @@ enum CaffeineDuration: String, CaseIterable, Identifiable {
     }
 }
 
-/// Les trois scènes. « Normal » restaure l'instantané pris avant la première scène appliquée.
+/// Les trois scènes. « Normal » restaure l'instantané pris avant les scènes (repris si les réglages ont changé
+/// à la main depuis la dernière).
 enum QuickScene: String, Codable, CaseIterable, Identifiable {
     case autonomy, normal, presentation
 
@@ -55,7 +56,7 @@ enum QuickScene: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// État du Mac avant la première scène, pour que « Normal » le restaure. Rangé dans UserDefaults : il survit à
+/// État du Mac avant les scènes, pour que « Normal » le restaure. Rangé dans UserDefaults : il survit à
 /// un redémarrage de l'app (mise à jour automatique comprise).
 struct SceneSnapshot: Codable, Equatable {
     /// Dernière scène appliquée (le reste de l'instantané ne bouge pas quand on passe d'une scène à l'autre).
@@ -150,6 +151,14 @@ struct PowerSourceInfo: Equatable, Identifiable {
     var minutes: Int?
 
     var id: String { kind == .mac ? "mac" : name }
+
+    /// Icône de la ligne : boîtier, casque (AirPods, Beats), sinon un accessoire sans fil quelconque (clavier,
+    /// souris…).
+    var symbol: String {
+        if kind == .chargingCase { return "airpods.chargingcase" }
+        let folded = name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+        return folded.contains("airpods") || folded.contains("beats") ? "headphones" : "dot.radiowaves.left.and.right"
+    }
 
     /// Mots qui désignent un boîtier de charge dans le nom d'un accessoire (comparés sans accents ni casse).
     private static let caseWords = ["case", "etui", "boitier", "estuche", "custodia", "caixa", "hulle"]

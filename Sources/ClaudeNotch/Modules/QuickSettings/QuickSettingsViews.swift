@@ -75,7 +75,7 @@ struct QuickSettingsView: View {
                 .help(L("Réglée par un raccourci : macOS ne permet pas de lire son état, celui du dernier clic est affiché.",
                         table: "QuickSettings"))
         case .lowPower:
-            TileView(icon: AnyView(Image(systemName: "leaf.fill")), title: L("Économie d'énergie", table: "QuickSettings"),
+            TileView(icon: AnyView(Image(systemName: "leaf.fill")), title: L("Économie", table: "QuickSettings"),
                       detail: module.lowPower ? L("Activée", table: "QuickSettings") : L("Désactivée", table: "QuickSettings"),
                       isOn: module.lowPower, isBusy: module.busy.contains(.lowPower), isLocked: true,
                       action: module.toggleLowPower)
@@ -191,20 +191,27 @@ struct QuickSettingsView: View {
     }
 
     private func sceneSubtitle(_ scene: QuickScene) -> String {
+        Self.sceneSubtitle(scene, lowPowerSupported: module.lowPowerSupported,
+                           noBluetooth: module.prefs.autonomyBluetoothOff, withFocus: module.prefs.presentationFocus,
+                           canRestore: module.canRestoreNormal)
+    }
+
+    /// Ce que fait la scène, en une ligne : le panneau « Compact » (480 pt) laisse environ 100 pt au texte.
+    static func sceneSubtitle(_ scene: QuickScene, lowPowerSupported: Bool, noBluetooth: Bool, withFocus: Bool,
+                              canRestore: Bool) -> String {
         switch scene {
         case .autonomy:
-            let noBluetooth = module.prefs.autonomyBluetoothOff
-            if module.lowPowerSupported {
-                return noBluetooth ? L("Économie, sans Bluetooth", table: "QuickSettings")
+            if lowPowerSupported {
+                return noBluetooth ? L("Économie, sans BT", table: "QuickSettings")
                     : L("Économie d'énergie", table: "QuickSettings")
             }
-            return noBluetooth ? L("Sans Bluetooth, sans caféine", table: "QuickSettings")
+            return noBluetooth ? L("Sans BT, sans caféine", table: "QuickSettings")
                 : L("Caféine coupée", table: "QuickSettings")
         case .normal:
-            return module.canRestoreNormal ? L("Retour à l'état d'avant", table: "QuickSettings")
+            return canRestore ? L("Retour à l'état d'avant", table: "QuickSettings")
                 : L("Rien à restaurer", table: "QuickSettings")
         case .presentation:
-            return module.prefs.presentationFocus ? L("Écran allumé, Concentration", table: "QuickSettings")
+            return withFocus ? L("Écran + Concentration", table: "QuickSettings")
                 : L("Écran allumé", table: "QuickSettings")
         }
     }
@@ -365,15 +372,22 @@ struct SceneButton: View {
     }
 }
 
-/// Batterie des accessoires (AirPods, boîtier) : une ligne chacun.
+/// Batterie des accessoires (AirPods, boîtier, clavier…) : une ligne chacun, trois au plus. S'il y en a davantage,
+/// la dernière ligne devient « +N autres » : le panneau doit rester sous 460 pt.
 struct AccessoriesCard: View {
+    static let maxRows = 3
     let accessories: [PowerSourceInfo]
 
+    private var shown: [PowerSourceInfo] {
+        accessories.count > Self.maxRows ? Array(accessories.prefix(Self.maxRows - 1)) : accessories
+    }
+
     var body: some View {
+        let hidden = accessories.count - shown.count
         VStack(spacing: 6) {
-            ForEach(accessories) { item in
+            ForEach(shown) { item in
                 HStack(spacing: 8) {
-                    Image(systemName: item.kind == .chargingCase ? "airpods.chargingcase" : "headphones")
+                    Image(systemName: item.symbol)
                         .font(.system(size: 11.5))
                         .foregroundColor(Palette.secondary)
                         .frame(width: 18)
@@ -388,6 +402,16 @@ struct AccessoriesCard: View {
                         .monospacedDigit()
                         .foregroundColor(Palette.primary)
                     BatteryGlyph(source: item)
+                }
+            }
+            if hidden > 0 {
+                HStack(spacing: 8) {
+                    Color.clear.frame(width: 18, height: 1)
+                    Text(verbatim: String(format: L(hidden, one: "+%d autre", other: "+%d autres", table: "QuickSettings"),
+                                          hidden))
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(Palette.secondary)
+                    Spacer(minLength: 0)
                 }
             }
         }
@@ -619,7 +643,7 @@ struct QuickSettingsSettingsView: View {
                     Text("Présentation : activer la Concentration", tableName: "QuickSettings")
                 }
                 SettingsNote(L("Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, "
-                    + "économie d'énergie coupée. Normal rétablit l'état d'avant la première scène. "
+                    + "économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. "
                     + "Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : "
                     + "macOS l'exige, rien n'est installé en arrière-plan.", table: "QuickSettings"))
             } header: {

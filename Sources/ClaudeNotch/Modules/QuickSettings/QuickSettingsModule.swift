@@ -117,7 +117,7 @@ final class QuickSettingsModule: NotchModule {
             supportChecked = true
             backends.power.checkSupport { [weak self] supported in self?.lowPowerSupported = supported }
         }
-        refreshBattery(forceAccessories: true)
+        refreshBattery(forceAccessories: false)
     }
 
     /// Libère tout, caféine comprise : un module arrêté ne tient plus rien. (Tant que la caféine est active, le
@@ -130,6 +130,9 @@ final class QuickSettingsModule: NotchModule {
         backends.wifi.stopMonitoring()
         verifyWork?.cancel()
         verifyWork = nil
+        // La relecture annulée était la seule à retirer cette marque : sans cela la tuile resterait occupée.
+        // L'état réel est relu quand l'onglet réapparaît.
+        busy.remove(.bluetooth)
         lowPowerWork?.cancel()
         lowPowerWork = nil
         stopCaffeine()
@@ -178,7 +181,9 @@ final class QuickSettingsModule: NotchModule {
 
     /// IOPS donne la batterie du Mac (et ses accessoires s'il en liste). Sur certains Mac il ne liste ni AirPods
     /// ni boîtier alors que `pmset -g accps` les donne : dans ce cas pmset est lu hors du fil principal, à
-    /// l'ouverture et au plus une fois par minute ensuite. Si IOPS ne donne rien du tout, pmset fournit tout.
+    /// l'affichage de l'onglet et au plus une fois par minute ensuite. Les accessoires n'apparaissent ni dans les
+    /// oreilles ni dans le résumé compact : sans onglet affiché, pmset n'est jamais lancé (et si IOPS ne donne
+    /// rien du tout, la batterie du Mac vient de pmset seulement une fois l'onglet affiché).
     private func refreshBattery(forceAccessories: Bool) {
         let iops = backends.battery.readIOPS()
         let iopsMac = iops.first { $0.kind == .mac }
@@ -186,7 +191,7 @@ final class QuickSettingsModule: NotchModule {
         if let iopsMac, mac != iopsMac { mac = iopsMac }
         if !iopsAccessories.isEmpty {
             if accessories != iopsAccessories { accessories = iopsAccessories }
-        } else if forceAccessories || clock().timeIntervalSince(lastPmsetRead) > 60 {
+        } else if visibleViews > 0, forceAccessories || clock().timeIntervalSince(lastPmsetRead) > 60 {
             readPmset(iopsWasEmpty: iops.isEmpty)
         }
         evaluateAutoSwitch()
@@ -451,17 +456,25 @@ final class QuickSettingsModule: NotchModule {
 
     func applyScene(_ scene: QuickScene) {
         guard !busy.contains(.scene) else { return }
-        if bluetooth == nil { refreshBluetooth() }
+        let targets = sceneTargets(for: scene)
+        // Le premier accès au Bluetooth peut afficher la demande d'autorisation du système : seulement si la
+        // scène y touche (le passage automatique ne doit pas la faire surgir pour rien).
+        let touchesBluetooth = scene != .normal && targets.bluetooth != nil
+        if touchesBluetooth, bluetooth == nil { refreshBluetooth() }
         var kept = snapshot
         if scene == .normal {
             guard kept != nil else { return }
-        } else if kept == nil {
-            kept = SceneSnapshot(scene: scene, lowPower: lowPower, bluetooth: bluetooth,
-                                 caffeine: caffeine != nil, caffeineEnd: caffeine?.end, focus: focus)
-        } else {
+        } else if let current = kept, isSceneActive(current.scene) {
+            // L'état est celui de la dernière scène : on garde l'instantané d'avant la première.
             kept?.scene = scene
+            if touchesBluetooth, current.bluetooth == nil { kept?.bluetooth = bluetooth }
+        } else {
+            // Premier passage, ou réglages changés à la main depuis la dernière scène : « Normal » doit revenir à
+            // l'état d'avant cette scène-ci, pas à un instantané ancien. shortcut: un réglage que la scène
+            // précédente avait modifié et que l'utilisateur n'a pas touché est repris tel quel.
+            kept = SceneSnapshot(scene: scene, lowPower: lowPower, bluetooth: touchesBluetooth ? bluetooth : nil,
+                                 caffeine: caffeine != nil, caffeineEnd: caffeine?.end, focus: focus)
         }
-        let targets = sceneTargets(for: scene)
         busy.insert(.scene)
         issue = nil
         apply(targets) { [weak self] ok in
