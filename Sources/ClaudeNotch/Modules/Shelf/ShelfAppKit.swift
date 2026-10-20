@@ -13,6 +13,8 @@ final class ShelfDropView: NSView {
     var accepts: (NSPoint) -> Bool = { _ in false }
     /// Le glisser arrive : l'onglet Étagère passe devant.
     var showShelf: () -> Void = {}
+    /// Des fichiers ont été posés sur l'étagère.
+    var dropped: () -> Void = {}
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -32,6 +34,7 @@ final class ShelfDropView: NSView {
         let urls = ShelfDrop.fileURLs(in: sender.draggingPasteboard)
         guard !urls.isEmpty else { return false }
         shelf.add(urls)
+        dropped()
         return true
     }
 

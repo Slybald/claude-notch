@@ -78,6 +78,8 @@ final class NotchController {
     private var fileDragBaseline: Int?
     /// Notch montrée seulement pour un dépôt (rien d'autre à afficher) : recachée au repli.
     private var shownForDrag = false
+    /// Onglet d'avant qu'un glisser de fichiers montre l'Étagère ; nil dès qu'un dépôt a lieu.
+    private var tabBeforeDrag: String?
 
     init(store: SessionStore, monitor: ClaudeMonitor, prefs: Preferences, tools: ToolsFeed) {
         self.store = store
@@ -130,7 +132,12 @@ final class NotchController {
             guard let self else { return false }
             return self.model.isExpanded && self.registry.isEnabled(ShelfModule.moduleId) && self.isInsideZone(point)
         }
-        drop.showShelf = { [weak self] in self?.model.selectedTab = ShelfModule.moduleId }
+        drop.showShelf = { [weak self] in
+            guard let self, self.model.selectedTab != ShelfModule.moduleId else { return }
+            self.tabBeforeDrag = self.model.selectedTab
+            self.model.selectedTab = ShelfModule.moduleId
+        }
+        drop.dropped = { [weak self] in self?.tabBeforeDrag = nil }
         panel.contentView = drop
 
         updateGeometry()
@@ -314,8 +321,10 @@ final class NotchController {
         panel.ignoresMouseEvents = true
         if model.isExpanded {
             model.isExpanded = false
-            if prefs.lastTab != model.selectedTab { prefs.lastTab = model.selectedTab }
+            let tab = Self.tabToRemember(selected: model.selectedTab, beforeDrag: tabBeforeDrag)
+            if prefs.lastTab != tab { prefs.lastTab = tab }
         }
+        tabBeforeDrag = nil
         registry.setPanelOpen(false)
         if shownForDrag {
             shownForDrag = false
@@ -350,7 +359,8 @@ final class NotchController {
     /// prend le relais (fenêtre qui accepte la souris). Une fois par glisser ; jamais en plein écran « masquée ».
     private func openForFileDrag() -> Bool {
         guard let baseline = fileDragBaseline, !model.isExpanded, !hiddenForFullScreen,
-              dropZone().contains(NSEvent.mouseLocation) else { return false }
+              Self.dropZone(notch: notchRect, screen: screenFrame, contentWidth: model.contentSize.width)
+                .contains(NSEvent.mouseLocation) else { return false }
         let pasteboard = NSPasteboard(name: .drag)
         guard pasteboard.changeCount != baseline else { return false }
         fileDragBaseline = nil
@@ -365,17 +375,23 @@ final class NotchController {
             updateGeometry()
             panel.orderFrontRegardless()
         }
+        tabBeforeDrag = prefs.lastTab
         expand(tab: ShelfModule.moduleId)
         shelf?.isDropTargeted = true
         return true
     }
 
     /// Notch repliée : la forme et la place des oreilles, élargies (le glisser arrive vite et de biais).
-    private func dropZone() -> CGRect {
-        let width = max(model.contentSize.width, notchRect.width + 2 * Self.earWidth) + 40
-        let height = notchRect.height + 16
+    static func dropZone(notch: CGRect, screen: CGRect, contentWidth: CGFloat) -> CGRect {
+        let width = max(contentWidth, notch.width + 2 * earWidth) + 40
+        let height = notch.height + 16
         // +1 : la souris peut être pile sur le bord haut de l'écran.
-        return CGRect(x: notchRect.midX - width / 2, y: screenFrame.maxY - height, width: width, height: height + 1)
+        return CGRect(x: notch.midX - width / 2, y: screen.maxY - height, width: width, height: height + 1)
+    }
+
+    /// Onglet mémorisé au repli : l'Étagère montrée par un glisser de fichiers resté sans dépôt ne compte pas.
+    static func tabToRemember(selected: String, beforeDrag: String?) -> String {
+        selected == ShelfModule.moduleId ? beforeDrag ?? selected : selected
     }
 
     // MARK: - Actions

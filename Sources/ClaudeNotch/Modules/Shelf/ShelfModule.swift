@@ -11,7 +11,8 @@ import UniformTypeIdentifiers
 /// - Références, pas de copies : un signet par élément retrouve le fichier déplacé ; un fichier disparu reste
 ///   grisé (« Introuvable ») jusqu'à ce qu'on le retire.
 /// - Arrêté (panneau replié), le module ne fait rien. La liste est lue au premier démarrage ; signets et vignettes
-///   ne sont relus que quand l'onglet est à l'écran, hors du main thread (dossiers protégés).
+///   ne sont relus que quand l'onglet est à l'écran, hors du main thread (dossiers protégés). Vignettes et icônes
+///   survivent à un repli bref (`releaseDelay`) ; « Annuler » survit au repli jusqu'à son échéance.
 final class ShelfModule: NotchModule {
     static let moduleId = "shelf"
     let id = ShelfModule.moduleId
@@ -31,7 +32,7 @@ final class ShelfModule: NotchModule {
     @Published private(set) var items: [ShelfItem] = []
     /// Éléments introuvables (signet qui ne se résout plus, fichier à la corbeille).
     @Published private(set) var missing: Set<UUID> = []
-    /// Vignettes Quick Look : au plus une par élément (50), vidées à l'arrêt.
+    /// Vignettes Quick Look : au plus une par élément (50), vidées `releaseDelay` après l'arrêt.
     @Published private(set) var thumbnails: [UUID: NSImage] = [:]
     @Published private(set) var selection = ShelfSelection()
     /// Vignette sous la souris : son bouton « retirer » apparaît.
@@ -74,6 +75,7 @@ final class ShelfModule: NotchModule {
     private let thumbnailer: Thumbnailer
     private let saveDelay: TimeInterval
     private let undoDelay: TimeInterval
+    private let releaseDelay: TimeInterval
     /// Signets, existence des fichiers et écriture du JSON : jamais sur le main thread.
     private let ioQueue = DispatchQueue(label: "claudenotch.shelf.io", qos: .utility)
     private var loaded = false
@@ -86,7 +88,8 @@ final class ShelfModule: NotchModule {
     private var pendingSave: DispatchWorkItem?
     private var undoWork: DispatchWorkItem?
     private var noticeWork: DispatchWorkItem?
-    /// Icônes par type de fichier (aucun accès au fichier), vidées à l'arrêt.
+    private var releaseWork: DispatchWorkItem?
+    /// Icônes par type de fichier (aucun accès au fichier), vidées avec les vignettes.
     private var icons: [String: NSImage] = [:]
     private var sharePicker: NSSharingServicePicker?
     private let preview = ShelfPreview()
@@ -95,12 +98,13 @@ final class ShelfModule: NotchModule {
 
     init(defaults: UserDefaults = .standard, store: ShelfStore = .standard,
          thumbnailer: @escaping Thumbnailer = ShelfModule.quickLookThumbnail,
-         saveDelay: TimeInterval = 0.5, undoDelay: TimeInterval = 6) {
+         saveDelay: TimeInterval = 0.5, undoDelay: TimeInterval = 6, releaseDelay: TimeInterval = 60) {
         self.defaults = defaults
         self.store = store
         self.thumbnailer = thumbnailer
         self.saveDelay = saveDelay
         self.undoDelay = undoDelay
+        self.releaseDelay = releaseDelay
         removeAfterDrag = defaults.bool(forKey: Key.removeAfterDrag)
         clearOnQuit = defaults.bool(forKey: Key.clearOnQuit)
         let saved = defaults.integer(forKey: Key.limit)
@@ -111,6 +115,8 @@ final class ShelfModule: NotchModule {
 
     func start() {
         isRunning = true
+        releaseWork?.cancel()
+        releaseWork = nil
         loadIfNeeded()
         refresh()
     }
@@ -119,12 +125,20 @@ final class ShelfModule: NotchModule {
         isRunning = false
         generation += 1
         pendingThumbnails = []
-        icons = [:]
-        if !thumbnails.isEmpty { thumbnails = [:] }
         if hovered != nil { hovered = nil }
         if isDropTargeted { isDropTargeted = false }
         if !selection.ids.isEmpty { selection.clear() }
-        finishUndo()
+        // Le panneau se replie dès que la souris sort : une réouverture rapide ne redemande rien à Quick Look.
+        releaseWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.releaseImages() }
+        releaseWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + releaseDelay, execute: work)
+    }
+
+    private func releaseImages() {
+        releaseWork = nil
+        icons = [:]
+        if !thumbnails.isEmpty { thumbnails = [:] }
     }
 
     func makeView() -> AnyView { AnyView(ShelfPanel(module: self)) }
@@ -344,15 +358,16 @@ final class ShelfModule: NotchModule {
         let ext = (item.path as NSString).pathExtension.lowercased()
         let key = item.isDirectory ? "dir.\(ext)" : ext
         if let icon = icons[key] { return icon }
-        let type: UTType
-        if item.isDirectory {
-            type = UTType(filenameExtension: ext).flatMap { $0.conforms(to: .package) ? $0 : nil } ?? .folder
-        } else {
-            type = UTType(filenameExtension: ext) ?? .data
-        }
-        let icon = NSWorkspace.shared.icon(for: type)
+        let icon = NSWorkspace.shared.icon(for: Self.iconType(extension: ext, isDirectory: item.isDirectory))
         if isRunning { icons[key] = icon }
         return icon
+    }
+
+    /// Un dossier n'a l'icône d'un paquet (.app, .rtfd, .xcodeproj) que si son extension en déclare un.
+    /// `UTType(filenameExtension:)` seul ne cherche que des fichiers (`.data`) : « app » y donne un type sans paquet.
+    static func iconType(extension ext: String, isDirectory: Bool) -> UTType {
+        guard isDirectory else { return UTType(filenameExtension: ext) ?? .data }
+        return UTType(filenameExtension: ext, conformingTo: .package).flatMap { $0.isDynamic ? nil : $0 } ?? .folder
     }
 
     func image(for item: ShelfItem) -> NSImage {

@@ -27,7 +27,7 @@ struct ShelfItem: Codable, Equatable, Identifiable {
     enum Resolution: Equatable {
         /// Le fichier est là, peut-être ailleurs ; `bookmark` = signet renouvelé s'il était périmé.
         case found(path: String, bookmark: Data?)
-        /// Signet qui ne se résout plus, ou fichier parti à la corbeille.
+        /// Signet qui ne se résout plus, ou fichier parti à la corbeille (`~/.Trash`, ou `.Trashes` d'un volume).
         case missing
     }
 
@@ -37,7 +37,7 @@ struct ShelfItem: Codable, Equatable, Identifiable {
         guard let url = try? URL(resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting],
                                  relativeTo: nil, bookmarkDataIsStale: &stale),
               fileManager.fileExists(atPath: url.path),
-              !url.path.contains("/.Trash/") else { return .missing }
+              !url.path.contains("/.Trash/"), !url.path.contains("/.Trashes/") else { return .missing }
         return .found(path: url.standardizedFileURL.path, bookmark: stale ? try? url.bookmarkData() : nil)
     }
 }

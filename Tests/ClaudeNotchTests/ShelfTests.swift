@@ -17,6 +17,8 @@ final class ShelfTests: XCTestCase {
             if name.hasSuffix("/") {
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             } else {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                        withIntermediateDirectories: true)
                 try Data("x".utf8).write(to: url)
             }
             return url.standardizedFileURL
@@ -35,9 +37,11 @@ final class ShelfTests: XCTestCase {
     }
 
     private func module(_ store: ShelfStore, defaults: UserDefaults? = nil, undoDelay: TimeInterval = 5,
+                        releaseDelay: TimeInterval = 60,
                         thumbnailer: @escaping ShelfModule.Thumbnailer = { _, done in done(nil) }) -> ShelfModule {
         let module = ShelfModule(defaults: defaults ?? makeEphemeralDefaults(self), store: store,
-                                 thumbnailer: thumbnailer, saveDelay: 0, undoDelay: undoDelay)
+                                 thumbnailer: thumbnailer, saveDelay: 0, undoDelay: undoDelay,
+                                 releaseDelay: releaseDelay)
         addTeardownBlock { module.stop() }
         return module
     }
@@ -103,6 +107,12 @@ final class ShelfTests: XCTestCase {
 
         try FileManager.default.removeItem(at: urls[1])
         XCTAssertEqual(items[1].resolve(), .missing)
+    }
+
+    /// Corbeille de l'utilisateur (`~/.Trash`) ou d'un volume externe (`/Volumes/X/.Trashes/<uid>/`) : introuvable.
+    func testFilesInATrashAreMissing() throws {
+        let (_, urls) = try makeFiles([".Trash/a.txt", ".Trashes/501/b.txt", "Trashes/c.txt"])
+        XCTAssertEqual(urls.compactMap(ShelfItem.make).map { $0.resolve() == .missing }, [true, true, false])
     }
 
     // MARK: Liste
@@ -200,6 +210,74 @@ final class ShelfTests: XCTestCase {
         XCTAssertEqual(hosting.registeredDraggedTypes, [], "le contenu SwiftUI laisse les fichiers à la vue racine")
     }
 
+    /// Chaîne complète d'un dépôt sur le panneau déplié, avec un faux glisser : cible, sortie de la zone, dépôt
+    /// (fichier et dossier), puis refus d'un « déplacer » seul et du texte.
+    func testDropViewTargetsAndAddsFiles() throws {
+        let (dir, urls) = try makeFiles(["Photo.png", "Dossier/"])
+        let shelf = module(store(in: dir))
+        shelf.start()
+        let drop = ShelfDropView(frame: CGRect(x: 0, y: 0, width: 300, height: 200))
+        let window = NSWindow(contentRect: drop.frame, styleMask: [.borderless], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        window.contentView = drop
+        var inside = true
+        var shown = 0
+        var dropped = 0
+        drop.shelf = shelf
+        drop.accepts = { _ in inside }
+        drop.showShelf = { shown += 1 }
+        drop.dropped = { dropped += 1 }
+
+        let files = pasteboard()
+        files.writeObjects(urls.map { $0 as NSURL })
+        let drag = FakeDrag(files)
+        XCTAssertEqual(drop.draggingEntered(drag), .copy)
+        XCTAssertTrue(shelf.isDropTargeted)
+        XCTAssertEqual(shown, 1, "l'onglet Étagère passe devant")
+        inside = false
+        XCTAssertEqual(drop.draggingUpdated(drag), [])
+        XCTAssertFalse(shelf.isDropTargeted, "hors de la forme noire")
+        inside = true
+        XCTAssertEqual(drop.draggingUpdated(drag), .copy)
+        XCTAssertTrue(drop.performDragOperation(drag))
+        XCTAssertFalse(shelf.isDropTargeted)
+        XCTAssertEqual(dropped, 1)
+        wait { shelf.items.count == 2 }
+        XCTAssertEqual(Set(shelf.items.map { $0.path }), Set(urls.map { $0.path }))
+
+        let move = FakeDrag(files, mask: .move)
+        XCTAssertEqual(drop.draggingEntered(move), [], "la source supprimerait l'original")
+        XCTAssertFalse(drop.performDragOperation(move))
+        let text = pasteboard()
+        text.setString(urls[0].path, forType: .string)
+        XCTAssertEqual(drop.draggingEntered(FakeDrag(text)), [])
+        XCTAssertFalse(drop.performDragOperation(FakeDrag(text)))
+        XCTAssertEqual(dropped, 1)
+        XCTAssertFalse(shelf.isDropTargeted)
+    }
+
+    /// Notch repliée (200 × 32 au centre d'un écran de 1512 × 982) : la forme, les oreilles et une marge.
+    func testDropZoneCoversTheNotchAndItsEars() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let notch = CGRect(x: 656, y: 950, width: 200, height: 32)
+        let zone = NotchController.dropZone(notch: notch, screen: screen, contentWidth: 0)
+        XCTAssertEqual(zone, CGRect(x: 600, y: 934, width: 312, height: 49))
+        XCTAssertTrue(zone.contains(CGPoint(x: 756, y: 982)), "pile sur le bord haut de l'écran")
+        XCTAssertTrue(zone.contains(CGPoint(x: 606, y: 960)), "sur l'oreille gauche")
+        XCTAssertFalse(zone.contains(CGPoint(x: 756, y: 930)), "sous la notch")
+        XCTAssertFalse(zone.contains(CGPoint(x: 590, y: 960)), "au-delà de l'oreille")
+        XCTAssertEqual(NotchController.dropZone(notch: notch, screen: screen, contentWidth: 400).width, 440,
+                       "forme plus large (oreilles d'un module)")
+    }
+
+    /// Un glisser passé sur l'Étagère sans dépôt ne change pas l'onglet « dernier utilisé ».
+    func testFileDragWithoutDropKeepsTheLastTab() {
+        XCTAssertEqual(NotchController.tabToRemember(selected: "shelf", beforeDrag: "media"), "media")
+        XCTAssertEqual(NotchController.tabToRemember(selected: "shelf", beforeDrag: nil), "shelf", "dépôt fait")
+        XCTAssertEqual(NotchController.tabToRemember(selected: "media", beforeDrag: "claude"), "media",
+                       "onglet choisi ensuite à la main")
+    }
+
     // MARK: Module
 
     func testModuleAddsPersistsAndReloads() throws {
@@ -258,6 +336,28 @@ final class ShelfTests: XCTestCase {
         XCTAssertTrue(shelf.items.isEmpty)
     }
 
+    /// Clic sur « Tout vider » puis la souris s'éloigne : le panneau se replie (stop) et se rouvre (start) ;
+    /// « Annuler » est toujours là tant que le délai court, et le délai expire aussi panneau replié.
+    func testUndoSurvivesCollapsingThePanel() throws {
+        let (dir, urls) = try makeFiles(["a", "b"])
+        let shelf = module(store(in: dir), undoDelay: 0.3)
+        shelf.start()
+        shelf.add(urls)
+        wait { shelf.items.count == 2 }
+        let before = shelf.items
+
+        shelf.clearAll()
+        shelf.stop()
+        shelf.start()
+        XCTAssertEqual(shelf.undoItems, before)
+        shelf.undoClear()
+        XCTAssertEqual(shelf.items, before)
+
+        shelf.clearAll()
+        shelf.stop()
+        wait("l'annulation expire panneau replié") { shelf.undoItems == nil }
+    }
+
     func testRemoveAfterDragOnlyWhenEnabledAndSuccessful() throws {
         let (dir, urls) = try makeFiles(["a", "b", "c"])
         let shelf = module(store(in: dir))
@@ -301,7 +401,7 @@ final class ShelfTests: XCTestCase {
     func testShownTabFindsMovedAndMissingFilesThenThumbnails() throws {
         let (dir, urls) = try makeFiles(["Garde.txt", "Supprimé.txt"])
         var requests: [String] = []
-        let shelf = module(store(in: dir)) { url, done in
+        let shelf = module(store(in: dir), releaseDelay: 0.3) { url, done in
             DispatchQueue.main.async { requests.append(url.lastPathComponent) }
             done(NSImage(size: NSSize(width: 4, height: 4)))
         }
@@ -322,8 +422,26 @@ final class ShelfTests: XCTestCase {
         XCTAssertEqual(requests, ["Déplacé.txt"], "pas de vignette pour un fichier introuvable")
         XCTAssertEqual(shelf.urls(shelf.items.map { $0.id }), [moved.standardizedFileURL])
 
+        // Repli puis réouverture rapide : vignettes gardées, rien de redemandé à Quick Look.
         shelf.stop()
-        XCTAssertTrue(shelf.thumbnails.isEmpty, "vignettes libérées à l'arrêt")
+        shelf.start()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        XCTAssertEqual(shelf.thumbnails.count, 1)
+        XCTAssertEqual(requests, ["Déplacé.txt"])
+
+        shelf.stop()
+        XCTAssertEqual(shelf.thumbnails.count, 1)
+        wait("vignettes libérées un moment après l'arrêt") { shelf.thumbnails.isEmpty }
+    }
+
+    /// Icône immédiate : un paquet (.app, .rtfd) a la sienne, pas celle d'un dossier.
+    func testPackagesGetTheirOwnIconType() {
+        XCTAssertEqual(ShelfModule.iconType(extension: "app", isDirectory: true), .applicationBundle)
+        XCTAssertEqual(ShelfModule.iconType(extension: "rtfd", isDirectory: true), .rtfd)
+        XCTAssertEqual(ShelfModule.iconType(extension: "", isDirectory: true), .folder)
+        XCTAssertEqual(ShelfModule.iconType(extension: "2026", isDirectory: true), .folder, "« Photos.2026 » : dossier")
+        XCTAssertEqual(ShelfModule.iconType(extension: "pdf", isDirectory: false), .pdf)
+        XCTAssertEqual(ShelfModule.iconType(extension: "", isDirectory: false), .data)
     }
 
     func testMenuActsOnTheSelectionAndLeavesMissingFilesRemovable() throws {
@@ -381,4 +499,32 @@ final class ShelfTests: XCTestCase {
         let corner = tile.convert(NSPoint(x: tile.bounds.maxX - 12, y: flip(12)), to: hosting.superview)
         XCTAssertFalse(hosting.hitTest(corner) === tile, "coin haut droit : le bouton « retirer »")
     }
+}
+
+/// Faux glisser : un presse-papiers, un masque d'opérations ; le reste n'est pas lu par `ShelfDropView`.
+private final class FakeDrag: NSObject, NSDraggingInfo {
+    let draggingPasteboard: NSPasteboard
+    let draggingSourceOperationMask: NSDragOperation
+
+    init(_ pasteboard: NSPasteboard, mask: NSDragOperation = .every) {
+        draggingPasteboard = pasteboard
+        draggingSourceOperationMask = mask
+    }
+
+    var draggingDestinationWindow: NSWindow? { nil }
+    var draggingLocation: NSPoint { NSPoint(x: 10, y: 10) }
+    var draggedImageLocation: NSPoint { .zero }
+    var draggedImage: NSImage? { nil }
+    var draggingSource: Any? { nil }
+    var draggingSequenceNumber: Int { 1 }
+    var draggingFormation: NSDraggingFormation = .default
+    var animatesToDestination = false
+    var numberOfValidItemsForDrop = 0
+    var springLoadingHighlight: NSSpringLoadingHighlight { .none }
+    func slideDraggedImage(to screenPoint: NSPoint) {}
+    func enumerateDraggingItems(options enumOpts: NSDraggingItemEnumerationOptions = [], for view: NSView?,
+                                classes classArray: [AnyClass],
+                                searchOptions: [NSPasteboard.ReadingOptionKey: Any] = [:],
+                                using block: (NSDraggingItem, Int, UnsafeMutablePointer<ObjCBool>) -> Void) {}
+    func resetSpringLoading() {}
 }
