@@ -2,7 +2,8 @@
 
 A native macOS app that lives in your MacBook's notch and keeps track of your Claude Code sessions,
 whether they run in a terminal or an editor (CLI) or in the Code tab of Claude Desktop. Hover the notch
-and the panel unfolds with a summary of every session: state, current tool, task list, subagents.
+and the panel unfolds with a summary of every session: state, current tool, task list, subagents. Six more
+tabs sit next to Claude: Player, Quick Settings, Shelf, Clipboard, Timer and Quick notes.
 
 <p align="center">
   <img src="docs/collapsed.png" width="380" alt="Collapsed notch: a raised hand on the left ear, 2·2 on the right ear">
@@ -38,12 +39,74 @@ Interface available in English and French (follows the system language). Screens
 - **Claude Desktop**: a row shows whether Claude Desktop is open, with a button to bring it to the front.
 - **Optional tools section**: files recently written by Claude, Git status of your repositories, today's usage.
   It only appears when its data files exist (see [Tools section](#tools-section)).
+- **Six more tabs**: Player, Quick Settings, Shelf, Clipboard, Timer and Quick notes (see [Tabs](#tabs)).
 - Works on screens without a notch too (external display, closed lid): a small notch is drawn at the top
   center of the screen.
 
 <p align="center">
   <img src="docs/tools.png" width="620" alt="Expanded panel with the tools section: recent files, two Git repositories to deal with, today's usage">
 </p>
+
+## Tabs
+
+The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default. In
+**Settings › Tabs** you can hide a tab (a hidden tab does no work), change the order, or pick the tab that opens
+by default. The panel reopens on the last tab you used, or on Claude when a session needs you.
+
+- **Claude**: your sessions, with their state, permissions, questions and plans. The only tab that cannot be hidden.
+- **Player**: the track playing in Music, Spotify or your browser, with artwork, progress (drag to seek) and
+  controls. Below it, a week view of your calendar: click an event to open it in Calendar.
+- **Quick Settings**: Wi-Fi, Bluetooth, Focus, Low Power Mode, caffeine (keeps the Mac awake for 1 h, 2 h or
+  without limit), the battery of the Mac and of your AirPods, and three scenes: Battery, Normal and Presentation.
+- **Shelf**: files and folders to keep at hand. Drop them on the notch, even when it is collapsed, and drag them
+  out to Finder or another app. The shelf keeps a reference to each item: nothing is copied.
+- **Clipboard**: your recent copies (text, links, images, files, colors). Click one to copy it again; nothing is
+  pasted for you. Copies made in password managers are not recorded.
+- **Timer**: a countdown, or a Pomodoro cycle with the focus and break lengths you set. It keeps counting through
+  sleep and restarts.
+- **Quick notes**: plain-text notes. Pin the ones you use, delete with undo, and search once you have more than
+  eight.
+
+## Reply from the notch
+
+Off by default: turn it on in **Settings › Claude**. Then Claude Code waits for your answer in the notch as well
+as in the terminal:
+
+- **Permissions**: allow or deny a tool call, with an optional reason that Claude reads. The notch never offers
+  "always allow".
+- **Questions**: pick one answer or several, or write your own.
+- **Plans**: approve a plan, or ask for changes.
+- **Messages**: hover a session card and click **Message** to write to Claude. The message reaches Claude after
+  the current action, or starts a new turn if Claude was waiting.
+
+The terminal dialog stays usable: the first answer wins. If the notch gives no answer in time (4 seconds when its
+card never appeared, about 590 seconds otherwise), the request goes back to the terminal. The same happens when the
+app is closed or the setting is off, so nothing is ever approved by default.
+
+For sessions without a terminal (`claude -p`, the Agent SDK, the Code tab of Claude Desktop) there is no **Message**
+button, and permissions, questions and plans were not tested. A session opened before the update gets replies only
+after it restarts.
+
+## Notch settings
+
+Open **…** › **Settings…** (⌘,).
+
+- **Visibility**: always visible (the default), only while Claude is open, or only during an activity: a session
+  working, waiting or just finished, or a tab showing ears (a timer, the player).
+- **Hide the notch** for 1 hour, until tomorrow, or until you show it again. The same options are in the **…** menu
+  and in the right-click menu of the collapsed notch.
+- **Opening**: on hover (with an opening delay) or on click. **Close on click outside** keeps the panel open until
+  you click elsewhere, instead of closing it when the mouse leaves.
+- **Shortcuts** (none by default): one opens or closes the panel, one hides or shows the notch. They work
+  everywhere, without the Accessibility permission. Once the panel is open from the keyboard, ← and → switch tabs,
+  ⌘1 to ⌘9 jump to a tab, and Esc closes it.
+- **Size and look**: panel width (compact, standard, large, or a custom width from 460 to 720 pt), background (black,
+  graphite, midnight blue or a custom color), opacity, shadow, accent color and animation speed. With "Reduce
+  motion" on in macOS, the animations become a simple fade.
+- **Screen**: the built-in display (the default), the main display, the display under the mouse, or a display
+  picked by name. A screen without a notch gets a virtual one at the top center.
+- **Privacy**: hide the notch from screenshots and screen sharing. This depends on the app that captures the screen.
+- **Reset to defaults**, after a confirmation. Tabs, their data and the hooks are not changed.
 
 ## Installation
 
@@ -73,7 +136,7 @@ these accesses one last time, then no longer.
 On first launch, a window offers to install the Claude Code hooks. It adds Claude Notch's entries to
 `~/.claude/settings.json` (a timestamped backup is written next to it first, and your existing hooks are kept)
 and installs the hook script in `~/.claude/hooks/`. You can reinstall them later from the **…** menu ›
-**Installer les hooks**. Sessions that were already open show up at their next message.
+**Install Claude Code Hooks**. Sessions that were already open show up at their next message.
 
 ### Requirements
 
@@ -118,12 +181,40 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   notch. No route lets another program decide in your place, and there is no "always allow". When anything
   fails (app not running, setting off, delay over), the hook hands control back to the terminal: never an
   approval by default.
+- **Clipboard**: while the app runs, the Clipboard tab checks the clipboard once a second, and reads its content only
+  when it has changed and passes the privacy checks. Copies marked as concealed, transient or auto-generated by a
+  password manager are never recorded, nor are copies made from Keychain Access, Passwords, 1Password, Bitwarden,
+  Dashlane or KeePassXC (the list can be edited). By default the history stays in memory and is cleared when you
+  quit the app or turn the tab off. If you keep it across restarts, only text and links are written, never images
+  or files. Pausing the capture stops the checks until the next launch.
 - What the app reads: the hook events, the end of the transcript of a running session (to detect Esc),
-  Claude Code's task files, the process list (to find the host app).
-- What the app writes: two local logs and the token files in `~/Library/Application Support/ClaudeNotch/` (see
-  [Shared logs](#shared-logs)), the hooks in `~/.claude` when you ask for it, and during an update the DMG in
+  Claude Code's task files, the process list (to find the host app), the track playing and its artwork (Player),
+  the events of the calendars you chose to show, the state of Wi-Fi and Bluetooth, and the battery level.
+- What the app writes: the logs and token files in `~/Library/Application Support/ClaudeNotch/` (see
+  [Shared logs](#shared-logs)), and the data of the tabs in the same folder: `shelf.json` (references to your
+  files), `notes.json`, `timer.json`, and `clipboard-history.json` only if you keep the history. These files are
+  readable by your account only. Also the hooks in `~/.claude` when you ask for it, and during an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
   the old one. The messages you type are sent to the Claude Code session only, never stored.
+
+## macOS permissions
+
+Claude Notch asks for a permission only when you use the feature that needs it. Nothing is requested at launch.
+
+- **Calendars** (full access): your week and events in the Player tab. Asked when you press the calendar's button
+  or turn the option on.
+- **Automation: Calendar** (Apple Events): to open a day or an event in Calendar. macOS asks the first time.
+- **Bluetooth**: to read the state of Bluetooth and switch it from Quick Settings. Asked when you first use the
+  Bluetooth tile, or a scene that changes it.
+- **Notifications**: to announce the end of a timer. Asked when you start your first timer. Without it, the sound
+  and the "Done" ear still signal the end.
+- **Paste from other apps** (macOS 15.4 and later): so the Clipboard tab can read what you copy. macOS may ask each
+  time, or block it. When it is blocked, nothing is recorded, and the tab and the settings link to System Settings.
+- **Desktop, Documents, Downloads**: only for the optional companion tools (see [Tools section](#tools-section)).
+- Wi-Fi: the network name is not read, so Location is not requested. If macOS refuses to change the Wi-Fi state,
+  the tile says so.
+- Low Power Mode asks for your administrator password or Touch ID each time it changes. macOS requires it for
+  `pmset`.
 
 ## How it works
 
@@ -213,10 +304,23 @@ hooks it already receives:
 - Task list: the TaskCreate/TaskUpdate tools are only enabled by default on some models. Otherwise, set
   `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`. Claude Code deletes the task files once the whole list is done: the
   progress bar then disappears.
+- Player: the track comes from `mediaremote-adapter`, an open-source helper (BSD-3-Clause) that runs through Apple's
+  `/usr/bin/perl`, because since macOS 15.4 MediaRemote no longer answers third-party apps. If the helper cannot
+  run, the tab shows "Now playing unavailable" and a **Try Again** button.
+- Low Power Mode asks for your administrator password or Touch ID at each change. The tile is hidden on Macs that
+  do not offer this mode.
+- Focus: macOS offers no API to read or set Focus. The tile runs a shortcut that you create in the Shortcuts app
+  (the tile explains how). The state it shows is the one set by your last click.
+- Bluetooth uses a private API of `IOBluetooth`, loaded at runtime. Apple may change it without notice.
+- Wi-Fi: the name of the network is not shown.
+- Clipboard: images over 5 MB are not kept, and the history holds 25, 50 or 100 items. Pinned items are added to
+  that number and never removed.
+- Quick notes: 200 notes at most, 100,000 characters per note, plain text only.
+- Timer: the end of a timer is announced by the sound and the "Done" ear. The notification needs your permission.
 
 ## Uninstall
 
-**…** menu › **Désinstaller Claude Notch…** removes the hooks and what the app installed, then quits.
+**…** menu › **Uninstall Claude Notch…** removes the hooks and what the app installed, then quits.
 Then drag `ClaudeNotch.app` from Applications to the Trash.
 
 ## Development
@@ -248,8 +352,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
   up on their own.
 
   ```sh
-  git tag v1.1.0
-  git push origin v1.1.0
+  git tag v1.2.0
+  git push origin v1.2.0
   ```
 
   The private signing key is also in the maintainer's keychain. Losing it breaks automatic updates for every
@@ -275,13 +379,17 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
 
 [MIT](LICENSE).
 
+Third-party code: `Vendor/mediaremote-adapter` (ungive/mediaremote-adapter, BSD-3-Clause, copied without changes).
+Its notice is listed in **About › Licenses**.
+
 ---
 
 ## Français
 
 App macOS native qui vit dans la notch du MacBook et suit les sessions Claude Code, dans un terminal ou un
 éditeur (CLI) comme dans l'onglet Code de Claude Desktop. Survole la notch : le panneau se déplie et résume
-chaque session (état, outil en cours, liste de tâches, sous-agents). Interface disponible en anglais et en
+chaque session (état, outil en cours, liste de tâches, sous-agents). Six autres onglets l'accompagnent : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et
+Notes rapides. Interface disponible en anglais et en
 français (suit la langue du système). Les captures ci-dessus utilisent des données fictives.
 
 *Projet indépendant, ni affilié à Anthropic ni approuvé par Anthropic. Claude est une marque d'Anthropic.*
@@ -310,8 +418,76 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **Claude Desktop** : une ligne indique si Claude Desktop est ouvert, avec un bouton pour le ramener devant.
 - **Section outils (optionnelle)** : fichiers récemment écrits par Claude, état Git de tes dépôts, usage du
   jour. Elle n'apparaît que si ses fichiers de données existent (voir [Section outils](#section-outils)).
+- **Six autres onglets** : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
 - Marche aussi sur un écran sans notch (écran externe, capot fermé) : une petite notch est dessinée en haut
   au centre de l'écran.
+
+### Onglets
+
+La notch déployée est une rangée d'onglets. Clique sur un onglet, ou survole-le un instant. Tous les onglets sont
+activés par défaut. Dans **Réglages › Onglets**, tu peux masquer un onglet (un onglet masqué ne fait aucun
+travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Le panneau se rouvre sur le dernier onglet
+utilisé, ou sur Claude quand une session a besoin de toi.
+
+- **Claude** : tes sessions, avec leur état, leurs permissions, leurs questions et leurs plans. C'est le seul onglet
+  qu'on ne peut pas masquer.
+- **Lecteur** : le morceau en cours dans Musique, Spotify ou ton navigateur, avec la pochette, la progression
+  (glisse pour avancer) et les commandes. Dessous, une vue de la semaine de ton calendrier : un clic sur un
+  événement l'ouvre dans Calendrier.
+- **Réglages rapides** : Wi-Fi, Bluetooth, Concentration, Économie d'énergie, caféine (empêche la mise en veille
+  pendant 1 h, 2 h ou sans limite), batterie du Mac et des AirPods, et trois scènes : Autonomie, Normal et
+  Présentation.
+- **Étagère** : des fichiers et des dossiers à garder sous la main. Dépose-les sur la notch, même repliée, et
+  glisse-les vers le Finder ou une autre app. L'étagère garde un lien vers chaque élément : rien n'est copié.
+- **Presse-papiers** : tes copies récentes (texte, liens, images, fichiers, couleurs). Un clic les recopie ; rien
+  n'est collé à ta place. Les copies faites dans les gestionnaires de mots de passe ne sont pas enregistrées.
+- **Minuteur** : un compte à rebours, ou un cycle Pomodoro avec les durées de concentration et de pause que tu
+  règles. Il continue de compter après une mise en veille ou un redémarrage.
+- **Notes rapides** : des notes en texte brut. Épingle celles que tu utilises, supprime avec annulation, et cherche
+  dès que tu en as plus de huit.
+
+### Répondre depuis la notch
+
+Désactivé par défaut : active-le dans **Réglages › Claude**. Claude Code attend alors ta réponse dans la notch
+comme dans le terminal :
+
+- **Permissions** : autoriser ou refuser un appel d'outil, avec un motif facultatif que Claude lit. La notch ne
+  propose jamais « toujours autoriser ».
+- **Questions** : choisir une ou plusieurs réponses, ou écrire la tienne.
+- **Plans** : approuver un plan, ou demander des changements.
+- **Messages** : survole la carte d'une session et clique sur **Écrire** pour écrire à Claude. Le message lui
+  parvient après l'action en cours, ou démarre un tour s'il attendait.
+
+Le dialogue du terminal reste utilisable : la première réponse gagne. Si la notch ne répond pas à temps (4 secondes
+si sa carte n'a jamais été affichée, environ 590 secondes sinon), la demande revient au terminal. Il en va de même
+quand l'app est fermée ou le réglage coupé : rien n'est jamais approuvé par défaut.
+
+Pour les sessions sans terminal (`claude -p`, le SDK Agent, l'onglet Code de Claude Desktop), il n'y a pas de bouton
+**Écrire**, et les permissions, questions et plans n'ont pas été testés. Une session ouverte avant la mise à jour ne
+reçoit les réponses qu'après son redémarrage.
+
+### Réglages de la notch
+
+Ouvre **…** › **Réglages…** (⌘,).
+
+- **Visibilité** : toujours visible (par défaut), seulement quand Claude est ouvert, ou seulement pendant une
+  activité : une session qui travaille, attend ou vient de finir, ou un onglet qui affiche des oreilles (minuteur,
+  lecteur).
+- **Masquer la notch** pendant 1 h, jusqu'à demain, ou jusqu'à ce que tu la réaffiches. Les mêmes choix sont dans le
+  menu **…** et dans le menu du clic droit sur la notch repliée.
+- **Ouverture** : au survol (avec un délai) ou au clic. **Fermer au clic à l'extérieur** garde le panneau ouvert
+  jusqu'à un clic ailleurs, au lieu de le refermer quand la souris le quitte.
+- **Raccourcis** (aucun par défaut) : l'un ouvre ou ferme le panneau, l'autre masque ou réaffiche la notch. Ils
+  marchent partout, sans l'autorisation d'accessibilité. Panneau ouvert au clavier : ← et → changent d'onglet, ⌘1 à
+  ⌘9 vont à un onglet, Échap ferme.
+- **Taille et apparence** : largeur du panneau (compact, standard, grand, ou une largeur personnalisée de 460 à
+  720 pt), fond (noir, graphite, bleu nuit ou couleur libre), opacité, ombre, couleur d'accent et vitesse des
+  animations. Avec « Réduire les animations » activé dans macOS, les animations deviennent un simple fondu.
+- **Écran** : l'écran intégré (par défaut), l'écran principal, l'écran sous la souris, ou un écran choisi par son
+  nom. Un écran sans encoche reçoit une encoche virtuelle en haut au centre.
+- **Confidentialité** : masquer la notch des captures d'écran et du partage d'écran. Cela dépend de l'app qui capture
+  l'écran.
+- **Rétablir les réglages par défaut**, après confirmation. Les onglets, leurs données et les hooks ne changent pas.
 
 ### Installation
 
@@ -341,7 +517,7 @@ certificat, macOS redemande ces accès une dernière fois, puis plus jamais.
 Au premier lancement, une fenêtre propose d'installer les hooks de Claude Code. Elle ajoute les entrées de
 Claude Notch dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à côté avant, tes hooks
 existants sont conservés) et installe le script de hook dans `~/.claude/hooks/`. Tu peux les réinstaller
-plus tard depuis le menu **…** › **Installer les hooks**. Une session déjà ouverte apparaît à son prochain
+plus tard depuis le menu **…** › **Installer les hooks Claude Code**. Une session déjà ouverte apparaît à son prochain
 message.
 
 #### Prérequis
@@ -389,13 +565,47 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
   clic dans la notch. Aucune route ne permet à un autre programme de décider à ta place, et il n'y a pas de
   « toujours autoriser ». Au moindre échec (app fermée, réglage coupé, délai passé), le hook rend la main au
   terminal : jamais d'autorisation par défaut.
+- **Presse-papiers** : pendant que l'app tourne, l'onglet Presse-papiers vérifie le presse-papiers une fois par
+  seconde, et ne lit son contenu que s'il a changé et passe les contrôles de confidentialité. Les copies marquées
+  confidentielles, temporaires ou générées par un gestionnaire de mots de passe ne sont jamais enregistrées, ni
+  celles faites depuis Trousseaux d'accès, Mots de passe, 1Password, Bitwarden, Dashlane ou KeePassXC (la liste
+  peut être modifiée). Par défaut, l'historique reste en mémoire et disparaît à la fermeture de l'app ou à la
+  désactivation de l'onglet. Si tu le gardes d'un lancement à l'autre, seuls les textes et les liens sont écrits,
+  jamais les images ni les fichiers. Suspendre la capture arrête les contrôles jusqu'au prochain lancement.
 - Ce que l'app lit : les événements de hook, la fin du transcript d'une session en cours (pour détecter
-  Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte).
-- Ce que l'app écrit : deux journaux locaux et les fichiers du jeton dans
-  `~/Library/Application Support/ClaudeNotch/` (voir [Registres partagés](#registres-partagés)), les hooks dans
+  Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte), le morceau en cours
+  et sa pochette (Lecteur), les événements des calendriers que tu as choisi d'afficher, l'état du Wi-Fi et du
+  Bluetooth, et le niveau de la batterie.
+- Ce que l'app écrit : les journaux et les fichiers du jeton dans `~/Library/Application Support/ClaudeNotch/`
+  (voir [Registres partagés](#registres-partagés)), et les données des onglets dans le même dossier :
+  `shelf.json` (les références à tes fichiers), `notes.json`, `timer.json`, et `clipboard-history.json` seulement
+  si tu gardes l'historique. Ces fichiers ne sont lisibles que par ton compte. Il y a aussi les hooks dans
   `~/.claude` quand tu le demandes et, pendant une mise à jour, le DMG dans
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
   l'ancienne. Les messages que tu tapes partent à la session Claude Code seulement, sans être enregistrés.
+
+### Autorisations macOS
+
+Claude Notch ne demande une autorisation que lorsque tu utilises la fonction qui en a besoin. Rien n'est demandé au
+lancement.
+
+- **Calendriers** (accès complet) : ta semaine et tes événements dans l'onglet Lecteur. Demandé quand tu appuies sur
+  le bouton du calendrier ou que tu actives l'option.
+- **Automatisation : Calendrier** (Apple Events) : pour ouvrir un jour ou un événement dans Calendrier. macOS le
+  demande la première fois.
+- **Bluetooth** : pour lire l'état du Bluetooth et le couper ou le rallumer depuis Réglages rapides. Demandé quand tu
+  utilises pour la première fois la tuile Bluetooth ou une scène qui la change.
+- **Notifications** : pour annoncer la fin d'un minuteur. Demandé au premier minuteur lancé. Sans elles, le son et
+  l'oreille « Terminé » signalent quand même la fin.
+- **Coller depuis d'autres apps** (macOS 15.4 et plus récent) : pour que l'onglet Presse-papiers puisse lire ce que
+  tu copies. macOS peut le demander à chaque fois, ou le bloquer. Bloqué, rien ne peut être enregistré ; l'onglet et
+  les réglages renvoient vers Réglages Système.
+- **Bureau, Documents, Téléchargements** : seulement pour les outils compagnons facultatifs (voir
+  [Section outils](#section-outils)).
+- Wi-Fi : le nom du réseau n'est pas lu, donc la localisation n'est pas demandée. Si macOS refuse de changer l'état
+  du Wi-Fi, la tuile l'indique.
+- L'économie d'énergie demande ton mot de passe administrateur ou Touch ID à chaque changement : macOS l'exige pour
+  `pmset`.
 
 ### Fonctionnement
 
@@ -487,6 +697,20 @@ partir de hooks qu'elle reçoit déjà :
 - Liste de tâches : les outils TaskCreate/TaskUpdate ne sont actifs par défaut que sur certains modèles.
   Sinon, `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`. Claude Code supprime les fichiers de tâches quand toute la liste
   est terminée : la barre disparaît.
+- Lecteur : le morceau vient de `mediaremote-adapter`, un utilitaire open source (BSD-3-Clause) qui passe par
+  `/usr/bin/perl` d'Apple, car depuis macOS 15.4 MediaRemote ne répond plus aux apps tierces. Si l'utilitaire ne
+  démarre pas, l'onglet affiche « Lecture en cours indisponible » et un bouton **Réessayer**.
+- Économie d'énergie : demande le mot de passe administrateur ou Touch ID à chaque changement. La tuile est masquée
+  sur les Mac qui n'ont pas ce mode.
+- Concentration : macOS n'offre aucun moyen de lire ni de régler la Concentration depuis une app. La tuile lance un
+  raccourci que tu crées dans l'app Raccourcis (la tuile explique comment). L'état affiché est celui de ton dernier
+  clic.
+- Bluetooth utilise une API privée d'`IOBluetooth`, chargée à l'exécution. Apple peut la modifier sans prévenir.
+- Wi-Fi : le nom du réseau n'est pas affiché.
+- Presse-papiers : les images de plus de 5 Mo ne sont pas gardées, et l'historique garde 25, 50 ou 100 éléments. Les
+  éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés.
+- Notes rapides : 200 notes au plus, 100 000 caractères par note, texte brut seulement.
+- Minuteur : la fin est signalée par le son et l'oreille « Terminé ». La notification demande ton autorisation.
 
 ### Désinstallation
 
@@ -523,8 +747,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifi�
   existantes la récupèrent seules.
 
   ```sh
-  git tag v1.1.0
-  git push origin v1.1.0
+  git tag v1.2.0
+  git push origin v1.2.0
   ```
 
   La clé privée de signature est aussi dans le trousseau du mainteneur. La perdre casse la mise à jour
@@ -550,3 +774,6 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifi�
 ### Licence
 
 [MIT](LICENSE).
+
+Code tiers : `Vendor/mediaremote-adapter` (ungive/mediaremote-adapter, BSD-3-Clause, copié sans modification).
+Sa notice figure dans **À propos › Licences**.

@@ -39,11 +39,29 @@ organised and why some choices were made, so they are not undone by accident.
   session cards), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
-  per module: `Claude/` (sessions, compact summary, Claude settings; `ReplyCenter` and `ReplyViews` for
-  replies from the notch), and the empty `Media/`,
-  `QuickSettings/`, `Shelf/`, `Clipboard/`, `Timer/`, `Notes/`.
+  per module:
+  - `Claude/`: sessions, compact summary, Claude settings. `ReplyCenter` holds the long requests of `/permission`
+    and `/inbox` (one waiter per session, FIFO queue of messages); `ReplyViews` draws the cards.
+  - `Media/` (`media`): `MediaModule` (life cycle, settings), `NowPlaying` (state rebuilt from the
+    `mediaremote-adapter` JSON lines; `MediaRemoteAdapter` runs the helper and restarts it with a growing delay),
+    `MediaCalendar` (EventKit and the Calendar opener), `MediaViews`.
+  - `QuickSettings/` (`quicksettings`): `QuickSettingsModule` (tiles, scenes, caffeine, automatic switch),
+    `QuickSettingsBackends` (the system accesses, behind protocols: CoreWLAN, IOBluetooth loaded at runtime,
+    `pmset`, IOPS, IOPMAssertion, `shortcuts run`), `QuickSettingsModels` (pure parsers and state), `QuickSettingsViews`.
+  - `Shelf/` (`shelf`): `ShelfModule`, `ShelfStore` (bookmarks in `shelf.json`), `ShelfAppKit` (drag and drop,
+    Quick Look, `ShelfDropView`, the AppKit view under the notch's SwiftUI content), `ShelfViews`.
+  - `Clipboard/` (`clipboard`): `ClipboardModule` (capture by change count, limits, suspension), `ClipboardSystem`
+    (pasteboard reads and access), `ClipboardModels` (history and `ClipboardPrivacy` rules), `ClipboardStorage`
+    (opt-in history file), `ClipboardViews`.
+  - `Timer/` (`timer`): `TimerModule`, `TimerEngine` (pure state machine, keeps an end date), `TimerSystem`
+    (sounds and notifications), `ModuleStorage` (`ModuleScheduler` and `SecureJSONFile`, shared with Notes),
+    `TimerViews`.
+  - `Notes/` (`notes`): `NotesModule` (list, limits, undo, save) and `NotesViews` (plain-text editor).
 - `Preferences`: every setting (UserDefaults, observable, values clamped). `SettingsWindow`: the settings
   window (SwiftUI in an `NSWindow`, sidebar) and the main menu (⌘, ⌘W, editing).
+- `NotchShell`: notch rules that do not need a window: visibility (`NotchVisibilityRule`), screen choice and
+  virtual notch geometry (`NotchScreenPicker`). `HotKeys`: global shortcuts (`HotKeyCenter`) through Carbon
+  `RegisterEventHotKey`, which needs no Accessibility permission.
 - `HookInstaller` + `OrderedJSON`: add and remove the hooks in `~/.claude/settings.json`. `Onboarding`:
   first-launch window and menu items. `AppIdentity`: bundle identifier and migration from early builds.
 - `ActivityLog`: `files.jsonl` / `permissions.jsonl`. `JobRunner`: optional companion tool jobs.
@@ -67,6 +85,9 @@ Apple Events and Bluetooth are already there) nor another module's files.
   as that is no longer true, including when it is disabled. Stopped, a module does no work at all: no timer, no
   observer, no file read. All enabled modules run while the panel is open, so tabs switch instantly and the
   compact mode has its summaries.
+- **Running while collapsed** (`keepsRunningWhenCollapsed`): Clipboard while its capture is not suspended (the
+  history must not have holes); Player while its tab and its ears are on; Quick Settings while a caffeine is
+  active or the automatic switch is on; Timer while a timer counts, is paused, or shows its "Done" ears.
 - **Views** are built on demand (shown tab, compact mode, settings) and thrown away: state that must survive a
   tab switch lives in the module (`@Published`). Content width and maximum height come from the environment
   (`\.notchContentWidth`, `\.notchContentMaxHeight`): the whole panel must stay under 460 pt.
@@ -76,8 +97,9 @@ Apple Events and Bluetooth are already there) nor another module's files.
   that slides (`matchedGeometryEffect`). Click, or hover for 0.2 s (passing over a tab does not switch). The panel
   opens on the last tab or the default one (settings), except when Claude needs the user: then on Claude.
 - **Ears** (collapsed notch): Claude waiting for you > Claude working > Claude just finished (5 s) > the module
-  ears with the highest priority (tab order breaks ties) > nothing. Only running modules count. "Show the ears"
-  off: the collapsed notch is exactly the notch. Module ears also keep the notch window on screen.
+  ears with the highest priority (timer 5, player 1, caffeine -10; tab order breaks ties) > nothing. Only running
+  modules count. "Show the ears" off: the collapsed notch is exactly the notch. Module ears also keep the notch
+  window on screen.
 - **Full screen**: detected on events only (Space change, plus 0.4 s later, app activation, screen change): a
   layer-0 window of the front app covers the notch's whole screen, menu bar included (a zoomed window does not).
   Window bounds need no screen-recording permission. Setting: compact (270 pt, no tabs, each module's compact
@@ -226,6 +248,25 @@ Apple Events and Bluetooth are already there) nor another module's files.
   `settings.json` is not touched. When our entries come from a previous version (`.outdated`), entries and
   script are reinstalled silently too (timestamped backup); the onboarding window only opens if that fails or
   if the hooks were never installed.
+- **Reply flow** (`/permission`, `/inbox`): the hook script posts with the token (curl reads it from the 0600 file
+  `hook-token`, never from argv) and waits. `HookServer` checks `Host`, `Origin` and the token, then hands the
+  request to `ReplyCenter`. A click gives the answer: the app returns it with the `X-Claude-Notch-Proof` header,
+  whose value is the 0600 file `hook-proof`. The script checks that header, then prints the decision (`permission`)
+  or writes the message to stderr and exits 2 (`inbox`). Fail-open everywhere: a missing token or proof file, a
+  failed curl, an empty body, or a missing or wrong proof make the script exit 0 without applying anything, so
+  Claude Code falls back to the terminal.
+- **Notch visibility and settings** (`NotchVisibilityRule`, `NotchScreenPicker`): on-demand display (a file dragged
+  to the shelf, a shortcut) comes first; the user's hiding and the full-screen hiding win over the mode; an expanded
+  panel stays up; then the mode decides (always, while Claude is open, during an activity). A named screen that is
+  no longer connected falls back to the built-in screen. "Hide from captures" sets `NSWindow.sharingType` to
+  `.none`, and `/state` reports it. These rules are plain functions, tested without a screen.
+- **Clipboard capture runs while the panel is collapsed**: the capture reads only `changeCount`, once a second
+  (0.5 s tolerance), and reads the content only after the privacy checks (concealed, transient or auto-generated
+  types, excluded apps). The history stays in memory unless the user opts in; then only text and links go to
+  `clipboard-history.json` (0600). A history that stopped with the panel would have holes.
+- **The shelf keeps bookmarks, not copies**: `URL.bookmarkData` in `shelf.json` (0600) finds a moved file again and
+  marks a missing one. Dragging items out offers copy or alias, never a move; the optional "remove after drag"
+  only drops the reference from the shelf.
 
 ## Conventions
 
