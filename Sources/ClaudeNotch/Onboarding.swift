@@ -22,8 +22,17 @@ final class HookSetup: ObservableObject {
     var isInApplications: Bool { AppIdentity.isInApplicationsFolder(Bundle.main.bundlePath) }
 
     /// Au lancement : la fenêtre s'ouvre si les hooks manquent, sont anciens ou si settings.json est illisible.
+    /// Après une mise à jour de l'app, seul le script embarqué a changé : il est réinstallé sans rien demander.
     func showOnboardingIfNeeded() {
         refresh()
+        if status == .scriptOutdated {
+            do {
+                try installer.updateScript()
+            } catch {
+                NSLog("ClaudeNotch : mise à jour du script de hook impossible (%@).", error.localizedDescription)
+            }
+            refresh()
+        }
         if status != .installed { showOnboarding() }
     }
 
@@ -40,7 +49,7 @@ final class HookSetup: ObservableObject {
             var error: String?
             if case .unreadable(let message) = status { error = message }
             let view = OnboardingView(
-                mode: status == .outdated ? .update : .install,
+                mode: status == .outdated || status == .scriptOutdated ? .update : .install,
                 inApplications: isInApplications,
                 launchAtLogin: status == .notInstalled || Preferences.shared.launchAtLogin,
                 error: error,
@@ -387,7 +396,7 @@ struct HookMenuItems: View {
         case .installed:
             Button("Hooks Claude Code installés ✓") {}
                 .disabled(true)
-        case .outdated:
+        case .outdated, .scriptOutdated:
             Button("Mettre à jour les hooks Claude Code", action: setup.update)
         case .notInstalled, .unreadable:
             Button("Installer les hooks Claude Code", action: setup.showOnboarding)

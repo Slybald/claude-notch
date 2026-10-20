@@ -36,8 +36,10 @@ struct HookInstaller {
     enum Status: Equatable {
         case notInstalled
         case installed
-        /// Entrées présentes mais différentes (chemin, options, événements) ou script de hook absent ou ancien.
+        /// Entrées présentes mais différentes (chemin, options, événements).
         case outdated
+        /// Entrées à jour, mais script de hook absent ou différent de celui de l'app (app mise à jour).
+        case scriptOutdated
         case unreadable(String)
     }
 
@@ -111,6 +113,12 @@ struct HookInstaller {
         return try save(settings, replacing: original)
     }
 
+    /// Réécrit seulement le script de hook, sans toucher à settings.json (entrées déjà à jour).
+    func updateScript() throws {
+        guard let bundledHook, let script = try? Data(contentsOf: bundledHook) else { throw Failure.missingBundledHook }
+        try writeHookScript(script)
+    }
+
     /// Retire nos entrées (et ce qu'elles laissent vide), puis le script de hook.
     /// settings.json illisible : erreur, et le script reste en place (settings.json y renvoie peut-être encore).
     @discardableResult
@@ -156,7 +164,8 @@ struct HookInstaller {
         if ours.isEmpty { return .notInstalled }
         let entriesCurrent = Set(ours.keys) == Set(Self.events)
             && ours.values.allSatisfy { $0.count == 1 && isExpectedEntry($0[0]) }
-        return entriesCurrent && hookScriptIsCurrent ? .installed : .outdated
+        guard entriesCurrent else { return .outdated }
+        return hookScriptIsCurrent ? .installed : .scriptOutdated
     }
 
     // MARK: - Transformations (pures)

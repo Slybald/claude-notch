@@ -450,18 +450,46 @@ final class HookInstallerTests: XCTestCase {
         try write(String(decoding: settings.serialized(), as: UTF8.self))
         XCTAssertEqual(installer.status(), .outdated)
 
-        // Script ancien, puis absent.
+        // Script ancien, puis absent : entrées à jour, seul le script est à refaire.
         try write(String(decoding: installed, as: UTF8.self))
         XCTAssertEqual(installer.status(), .installed)
         try Data("#!/bin/sh\nopen -g -b local.claudenotch\n".utf8).write(to: installer.hookURL)
-        XCTAssertEqual(installer.status(), .outdated)
+        XCTAssertEqual(installer.status(), .scriptOutdated)
         try FileManager.default.removeItem(at: installer.hookURL)
-        XCTAssertEqual(installer.status(), .outdated)
+        XCTAssertEqual(installer.status(), .scriptOutdated)
 
         // Réinstaller remet tout d'aplomb.
         try installer.install()
         XCTAssertEqual(installer.status(), .installed)
         XCTAssertTrue(try settingsData() == installed)
+    }
+
+    /// Après une mise à jour de l'app : seul le script est réécrit, settings.json reste intact (ni écriture ni
+    /// sauvegarde), même quand nos entrées ne sont pas en fin de liste.
+    func testUpdateScriptLeavesSettingsUntouched() throws {
+        let installer = installer()
+        try installer.install()
+        var settings = try OrderedJSON.parse(try settingsData())
+        var stop = settings["hooks"]?["Stop"]?.items ?? []
+        stop.append(.object([OrderedJSON.Member(key: "hooks", value: .array([
+            .object([OrderedJSON.Member(key: "type", value: .string("command")),
+                     OrderedJSON.Member(key: "command", value: .string("~/.claude/hooks/apres.sh"))]),
+        ]))]))
+        settings["hooks"]?["Stop"] = .array(stop)
+        try write(String(decoding: settings.serialized(), as: UTF8.self))
+        let before = try settingsData()
+        let backupsBefore = backups()
+        try Data("#!/bin/sh\n# ancienne version\n".utf8).write(to: installer.hookURL)
+        XCTAssertEqual(installer.status(), .scriptOutdated)
+
+        try installer.updateScript()
+        XCTAssertEqual(installer.status(), .installed)
+        XCTAssertTrue(try settingsData() == before)
+        XCTAssertEqual(backups(), backupsBefore)
+        XCTAssertEqual(try Data(contentsOf: installer.hookURL), try Data(contentsOf: Self.bundledHook))
+        XCTAssertThrowsError(try self.installer(bundled: nil).updateScript()) { error in
+            XCTAssertEqual(error as? HookInstaller.Failure, .missingBundledHook)
+        }
     }
 
     func testOursRequiresAnObjectWithMarker() {
