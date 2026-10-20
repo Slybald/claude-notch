@@ -104,6 +104,18 @@ Apple Events and Bluetooth are already there) nor another module's files.
   just finished (5 s) > the module ears with the highest priority (timer 5, player 1, caffeine -10; tab order
   breaks ties) > nothing. Only running modules count. "Show the ears" off: the collapsed notch is exactly the
   notch. Module ears also keep the notch window on screen.
+  - **Index-tab rotation** (`EarsRotation.slots`, pure; "Alternate Claude and the other ears", on by default,
+    `appearance.alternateEars`): while Claude is working or has just finished and at least one module has ears,
+    the contents alternate every 4 s: Claude, then each module by decreasing priority (Claude + 2 modules at most),
+    with a short vertical slide (a plain fade with "Reduce motion"). Claude waiting for you stays alone (it is an
+    alert), and without Claude activity the highest-priority module is shown alone, as before. Setting off: the
+    old rule.
+  - **Cost**: one `Timer` of 4 s (tolerance 1 s) in `NotchViewModel.setEarsRotation`, driven by the root view
+    (`EarsRotation.shouldRotate`): it exists only while the notch is collapsed, shown and has at least 2 contents;
+    the panel open, one content left, ears off or the notch hidden cancel it. Nothing else runs at rest.
+  - **Stable shape**: the body width uses the widest ear in play (`EarsRotation.sideWidth`), so neither the shape
+    nor the hover zone moves from one content to the next. `/state` lists the contents (`notch.earsSlots`, ids
+    only) and whether the rotation runs (`notch.earsRotating`).
 - **Full screen**: detected on events only (Space change, plus 0.4 s later, app activation, screen change): a
   layer-0 window of the front app covers the notch's whole screen, menu bar included (a zoomed window does not).
   Window bounds need no screen-recording permission. Setting: compact (270 pt, no tabs, each module's compact

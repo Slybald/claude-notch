@@ -71,11 +71,12 @@ struct NotchRootView: View {
 
     private var expanded: Bool { model.isExpanded }
     private var compact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
-    private var ears: EarsChoice {
-        EarsChoice.choose(claude: registry.isClaudeEnabled ? store.indicator : .none, module: registry.moduleEars,
-                          showEars: prefs.showEars)
+    /// Contenus des oreilles repliées : un seul, ou plusieurs qui alternent (voir `EarsRotation`).
+    private var slots: [EarsSlot] { registry.earsSlots(claude: store.indicator) }
+    private var showsEars: Bool { !slots.isEmpty }
+    private var shouldRotateEars: Bool {
+        EarsRotation.shouldRotate(slots: slots, expanded: expanded, shown: model.isShown)
     }
-    private var showsEars: Bool { ears != .none }
     /// Ressort choisi dans les réglages, ou fondu simple avec « Réduire les animations ».
     private var motion: Animation { NotchMotion.animation(prefs.animationSpeed, reduceMotion: model.reduceMotion) }
     /// Repliée sur une vraie encoche : noir pur pour s'y fondre. Teintée seulement sur demande, sans encoche.
@@ -86,7 +87,7 @@ struct NotchRootView: View {
     private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : (showsEars ? 12 : 9) }
     private var bodyWidth: CGFloat {
         if expanded { return prefs.expandedWidth(compact: compact) }
-        return model.notchSize.width + (showsEars ? 2 * NotchController.earWidth : 0)
+        return model.notchSize.width + 2 * EarsRotation.sideWidth(slots)
     }
 
     var body: some View {
@@ -98,6 +99,8 @@ struct NotchRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
+        .onAppear { model.setEarsRotation(shouldRotateEars) }
+        .onChange(of: shouldRotateEars) { model.setEarsRotation($0) }
     }
 
     private var notch: some View {
@@ -110,17 +113,10 @@ struct NotchRootView: View {
                             .animation(motion.delay(0.06)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
-            } else {
-                switch ears {
-                case .claude(let indicator):
-                    CollapsedEars(indicator: indicator, ears: store.ears, notchSize: model.notchSize)
-                        .transition(.opacity.animation(.easeInOut(duration: 0.18)))
-                case .module(let content):
-                    ModuleEarsView(ears: content, notchSize: model.notchSize)
-                        .transition(.opacity.animation(.easeInOut(duration: 0.18)))
-                case .none:
-                    EmptyView()
-                }
+            } else if let slot = currentSlot {
+                earsView(slot)
+                    .id(slot.id)
+                    .transition(earsTransition)
             }
         }
         .frame(width: bodyWidth, alignment: .top)
@@ -138,8 +134,39 @@ struct NotchRootView: View {
         .onPreferenceChange(NotchSizeKey.self) { size in model.contentSize = size }
         .animation(motion, value: expanded)
         .animation(motion, value: showsEars)
+        // Seulement pendant l'alternance : l'arrivée des oreilles garde son ressort.
+        .animation(Self.slideAnimation, value: slots.count >= 2 ? currentSlot?.id : nil)
         .animation(motion, value: compact)
         .animation(motion, value: model.selectedTab)
+    }
+
+    /// Intercalaire montré : le premier à l'arrivée des oreilles, puis un de plus toutes les 4 s.
+    private var currentSlot: EarsSlot? {
+        let slots = slots
+        return slots.isEmpty ? nil : slots[model.earsStep % slots.count]
+    }
+
+    @ViewBuilder
+    private func earsView(_ slot: EarsSlot) -> some View {
+        switch slot {
+        case .claude(let indicator):
+            CollapsedEars(indicator: indicator, ears: store.ears, notchSize: model.notchSize)
+        case .module(_, let ears):
+            ModuleEarsView(ears: ears, notchSize: model.notchSize)
+        }
+    }
+
+    private static let slideAnimation = Animation.easeInOut(duration: 0.35)
+
+    /// Oreilles seules : fondu. Intercalaires : glissement vertical court (la forme coupe ce qui dépasse), fondu
+    /// seul avec « Réduire les animations ».
+    private var earsTransition: AnyTransition {
+        guard slots.count >= 2 else { return .opacity.animation(.easeInOut(duration: 0.18)) }
+        if model.reduceMotion { return AnyTransition.opacity.animation(Self.slideAnimation) }
+        return AnyTransition.asymmetric(
+            insertion: .move(edge: .bottom).combined(with: .opacity),
+            removal: .move(edge: .top).combined(with: .opacity)
+        ).animation(Self.slideAnimation)
     }
 
     /// Fond choisi, translucide une fois déplié si les réglages le demandent ; la bande de la notch reste opaque.

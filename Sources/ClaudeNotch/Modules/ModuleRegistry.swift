@@ -26,8 +26,10 @@ final class ModuleRegistry: ObservableObject {
     @Published private(set) var ordered: [any NotchModule] = []
     /// Modules activés, dans l'ordre des onglets.
     @Published private(set) var enabled: [any NotchModule] = []
-    /// Oreilles retenues parmi les modules qui tournent (avant la règle Claude, voir `EarsChoice`).
-    @Published private(set) var moduleEars: ModuleEars?
+    /// Oreilles des modules qui tournent, dans l'ordre des onglets (avant la règle Claude, voir `EarsRotation`).
+    @Published private(set) var earsEntries: [ModuleEarsEntry] = []
+    /// Oreilles du module de plus haute priorité (celui que montre la notch quand Claude n'est pas actif).
+    var moduleEars: ModuleEars? { Self.pickEars(earsEntries.map { $0.ears }) }
     /// Modules démarrés.
     private(set) var running: Set<String> = []
 
@@ -110,8 +112,16 @@ final class ModuleRegistry: ObservableObject {
                 module.stop()
             }
         }
-        let ears = Self.pickEars(enabled.filter { running.contains($0.id) }.compactMap { $0.ears })
-        if ears != moduleEars { moduleEars = ears }
+        let entries = enabled.filter { running.contains($0.id) }.compactMap { module in
+            module.ears.map { ModuleEarsEntry(id: module.id, ears: $0) }
+        }
+        if entries != earsEntries { earsEntries = entries }
+    }
+
+    /// Contenus des oreilles de la notch repliée, dans l'ordre où ils alternent. Sans onglet Claude, Claude ne compte pas.
+    func earsSlots(claude indicator: NotchIndicator) -> [EarsSlot] {
+        EarsRotation.slots(claude: isClaudeEnabled ? indicator : .none, modules: earsEntries,
+                           showEars: prefs.showEars, alternate: prefs.alternateEars)
     }
 
     /// Plus grande priorité ; à égalité, le premier dans l'ordre des onglets.
@@ -154,17 +164,73 @@ final class ModuleRegistry: ObservableObject {
     }
 }
 
-/// Ce que montrent les oreilles de la notch repliée.
-enum EarsChoice: Equatable {
-    case none
-    case claude(NotchIndicator)
-    case module(ModuleEars)
+/// Oreilles d'un module qui tourne, avec son identifiant.
+struct ModuleEarsEntry: Equatable {
+    let id: String
+    let ears: ModuleEars
+}
 
-    /// Claude attend l'utilisateur > Claude travaille > Claude vient de finir (5 s) > module > rien.
-    static func choose(claude: NotchIndicator, module: ModuleEars?, showEars: Bool) -> EarsChoice {
-        guard showEars else { return .none }
-        if claude != .none { return .claude(claude) }
-        if let module { return .module(module) }
-        return .none
+/// Un contenu des oreilles repliées. L'identifiant (« claude » ou celui du module) ne dit rien de personnel.
+enum EarsSlot: Equatable {
+    case claude(NotchIndicator)
+    case module(id: String, ears: ModuleEars)
+
+    var id: String {
+        switch self {
+        case .claude: return ModuleRegistry.claudeId
+        case .module(let id, _): return id
+        }
+    }
+
+    /// Largeur de chaque oreille de ce contenu.
+    var sideWidth: CGFloat { NotchController.earWidth }
+}
+
+/// Quoi montrer dans les oreilles de la notch repliée, et quand le faire alterner (intercalaires).
+enum EarsRotation {
+    /// Durée d'un contenu, et marge laissée au système pour regrouper ses réveils.
+    static let interval: TimeInterval = 4
+    static let tolerance: TimeInterval = 1
+    /// Claude + deux modules au plus.
+    static let maxSlots = 3
+
+    /// Claude qui attend l'utilisateur (alerte, seul) > Claude qui travaille ou vient de finir (5 s), en alternance
+    /// avec chaque module qui a des oreilles (priorité décroissante, `maxSlots` contenus au plus) > module de plus
+    /// haute priorité, seul > rien. `alternate` éteint : Claude seul, comme avant l'alternance.
+    static func slots(claude: NotchIndicator, modules: [ModuleEarsEntry], showEars: Bool, alternate: Bool) -> [EarsSlot] {
+        guard showEars else { return [] }
+        // Tri stable : à priorité égale, l'ordre des onglets.
+        let byPriority = modules.enumerated()
+            .sorted { $0.element.ears.priority != $1.element.ears.priority
+                ? $0.element.ears.priority > $1.element.ears.priority : $0.offset < $1.offset }
+            .map { EarsSlot.module(id: $0.element.id, ears: $0.element.ears) }
+        switch claude {
+        case .attention: return [.claude(claude)]
+        case .working, .done: return [.claude(claude)] + (alternate ? Array(byPriority.prefix(maxSlots - 1)) : [])
+        case .none: return Array(byPriority.prefix(1))
+        }
+    }
+
+    /// La plus grande largeur d'oreille en jeu : elle ne change pas d'un contenu à l'autre, sinon la forme et la
+    /// zone de survol bougeraient à chaque intercalaire.
+    static func sideWidth(_ slots: [EarsSlot]) -> CGFloat {
+        slots.map { $0.sideWidth }.max() ?? 0
+    }
+
+    /// Un seul timer, et seulement s'il y a quelque chose à alterner sous les yeux : notch repliée et affichée.
+    static func shouldRotate(slots: [EarsSlot], expanded: Bool, shown: Bool) -> Bool {
+        slots.count >= 2 && !expanded && shown
+    }
+}
+
+/// Minuterie répétée injectable : rend l'annulation. Le système crée un `Timer` ; les tests, un faux.
+struct EarsTimer {
+    var every: (_ interval: TimeInterval, _ tolerance: TimeInterval, _ tick: @escaping () -> Void) -> () -> Void
+
+    static let system = EarsTimer { interval, tolerance, tick in
+        let timer = Timer(timeInterval: interval, repeats: true) { _ in tick() }
+        timer.tolerance = tolerance
+        RunLoop.main.add(timer, forMode: .common)
+        return { timer.invalidate() }
     }
 }

@@ -25,7 +25,9 @@ Interface available in English and French (follows the system language). Screens
   Sessions that need you are listed first, with an amber outline.
 - **Collapsed notch with two "ears"**: the left one shows the overall state (a raised hand when a session
   needs you, a spinner while Claude works, a check mark when a turn ends); the right one shows
-  `active sessions·running subagents`, for example `1·6`, or the progress of the task list (`2/5`).
+  `active sessions·running subagents`, for example `1·6`, or the progress of the task list (`2/5`). When a tab
+  also has ears (now playing, timer), they take turns with Claude's every 4 seconds while Claude works
+  (Settings › Appearance to turn it off).
 - **Permissions**: the card shows what Claude is asking for (`Terminal · rm -rf build`, the file to edit,
   the question asked).
 - **Reply from the notch** (Settings › Claude, off by default): allow or deny a permission (with an optional
@@ -409,7 +411,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **Notch repliée avec deux « oreilles »** : à gauche l'état global (main levée quand une session t'attend,
   un spinner pendant que Claude travaille, une coche à la fin d'un tour) ;
   à droite `sessions actives·sous-agents en cours`, par exemple `1·6`, ou l'avancement de la liste de tâches
-  (`2/5`).
+  (`2/5`). Quand un onglet a aussi des oreilles (lecture en cours, minuteur), elles alternent avec celles de Claude
+  toutes les 4 secondes pendant qu'il travaille (Réglages › Apparence pour le désactiver).
 - **Permissions** : la carte montre ce que Claude demande (`Terminal · rm -rf build`, le fichier à modifier,
   la question posée).
 - **Répondre depuis la notch** (Réglages › Claude, désactivé par défaut) : autoriser ou refuser une

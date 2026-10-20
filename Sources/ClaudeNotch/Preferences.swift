@@ -178,6 +178,7 @@ final class Preferences: ObservableObject {
         static let shadow = "appearance.shadow"
         static let animationSpeed = "appearance.animationSpeed"
         static let showEars = "appearance.showEars"
+        static let alternateEars = "appearance.alternateEars"
         static let hideFromCapture = "privacy.hideFromCapture"
         static let replyFromNotch = "claude.replyFromNotch"
 
@@ -186,7 +187,7 @@ final class Preferences: ObservableObject {
         static let notchSettings = [
             alwaysVisible, visibility, hiddenUntil, openTrigger, closeOnClickOutside, openDelay, closeDelay, haptics,
             toggleHotKey, hideHotKey, fullScreen, screen, accent, panelSize, customWidth, background, customBackground,
-            tintCollapsed, opacity, shadow, animationSpeed, showEars, hideFromCapture,
+            tintCollapsed, opacity, shadow, animationSpeed, showEars, alternateEars, hideFromCapture,
         ]
     }
 
@@ -346,6 +347,11 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(showEars, forKey: Key.showEars) }
     }
 
+    /// Claude au travail et un onglet qui signale quelque chose : leurs oreilles alternent au lieu que Claude masque l'autre.
+    @Published var alternateEars: Bool {
+        didSet { defaults.set(alternateEars, forKey: Key.alternateEars) }
+    }
+
     // MARK: Claude
 
     /// Répondre depuis la notch (permissions, questions, plans, messages).
@@ -410,6 +416,7 @@ final class Preferences: ObservableObject {
         panelShadow = defaults.object(forKey: Key.shadow) as? Bool ?? true
         animationSpeed = choice(Key.animationSpeed, AnimationSpeed.normal)
         showEars = defaults.object(forKey: Key.showEars) as? Bool ?? true
+        alternateEars = defaults.object(forKey: Key.alternateEars) as? Bool ?? true
         replyFromNotch = defaults.bool(forKey: Key.replyFromNotch)
     }
 
@@ -515,6 +522,7 @@ final class Preferences: ObservableObject {
         panelShadow = fresh.panelShadow
         animationSpeed = fresh.animationSpeed
         showEars = fresh.showEars
+        alternateEars = fresh.alternateEars
     }
 }
 
