@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Onglet « Claude » : les sessions Claude Code, la section outils et la ligne Claude Desktop.
-/// Le suivi des sessions (`SessionStore`, `ClaudeMonitor`) tourne en permanence, géré par `AppCore` : il nourrit
-/// les oreilles et la visibilité de la notch. Le module, lui, ne vit que panneau déplié (section outils).
+/// Le suivi des sessions (`SessionStore`, `ClaudeMonitor`) tourne tant que l'onglet est activé, géré par `AppCore` :
+/// il nourrit les oreilles et la visibilité de la notch. Le module, lui, ne vit que panneau déplié (section outils).
 final class ClaudeModule: NotchModule {
     let id = ModuleRegistry.claudeId
     let title = "Claude"
