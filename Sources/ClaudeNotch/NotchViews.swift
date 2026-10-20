@@ -75,6 +75,12 @@ struct NotchRootView: View {
         EarsChoice.choose(claude: store.indicator, module: registry.moduleEars, showEars: prefs.showEars)
     }
     private var showsEars: Bool { ears != .none }
+    /// Ressort choisi dans les réglages, ou fondu simple avec « Réduire les animations ».
+    private var motion: Animation { NotchMotion.animation(prefs.animationSpeed, reduceMotion: model.reduceMotion) }
+    /// Repliée sur une vraie encoche : noir pur pour s'y fondre. Teintée seulement sur demande, sans encoche.
+    private var fill: Color {
+        expanded || (prefs.tintCollapsed && !model.hasNotch) ? prefs.panelColor : .black
+    }
     private var topRadius: CGFloat { expanded ? 12 : 6 }
     private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : (showsEars ? 12 : 9) }
     private var bodyWidth: CGFloat {
@@ -97,10 +103,10 @@ struct NotchRootView: View {
         ZStack(alignment: .top) {
             if expanded {
                 ExpandedPanel(registry: registry, prefs: prefs, selection: $model.selectedTab, compact: compact,
-                              notchSize: model.notchSize, actions: actions)
+                              notchSize: model.notchSize, tabAnimation: motion, actions: actions)
                     .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
-                            .animation(notchSpring.delay(0.06)),
+                        insertion: (model.reduceMotion ? AnyTransition.opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: .top)))
+                            .animation(motion.delay(0.06)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
             } else {
@@ -121,25 +127,26 @@ struct NotchRootView: View {
         .padding(.horizontal, topRadius)
         .background(background)
         .clipShape(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius))
-        .shadow(color: .black.opacity(expanded ? 0.45 : 0), radius: 14, y: 6)
-        // Replié et sans activité : exactement la notch, donc invisible.
-        .opacity(expanded || showsEars ? 1 : 0)
+        .shadow(color: .black.opacity(expanded && prefs.panelShadow ? 0.45 : 0), radius: 14, y: 6)
+        // Replié et sans activité sur une vraie encoche : exactement l'encoche, donc invisible. Sans encoche,
+        // la forme reste dessinée : c'est l'encoche virtuelle.
+        .opacity(expanded || showsEars || !model.hasNotch ? 1 : 0)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: NotchSizeKey.self, value: proxy.size)
         })
         .onPreferenceChange(NotchSizeKey.self) { size in model.contentSize = size }
-        .animation(notchSpring, value: expanded)
-        .animation(notchSpring, value: showsEars)
-        .animation(notchSpring, value: compact)
-        .animation(notchSpring, value: model.selectedTab)
+        .animation(motion, value: expanded)
+        .animation(motion, value: showsEars)
+        .animation(motion, value: compact)
+        .animation(motion, value: model.selectedTab)
     }
 
-    /// Noir, translucide une fois déplié si les réglages le demandent ; la bande de la notch reste opaque.
+    /// Fond choisi, translucide une fois déplié si les réglages le demandent ; la bande de la notch reste opaque.
     private var background: some View {
         ZStack(alignment: .top) {
             NotchShape(topRadius: topRadius, bottomRadius: bottomRadius)
-                .fill(Color.black.opacity(expanded ? prefs.backgroundOpacity : 1))
-            Color.black.frame(height: model.notchSize.height)
+                .fill(fill.opacity(expanded ? prefs.backgroundOpacity : 1))
+            fill.frame(height: model.notchSize.height)
         }
     }
 }
@@ -443,6 +450,8 @@ struct ExpandedPanel: View {
     @Binding var selection: String
     let compact: Bool
     let notchSize: CGSize
+    /// Ressort du changement d'onglet (vitesse des réglages, ou fondu).
+    var tabAnimation: Animation = notchSpring
     let actions: NotchActions
 
     static let spacing: CGFloat = 10
@@ -496,7 +505,7 @@ struct ExpandedPanel: View {
                 registry.module(ModuleRegistry.claudeId)?.makeTabIcon()
                 Spacer(minLength: 8)
             } else {
-                NotchTabBar(modules: registry.enabled, selection: $selection)
+                NotchTabBar(modules: registry.enabled, selection: $selection, animation: tabAnimation)
                 Spacer(minLength: 8)
                 selected?.makeHeaderAccessory()
             }
@@ -519,6 +528,7 @@ struct ExpandedPanel: View {
 struct NotchTabBar: View {
     let modules: [any NotchModule]
     @Binding var selection: String
+    var animation: Animation = notchSpring
 
     @Namespace private var namespace
     @State private var hovered: String?
@@ -533,7 +543,7 @@ struct NotchTabBar: View {
                 }
             }
         }
-        .animation(notchSpring, value: selection)
+        .animation(animation, value: selection)
     }
 
     private func tab(_ module: any NotchModule) -> some View {
@@ -600,7 +610,16 @@ struct NotchMoreMenu: View {
             Button("Réglages…", action: actions.openSettings)
                 .keyboardShortcut(",", modifiers: .command)
             Divider()
-            Toggle("Toujours visible", isOn: $prefs.alwaysVisible)
+            Picker("Afficher la notch", selection: $prefs.visibility) {
+                ForEach(NotchVisibility.allCases) { mode in
+                    Text(NotchMoreMenu.title(mode)).tag(mode)
+                }
+            }
+            Menu("Masquer la notch") {
+                ForEach(HideDuration.allCases) { duration in
+                    Button(NotchController.title(duration)) { prefs.hide(duration) }
+                }
+            }
             Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
             Divider()
             Button("Effacer les sessions terminées", action: actions.clearEnded)
@@ -620,6 +639,14 @@ struct NotchMoreMenu: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+    }
+
+    static func title(_ mode: NotchVisibility) -> String {
+        switch mode {
+        case .always: return L("Toujours")
+        case .whenClaudeOpen: return L("Quand Claude est ouvert")
+        case .duringActivity: return L("Pendant une activité")
+        }
     }
 }
 

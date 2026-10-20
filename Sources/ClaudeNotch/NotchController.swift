@@ -11,6 +11,8 @@ final class NotchViewModel: ObservableObject {
     @Published var selectedTab = ModuleRegistry.claudeId
     /// Une app est en plein écran sur l'écran de la notch.
     @Published var isFullScreen = false
+    /// « Réduire les animations » (Accessibilité) : fondu simple au lieu des ressorts.
+    @Published var reduceMotion = false
     /// Taille réelle de la forme noire, mesurée par la vue. Sert aux zones de survol.
     var contentSize: CGSize = .zero
 }
@@ -41,9 +43,8 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
 /// Fenêtre de la notch : position, survol, ouverture/fermeture, visibilité.
 final class NotchController {
     static let earWidth: CGFloat = 36
-    /// Assez large pour le grand panneau (620 pt), ses rayons et son ombre.
-    static let panelSize = CGSize(width: 700, height: 480)
-    private static let fakeNotchWidth: CGFloat = 200
+    /// Assez large pour la largeur libre maximale (720 pt), ses rayons et son ombre.
+    static let panelSize = CGSize(width: 800, height: 480)
     private static let hideDelay: TimeInterval = 3
     /// Après un changement de Space, le temps que l'animation se termine.
     private static let spaceSettleDelay: TimeInterval = 0.4
@@ -76,8 +77,14 @@ final class NotchController {
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     /// Compteur du presse-papiers de glisser relevé au dernier clic dans une autre app (Étagère).
     private var fileDragBaseline: Int?
-    /// Notch montrée seulement pour un dépôt (rien d'autre à afficher) : recachée au repli.
-    private var shownForDrag = false
+    /// Notch montrée seulement à la demande (dépôt sur l'Étagère, raccourci) : recachée au repli.
+    private var shownOnDemand = false
+    /// Panneau ouvert par le raccourci : il a le clavier et ne se ferme pas quand la souris est ailleurs.
+    private var openedByKeyboard = false
+    /// Fin du masquage temporaire (une seule échéance, jamais de scrutation).
+    private var unhideTimer: Timer?
+    /// Horloge du masquage temporaire.
+    var now: () -> Date = Date.init
     /// Onglet d'avant qu'un glisser de fichiers montre l'Étagère ; nil dès qu'un dépôt a lieu.
     private var tabBeforeDrag: String?
 
@@ -106,6 +113,15 @@ final class NotchController {
         panel.animationBehavior = .none
         panel.ignoresMouseEvents = true
         panel.acceptsMouseMovedEvents = true
+        // Appliqué tout de suite et à chaque changement (le publieur donne la nouvelle valeur).
+        prefs.$hideFromCapture
+            .sink { [weak panel] hidden in panel?.sharingType = Self.sharingType(hiddenFromCapture: hidden) }
+            .store(in: &cancellables)
+    }
+
+    /// `.none` : absente des captures d'écran, enregistrements et partages (selon l'app qui capture).
+    static func sharingType(hiddenFromCapture: Bool) -> NSWindow.SharingType {
+        hiddenFromCapture ? .none : .readOnly
     }
 
     func start() {
@@ -140,9 +156,11 @@ final class NotchController {
         drop.dropped = { [weak self] in self?.tabBeforeDrag = nil }
         panel.contentView = drop
 
+        model.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         updateGeometry()
         installMouseMonitors()
         observeChanges()
+        observeShellSettings()
         updateFullScreen()
         updateVisibility()
     }
@@ -172,7 +190,23 @@ final class NotchController {
             "fullScreenBehavior": prefs.fullScreenBehavior.rawValue,
             "selectedTab": model.selectedTab,
             "modules": registry.debugInfo,
+            "visibility": prefs.visibility.rawValue,
+            "openTrigger": prefs.openTrigger.rawValue,
+            "closeOnClickOutside": prefs.closeOnClickOutside,
+            "openedByKeyboard": openedByKeyboard,
+            "hotKeys": [prefs.toggleHotKey.rawValue, prefs.hideHotKey.rawValue],
+            "hotKeysUnavailable": HotKeyCenter.shared.unavailable.map { $0.rawValue }.sorted(),
+            "panelWidth": prefs.expandedWidth(compact: false),
+            "background": prefs.panelBackground.rawValue,
+            "reduceMotion": model.reduceMotion,
+            "sharingType": panel.sharingType == .none ? "none" : "readOnly",
         ]
+        // Choix de l'écran sans son nom (le nom de l'écran utilisé est déjà sous `screen`).
+        let choices = [ScreenChoice.builtin, ScreenChoice.main, ScreenChoice.mouse]
+        info["screenChoice"] = choices.contains(prefs.screenChoice) ? prefs.screenChoice : "named"
+        if let until = prefs.hiddenUntil {
+            info["hiddenUntil"] = until == .distantFuture ? "untilReactivated" : ISO8601DateFormatter().string(from: until)
+        }
         // Niveau vu par le serveur de fenêtres : celui qui compte face à la barre des menus et au plein écran.
         info["windowServerLevel"] = Self.windowServerLevel(of: panel)
         if let screen = panel.screen {
@@ -195,27 +229,24 @@ final class NotchController {
 
     // MARK: - Géométrie
 
+    /// Écran choisi dans les réglages (intégré, principal, sous la souris, ou par nom), relu à chaque appel.
     private func updateGeometry() {
-        guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
-                ?? NSScreen.screens.first ?? NSScreen.main else { return }
+        let screens = NSScreen.screens
+        let candidates = screens.map(ScreenCandidate.init)
+        guard let index = NotchScreenPicker.pick(prefs.screenChoice, among: candidates,
+                                                 mouse: NSEvent.mouseLocation) else { return }
+        let screen = screens[index]
         let frame = screen.frame
         screenFrame = frame
 
+        let previousDisplay = displayID
         displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-        if screen.safeAreaInsets.top > 0,
-           let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
-            let height = screen.safeAreaInsets.top
-            let width = frame.width - left.width - right.width
-            notchRect = CGRect(x: frame.minX + left.width, y: frame.maxY - height, width: width, height: height)
-            model.hasNotch = true
-        } else {
-            // Écran sans notch (externe, capot fermé) : fausse notch centrée, hauteur de la barre de menus.
-            let menuBar = max(frame.maxY - screen.visibleFrame.maxY, NSStatusBar.system.thickness)
-            notchRect = CGRect(x: frame.midX - Self.fakeNotchWidth / 2, y: frame.maxY - menuBar,
-                               width: Self.fakeNotchWidth, height: menuBar)
-            model.hasNotch = false
-        }
+        // Écran sans encoche (externe, capot fermé) : encoche virtuelle centrée, hauteur de la barre des menus.
+        let notch = NotchScreenPicker.notchRect(on: candidates[index], menuBarThickness: NSStatusBar.system.thickness)
+        notchRect = notch.rect
+        if model.hasNotch != notch.hasNotch { model.hasNotch = notch.hasNotch }
         if model.notchSize != notchRect.size { model.notchSize = notchRect.size }
+        if previousDisplay != nil, previousDisplay != displayID { updateFullScreen() }
 
         let size = Self.panelSize
         let origin = CGPoint(x: (notchRect.midX - size.width / 2).rounded(), y: frame.maxY - size.height)
@@ -226,21 +257,45 @@ final class NotchController {
 
     private func installMouseMonitors() {
         let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged]
-        // Clic dans une autre app : arme la détection d'un glisser de fichiers vers l'Étagère (`openForFileDrag`).
-        let globalMask = mask.union(.leftMouseDown)
+        // Clic dans une autre app : arme la détection d'un glisser de fichiers vers l'Étagère (`openForFileDrag`),
+        // ouvre le panneau en mode « au clic », ferme un panneau qui attend un clic à l'extérieur.
+        // Clic droit sur la notch repliée : menu contextuel.
+        let globalMask = mask.union([.leftMouseDown, .rightMouseDown])
         if let global = NSEvent.addGlobalMonitorForEvents(matching: globalMask, handler: { [weak self] event in
             guard let self else { return }
-            if event.type == .leftMouseDown { return self.armFileDrag() }
-            if event.type == .leftMouseDragged, self.openForFileDrag() { return }
-            self.mouseMoved()
+            switch event.type {
+            case .leftMouseDown:
+                self.mouseDown()
+                self.armFileDrag()
+            case .rightMouseDown:
+                self.showContextMenu()
+            case .leftMouseDragged where self.openForFileDrag():
+                return
+            default:
+                self.mouseMoved()
+            }
         }) {
             eventMonitors.append(global)
         }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            self?.mouseMoved()
+        let localMask = mask.union(.leftMouseDown)
+        if let local = NSEvent.addLocalMonitorForEvents(matching: localMask, handler: { [weak self] event in
+            guard let self else { return event }
+            if event.type != .leftMouseDown {
+                self.mouseMoved()
+            } else if event.window !== self.panel {
+                // Clic dans une autre fenêtre de l'app (réglages) ; ceux du panneau restent aux vues.
+                self.mouseDown()
+            }
             return event
         }) {
             eventMonitors.append(local)
+        }
+        // Touches du panneau quand il a le clavier (ouvert par le raccourci) ; sinon l'événement suit son cours.
+        if let keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            guard let self, self.handleKey(event) else { return event }
+            return nil
+        }) {
+            eventMonitors.append(keys)
         }
     }
 
@@ -266,6 +321,7 @@ final class NotchController {
     }
 
     private func mouseMoved() {
+        followMouseScreen()
         guard isShown else { return }
         let inside = isInsideZone(NSEvent.mouseLocation)
         if !inside { suppressUntilExit = false }
@@ -274,7 +330,7 @@ final class NotchController {
             if inside {
                 closeWork?.cancel()
                 closeWork = nil
-            } else if closeWork == nil, !menuTracking {
+            } else if closeWork == nil, !menuTracking, !staysOpenOutside {
                 let work = DispatchWorkItem { [weak self] in
                     guard let self else { return }
                     self.closeWork = nil
@@ -283,7 +339,7 @@ final class NotchController {
                 closeWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + prefs.closeDelay, execute: work)
             }
-        } else if inside, !suppressUntilExit {
+        } else if inside, !suppressUntilExit, prefs.openTrigger == .hover {
             guard openWork == nil else { return }
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
@@ -296,6 +352,31 @@ final class NotchController {
             openWork?.cancel()
             openWork = nil
         }
+    }
+
+    /// Fermé par un clic à l'extérieur (réglage, ou panneau ouvert au clavier), pas par la sortie de la souris.
+    private var staysOpenOutside: Bool { prefs.closeOnClickOutside || openedByKeyboard }
+
+    /// Mode « au clic » : clic sur la notch repliée. Panneau ouvert qui attend un clic à l'extérieur : il se ferme.
+    private func mouseDown() {
+        guard isShown else { return }
+        let inside = isInsideZone(NSEvent.mouseLocation)
+        if model.isExpanded {
+            // Un clic dans un menu ouvert depuis le panneau (« … ») n'est pas un clic à l'extérieur.
+            if !inside, staysOpenOutside, !menuTracking { collapse() }
+        } else if inside, prefs.openTrigger == .click {
+            openWork?.cancel()
+            openWork = nil
+            expand()
+        }
+    }
+
+    /// Écran « sous la souris » : la notch suit la souris d'un écran à l'autre, repliée seulement. Événementiel
+    /// (mouvements de souris déjà reçus) ; rien n'est recalculé tant que la souris reste sur le même écran.
+    private func followMouseScreen() {
+        guard prefs.screenChoice == ScreenChoice.mouse, !model.isExpanded,
+              !NotchScreenPicker.contains(screenFrame, NSEvent.mouseLocation) else { return }
+        updateGeometry()
     }
 
     private var isCompact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
@@ -318,6 +399,9 @@ final class NotchController {
         closeWork?.cancel()
         closeWork = nil
         stopPolling()
+        // Le clavier revient à l'app de devant (panneau ouvert au raccourci, ou champ resté actif).
+        if panel.isKeyWindow { NotchKeyboard.release(force: true) }
+        openedByKeyboard = false
         panel.ignoresMouseEvents = true
         if model.isExpanded {
             model.isExpanded = false
@@ -326,10 +410,9 @@ final class NotchController {
         }
         tabBeforeDrag = nil
         registry.setPanelOpen(false)
-        if shownForDrag {
-            shownForDrag = false
-            updateVisibility()
-        }
+        shownOnDemand = false
+        // Dépliée, la notch restait affichée même sans activité : on relit la règle.
+        if isShown { updateVisibility() }
     }
 
     /// 15 Hz, seulement déplié : rattrape les mouvements que les moniteurs ne voient pas.
@@ -358,23 +441,14 @@ final class NotchController {
     /// Glisser de fichiers au-dessus de la notch repliée : déplie tout de suite sur l'Étagère, puis `ShelfDropView`
     /// prend le relais (fenêtre qui accepte la souris). Une fois par glisser ; jamais en plein écran « masquée ».
     private func openForFileDrag() -> Bool {
-        guard let baseline = fileDragBaseline, !model.isExpanded, !hiddenForFullScreen,
+        guard let baseline = fileDragBaseline, !model.isExpanded, !hiddenForFullScreen, !prefs.isHidden(at: now()),
               Self.dropZone(notch: notchRect, screen: screenFrame, contentWidth: model.contentSize.width)
                 .contains(NSEvent.mouseLocation) else { return false }
         let pasteboard = NSPasteboard(name: .drag)
         guard pasteboard.changeCount != baseline else { return false }
         fileDragBaseline = nil
         guard ShelfDrop.hasFiles(pasteboard) else { return false }
-        if !shouldShow {
-            shownForDrag = true
-            hideWork?.cancel()
-            hideWork = nil
-        }
-        if !isShown {
-            isShown = true
-            updateGeometry()
-            panel.orderFrontRegardless()
-        }
+        showOnDemand()
         tabBeforeDrag = prefs.lastTab
         expand(tab: ShelfModule.moduleId)
         shelf?.isDropTargeted = true
@@ -499,6 +573,7 @@ final class NotchController {
         }))
         observers.append((workspace, workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
                                                            object: nil, queue: .main) { [weak self] _ in
+            self?.followMouseScreen()
             self?.updateFullScreen()
         }))
     }
@@ -529,13 +604,23 @@ final class NotchController {
     /// Plein écran avec le réglage « masquée ».
     private var hiddenForFullScreen: Bool { model.isFullScreen && prefs.fullScreenBehavior == .hidden }
 
+    /// « Masquer la notch » en cours.
+    private var hiddenByUser: Bool { prefs.isHidden(at: now()) }
+
     private var shouldShow: Bool {
-        guard !hiddenForFullScreen else { return false }
-        return prefs.alwaysVisible || monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions
-            || registry.moduleEars != nil || shownForDrag
+        NotchVisibilityRule.shouldShow(prefs.visibility, NotchVisibilityRule.Inputs(
+            claudeOpen: monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions,
+            claudeActive: store.indicator != .none,
+            moduleEars: registry.moduleEars != nil,
+            onDemand: shownOnDemand,
+            expanded: model.isExpanded,
+            hiddenForFullScreen: hiddenForFullScreen,
+            hiddenByUser: hiddenByUser))
     }
 
     private func updateVisibility() {
+        // Masquage temporaire échu : on l'oublie (le rappel des réglages disparaît).
+        if let until = prefs.hiddenUntil, until <= now() { prefs.hiddenUntil = nil }
         if shouldShow {
             hideWork?.cancel()
             hideWork = nil
@@ -544,7 +629,7 @@ final class NotchController {
                 updateGeometry()
                 panel.orderFrontRegardless()
             }
-        } else if isShown, hiddenForFullScreen {
+        } else if isShown, hiddenForFullScreen || hiddenByUser {
             hide()
         } else if isShown, hideWork == nil {
             // Délai anti-clignotement.
@@ -564,5 +649,146 @@ final class NotchController {
         isShown = false
         collapse()
         panel.orderOut(nil)
+    }
+
+    /// Montre la notch le temps d'un usage explicite (dépôt sur l'Étagère, raccourci), même hors de sa règle de
+    /// visibilité ; `collapse()` la rend à sa règle.
+    private func showOnDemand() {
+        if !shouldShow {
+            shownOnDemand = true
+            hideWork?.cancel()
+            hideWork = nil
+        }
+        if !isShown {
+            isShown = true
+            updateGeometry()
+            panel.orderFrontRegardless()
+        }
+    }
+
+    // MARK: - Réglages de la notch appliqués à chaud
+
+    private func observeShellSettings() {
+        // Le publieur donne la nouvelle valeur avant qu'elle ne soit rangée : on relit au tour suivant.
+        prefs.$screenChoice.dropFirst().removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, !self.model.isExpanded else { return }
+                self.updateGeometry()
+            }
+            .store(in: &cancellables)
+        prefs.$hiddenUntil
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.scheduleUnhide() }
+            .store(in: &cancellables)
+        Publishers.Merge(prefs.$toggleHotKey.map { _ in () }, prefs.$hideHotKey.map { _ in () })
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.registerHotKeys() }
+            .store(in: &cancellables)
+
+        let workspace = NSWorkspace.shared.notificationCenter
+        observers.append((workspace, workspace.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.model.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        }))
+        // Un minuteur ne compte pas le temps de veille : au réveil, l'échéance est relue.
+        observers.append((workspace, workspace.addObserver(forName: NSWorkspace.didWakeNotification,
+                                                           object: nil, queue: .main) { [weak self] _ in
+            self?.updateVisibility()
+        }))
+    }
+
+    /// Une seule échéance pour la fin du masquage temporaire (rien pour « jusqu'à réactivation »).
+    private func scheduleUnhide() {
+        unhideTimer?.invalidate()
+        unhideTimer = nil
+        guard let until = prefs.hiddenUntil, until != .distantFuture, until > now() else { return }
+        let timer = Timer(fire: until, interval: 0, repeats: false) { [weak self] _ in
+            self?.unhideTimer = nil
+            self?.updateVisibility()
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        unhideTimer = timer
+    }
+
+    // MARK: - Clavier
+
+    /// Tout est retiré avant d'enregistrer : une combinaison qui passe d'une action à l'autre serait refusée.
+    private func registerHotKeys() {
+        let center = HotKeyCenter.shared
+        center.set(.none, for: .togglePanel) {}
+        center.set(.none, for: .toggleHidden) {}
+        center.set(prefs.toggleHotKey, for: .togglePanel) { [weak self] in self?.togglePanelFromKeyboard() }
+        center.set(prefs.hideHotKey, for: .toggleHidden) { [weak self] in self?.toggleHiddenFromKeyboard() }
+    }
+
+    /// Raccourci global : ouvre le panneau avec le clavier (même notch masquée), ou le ferme.
+    func togglePanelFromKeyboard() {
+        if model.isExpanded {
+            suppressUntilExit = true
+            collapse()
+            return
+        }
+        showOnDemand()
+        if prefs.screenChoice == ScreenChoice.mouse { updateGeometry() }
+        expand()
+        openedByKeyboard = true
+        NotchKeyboard.take()
+    }
+
+    /// Raccourci global : masque la notch jusqu'à réactivation, ou la réaffiche.
+    func toggleHiddenFromKeyboard() {
+        if prefs.isHidden(at: now()) { prefs.showAgain() } else { prefs.hide(.untilReactivated, now: now()) }
+    }
+
+    /// Panneau ouvert au raccourci : ← → et ⌘1…⌘9 changent d'onglet, Échap ferme et rend le clavier. Ouvert au
+    /// survol ou au clic, rien ne change (les champs des modules gardent leurs touches).
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard openedByKeyboard, model.isExpanded, panel.isKeyWindow, !isCompact,
+              let command = NotchKeyCommand.parse(keyCode: event.keyCode, modifiers: event.modifierFlags,
+                                                  editingText: panel.firstResponder is NSText) else { return false }
+        if command == .close {
+            suppressUntilExit = true
+            collapse()
+            return true
+        }
+        let tabs = registry.enabled.map { $0.id }
+        guard let index = command.target(current: tabs.firstIndex(of: model.selectedTab) ?? 0, count: tabs.count)
+        else { return false }
+        model.selectedTab = tabs[index]
+        return true
+    }
+
+    // MARK: - Menu contextuel
+
+    /// Clic droit sur la notch repliée (la forme seule, pas les oreilles posées sur la barre des menus).
+    private func showContextMenu() {
+        let mouse = NSEvent.mouseLocation
+        guard isShown, !model.isExpanded,
+              NotchScreenPicker.contains(notchRect.insetBy(dx: -2, dy: -2), mouse) else { return }
+        let menu = NSMenu()
+        let hide = NSMenuItem(title: L("Masquer la notch"), action: nil, keyEquivalent: "")
+        let durations = NSMenu()
+        for duration in HideDuration.allCases {
+            durations.addItem(ClosureMenuItem(Self.title(duration)) { [weak self] in
+                guard let self else { return }
+                self.prefs.hide(duration, now: self.now())
+            })
+        }
+        hide.submenu = durations
+        menu.addItem(hide)
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem(L("Réglages…")) { [weak self] in self?.openSettings() })
+        menu.popUp(positioning: nil, at: mouse, in: nil)
+    }
+
+    static func title(_ duration: HideDuration) -> String {
+        switch duration {
+        case .oneHour: return L("Pendant 1 heure")
+        case .untilTomorrow: return L("Jusqu'à demain")
+        case .untilReactivated: return L("Jusqu'à réactivation")
+        }
     }
 }

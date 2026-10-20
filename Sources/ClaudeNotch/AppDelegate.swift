@@ -15,6 +15,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HookSetup.shared.showOnboardingIfNeeded()
     }
 
+    /// App rouverte (Finder, Spotlight) alors qu'elle tourne : une notch masquée réapparaît. Sans icône dans le
+    /// Dock ni la barre des menus, c'est le chemin de retour quand aucun raccourci n'est choisi.
+    /// Rien d'autre : le hook relance aussi l'app (`open -g`) quand un envoi échoue.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        core.prefs.showAgain()
+        return true
+    }
+
     /// Une instance de cette version tourne déjà : elle suffit.
     private func isAnotherInstanceRunning() -> Bool {
         let me = ProcessInfo.processInfo.processIdentifier
