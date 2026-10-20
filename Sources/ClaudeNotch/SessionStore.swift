@@ -180,6 +180,9 @@ final class SessionStore: ObservableObject {
 
     var hasLiveSessions: Bool { sessions.values.contains { $0.phase != .ended } }
 
+    /// Une session travaille ou attend l'utilisateur : la mise à jour automatique attend.
+    var hasBusySessions: Bool { sessions.values.contains { $0.phase.isWorking || $0.phase.needsAttention } }
+
     var trackedPids: Set<pid_t> { Set(sessions.values.compactMap(\.claudePid)) }
 
     var indicator: NotchIndicator {

@@ -4,6 +4,8 @@
 #
 # VERSION=1.2.3 scripts/build.sh  → version injectée dans la copie de l'Info.plist
 # (CFBundleShortVersionString et CFBundleVersion). Par défaut : celle de Resources/Info.plist.
+# RELEASE_CHANNEL=1 scripts/build.sh → ClaudeNotchUpdateChannel = release : l'app se met à jour seule depuis
+# les releases GitHub. Sans (builds locaux, scripts/install.sh) : aucune mise à jour automatique.
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -38,6 +40,11 @@ cp "$BIN" "$APP/Contents/MacOS/ClaudeNotch"
 cp "$PLIST_SRC" "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
+CHANNEL=développement
+if [ "${RELEASE_CHANNEL:-}" = 1 ]; then
+    plutil -replace ClaudeNotchUpdateChannel -string release "$APP/Contents/Info.plist"
+    CHANNEL=release
+fi
 cp "$ROOT/hooks/claude-notch-hook.sh" "$APP/Contents/Resources/claude-notch-hook.sh"
 chmod 755 "$APP/Contents/Resources/claude-notch-hook.sh"
 # Traductions (en.lproj, fr.lproj) : macOS affiche le français sur un système en français, l'anglais ailleurs.
@@ -47,4 +54,4 @@ for LPROJ in "$ROOT"/Resources/*.lproj; do
 done
 
 codesign --force --deep --sign - "$APP"
-echo "App prête : $APP (version $VERSION, $(lipo -archs "$APP/Contents/MacOS/ClaudeNotch"))"
+echo "App prête : $APP (version $VERSION, canal $CHANNEL, $(lipo -archs "$APP/Contents/MacOS/ClaudeNotch"))"

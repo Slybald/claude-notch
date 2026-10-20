@@ -77,6 +77,7 @@ final class Preferences: ObservableObject {
     static let shared = Preferences()
 
     private static let alwaysVisibleKey = "alwaysVisible"
+    private static let autoUpdateKey = "autoUpdate"
 
     @Published var alwaysVisible: Bool {
         didSet { UserDefaults.standard.set(alwaysVisible, forKey: Self.alwaysVisibleKey) }
@@ -88,8 +89,14 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Activée par défaut ; désactivée, les nouvelles versions sont seulement signalées dans le menu.
+    @Published var autoUpdate: Bool {
+        didSet { UserDefaults.standard.set(autoUpdate, forKey: Self.autoUpdateKey) }
+    }
+
     init() {
         alwaysVisible = UserDefaults.standard.bool(forKey: Self.alwaysVisibleKey)
+        autoUpdate = UserDefaults.standard.object(forKey: Self.autoUpdateKey) as? Bool ?? true
         launchAtLogin = LaunchAgent.isEnabled
     }
 }

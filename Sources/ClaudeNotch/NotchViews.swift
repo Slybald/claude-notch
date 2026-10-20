@@ -448,6 +448,8 @@ struct ExpandedPanel: View {
             Divider()
             HookMenuItems(setup: .shared)
             Divider()
+            UpdateMenuItems(updater: .shared, prefs: prefs)
+            Divider()
             Button("Quitter Claude Notch", action: actions.quit)
         } label: {
             Image(systemName: "ellipsis")

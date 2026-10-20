@@ -151,3 +151,23 @@
 "échappement \\u invalide" = "invalid \\u escape";
 "échappement \\u incomplet" = "incomplete \\u escape";
 "nombre invalide" = "invalid number";
+
+/* Updates */
+"Version %@" = "Version %@";
+"Mise à jour vers %@…" = "Updating to %@…";
+"Mis à jour en %@" = "Updated to %@";
+"Version %@ disponible" = "Version %@ Available";
+"Installer" = "Install";
+"Ouvrir la page de la release" = "Open the Release Page";
+"Mises à jour automatiques" = "Automatic Updates";
+"Rechercher les mises à jour" = "Check for Updates";
+"Build de développement : mises à jour désactivées" = "Development build: updates disabled";
+"Version %@ installée : quitte et rouvre Claude Notch pour l'utiliser." = "Version %@ installed: quit and reopen Claude Notch to use it.";
+"Mise à jour impossible (%@)." = "Couldn’t update (%@).";
+"Mise à jour impossible : GitHub a répondu %d." = "Couldn’t update: GitHub answered %d.";
+"Mise à jour impossible : réponse de GitHub illisible." = "Couldn’t update: unreadable answer from GitHub.";
+"Mise à jour impossible : %@ absent de la release." = "Couldn’t update: %@ is missing from the release.";
+"Mise à jour refusée : signature absente." = "Update refused: no signature.";
+"Mise à jour refusée : signature invalide." = "Update refused: invalid signature.";
+"Mise à jour refusée : l'image disque ne contient pas la version attendue." = "Update refused: the disk image does not contain the expected version.";
+"Mise à jour impossible : %@ a échoué (%@)." = "Couldn’t update: %@ failed (%@).";

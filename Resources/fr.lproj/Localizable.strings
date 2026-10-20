@@ -151,3 +151,23 @@
 "échappement \\u invalide" = "échappement \\u invalide";
 "échappement \\u incomplet" = "échappement \\u incomplet";
 "nombre invalide" = "nombre invalide";
+
+/* Updates */
+"Version %@" = "Version %@";
+"Mise à jour vers %@…" = "Mise à jour vers %@…";
+"Mis à jour en %@" = "Mis à jour en %@";
+"Version %@ disponible" = "Version %@ disponible";
+"Installer" = "Installer";
+"Ouvrir la page de la release" = "Ouvrir la page de la release";
+"Mises à jour automatiques" = "Mises à jour automatiques";
+"Rechercher les mises à jour" = "Rechercher les mises à jour";
+"Build de développement : mises à jour désactivées" = "Build de développement : mises à jour désactivées";
+"Version %@ installée : quitte et rouvre Claude Notch pour l'utiliser." = "Version %@ installée : quitte et rouvre Claude Notch pour l'utiliser.";
+"Mise à jour impossible (%@)." = "Mise à jour impossible (%@).";
+"Mise à jour impossible : GitHub a répondu %d." = "Mise à jour impossible : GitHub a répondu %d.";
+"Mise à jour impossible : réponse de GitHub illisible." = "Mise à jour impossible : réponse de GitHub illisible.";
+"Mise à jour impossible : %@ absent de la release." = "Mise à jour impossible : %@ absent de la release.";
+"Mise à jour refusée : signature absente." = "Mise à jour refusée : signature absente.";
+"Mise à jour refusée : signature invalide." = "Mise à jour refusée : signature invalide.";
+"Mise à jour refusée : l'image disque ne contient pas la version attendue." = "Mise à jour refusée : l'image disque ne contient pas la version attendue.";
+"Mise à jour impossible : %@ a échoué (%@)." = "Mise à jour impossible : %@ a échoué (%@).";
