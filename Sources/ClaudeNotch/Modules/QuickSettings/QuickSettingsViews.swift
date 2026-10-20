@@ -165,7 +165,7 @@ struct QuickSettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("Scènes", tableName: "QuickSettings")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(Palette.secondary)
                 if module.busy.contains(.scene) {
                     Spinner()
@@ -184,7 +184,7 @@ struct QuickSettingsView: View {
             if module.lowPowerSupported {
                 Text("Touch ID ou ton mot de passe est demandé pour l'économie d'énergie et les scènes.", tableName: "QuickSettings")
                     .font(.system(size: 10))
-                    .foregroundColor(Palette.secondary.opacity(0.8))
+                    .foregroundColor(Palette.secondary)
                     .padding(.horizontal, 2)
             }
         }
@@ -219,21 +219,12 @@ struct QuickSettingsView: View {
 
 // MARK: - Composants
 
-/// Texte lisible sur une couleur d'accent (noir sur les accents clairs, blanc sur les foncés).
-private extension Color {
-    var onFill: Color {
-        guard let c = NSColor(self).usingColorSpace(.sRGB) else { return .white }
-        let luminance = 0.299 * c.redComponent + 0.587 * c.greenComponent + 0.114 * c.blueComponent
-        return luminance > 0.62 ? Color.black.opacity(0.85) : .white
-    }
-}
-
 /// Réaction au clic : léger enfoncement.
 private struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(ModuleStyle.hover, value: configuration.isPressed)
     }
 }
 
@@ -304,11 +295,11 @@ struct TileView: View {
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, minHeight: 44)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.cardRadius)
                 .fill(isOn ? Palette.accent.opacity(0.16) : Palette.card)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.cardRadius)
                 .strokeBorder(Palette.accent.opacity(isOn ? 0.55 : 0), lineWidth: 1)
         )
         .overlay(alignment: .topTrailing) {
@@ -319,7 +310,7 @@ struct TileView: View {
                     .padding(6)
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(ModuleStyle.shape(ModuleStyle.cardRadius))
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isOn)
     }
 }
@@ -356,14 +347,14 @@ struct SceneButton: View {
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                ModuleStyle.shape(ModuleStyle.cardRadius)
                     .fill(isActive ? Palette.accent.opacity(0.16) : Palette.card)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                ModuleStyle.shape(ModuleStyle.cardRadius)
                     .strokeBorder(Palette.accent.opacity(isActive ? 0.55 : 0), lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(ModuleStyle.shape(ModuleStyle.cardRadius))
             .opacity(isEnabled ? 1 : 0.45)
         }
         .buttonStyle(PressStyle())
@@ -417,7 +408,7 @@ struct AccessoriesCard: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.card))
+        .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Palette.card))
     }
 }
 
@@ -428,40 +419,11 @@ struct IssueBanner: View {
     let dismiss: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11))
-                .foregroundColor(Palette.amber)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(verbatim: issue.message)
-                    .font(.system(size: 11))
-                    .foregroundColor(Palette.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let title = issue.actionTitle, issue.actionURL != nil {
-                    Button(action: perform) {
-                        Text(verbatim: title)
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundColor(Palette.amber)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            Spacer(minLength: 4)
-            Button(action: dismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(Palette.secondary)
-                    .frame(width: 16, height: 16)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(L("Fermer", table: "QuickSettings"))
-            .accessibilityLabel(Text("Fermer", tableName: "QuickSettings"))
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.amber.opacity(0.12)))
+        ModuleBanner(symbol: "exclamationmark.triangle.fill", text: issue.message, lines: 2,
+                     action: issue.actionTitle.flatMap { title in
+                         issue.actionURL == nil ? nil : ModuleAction(title: title, style: .warning, run: perform)
+                     },
+                     dismiss: (L("Fermer", table: "QuickSettings"), dismiss))
     }
 }
 
@@ -529,27 +491,22 @@ struct QuickSettingsCompactView: View {
     @ObservedObject var module: QuickSettingsModule
 
     var body: some View {
-        HStack(spacing: 8) {
+        ModuleSummaryRow {
             if let mac = module.mac {
-                BatteryGlyph(source: mac)
+                BatteryGlyph(source: mac).frame(width: 20)
                 Text(verbatim: QuickSettingsFormat.percent(mac.percent))
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
                     .foregroundColor(Palette.primary)
             } else {
-                Image(systemName: "powerplug.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(Palette.secondary)
+                ModuleSummaryIcon(symbol: "powerplug.fill", tint: Palette.secondary)
                 Text("Secteur", tableName: "QuickSettings")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .medium))
                     .foregroundColor(Palette.primary)
             }
             Spacer(minLength: 4)
             caffeineButton
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.card))
     }
 
     private var caffeineButton: some View {
@@ -596,9 +553,6 @@ struct QuickSettingsSettingsView: View {
             Section {
                 TextField(L("Raccourci « activer »", table: "QuickSettings"), text: $prefs.focusOnShortcut)
                 TextField(L("Raccourci « désactiver »", table: "QuickSettings"), text: $prefs.focusOffShortcut)
-                SettingsNote(L("macOS ne permet ni de lire ni de régler la Concentration. Un raccourci de l'app "
-                    + "Raccourcis l'active ou la désactive ; l'état affiché est celui de ton dernier clic.",
-                    table: "QuickSettings"))
                 HStack(spacing: 14) {
                     Button { module.openURL(SystemPane.newShortcut) } label: {
                         Text("Créer un raccourci…", tableName: "QuickSettings")
@@ -618,6 +572,9 @@ struct QuickSettingsSettingsView: View {
                 }
             } header: {
                 Text("Concentration", tableName: "QuickSettings")
+            } footer: {
+                SettingsNote(L("Un raccourci l'active ou la coupe ; l'état affiché est celui de ton dernier clic.",
+                               table: "QuickSettings"))
             }
 
             Section {
@@ -629,10 +586,11 @@ struct QuickSettingsSettingsView: View {
                 Toggle(isOn: $prefs.caffeineKeepsDisplayOn) {
                     Text("Garder aussi l'écran allumé", tableName: "QuickSettings")
                 }
-                SettingsNote(L("La caféine est visible dans les oreilles de la notch tant qu'elle est active.",
-                               table: "QuickSettings"))
             } header: {
                 Text("Caféine", tableName: "QuickSettings")
+            } footer: {
+                SettingsNote(L("La caféine est visible dans les oreilles de la notch tant qu'elle est active.",
+                               table: "QuickSettings"))
             }
 
             Section {
@@ -642,12 +600,11 @@ struct QuickSettingsSettingsView: View {
                 Toggle(isOn: $prefs.presentationFocus) {
                     Text("Présentation : activer la Concentration", tableName: "QuickSettings")
                 }
-                SettingsNote(L("Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, "
-                    + "économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. "
-                    + "Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : "
-                    + "macOS l'exige, rien n'est installé en arrière-plan.", table: "QuickSettings"))
             } header: {
                 Text("Scènes", tableName: "QuickSettings")
+            } footer: {
+                SettingsNote(L("Normal rétablit l'état d'avant les scènes ; l'économie d'énergie demande Touch ID.",
+                               table: "QuickSettings"))
             }
 
             Section {
@@ -658,10 +615,10 @@ struct QuickSettingsSettingsView: View {
                     Text(String(format: L("Seuil : %d %%", table: "QuickSettings"), prefs.autoThreshold))
                 }
                 .disabled(!prefs.autoAutonomy)
-                SettingsNote(L("Une seule fois par descente, sur batterie. La demande d'autorisation du système "
-                    + "s'affiche à ce moment-là. Désactivé par défaut.", table: "QuickSettings"))
             } header: {
                 Text("Passage automatique", tableName: "QuickSettings")
+            } footer: {
+                SettingsNote(L("Une seule fois par descente, sur batterie. Désactivé par défaut.", table: "QuickSettings"))
             }
         }
     }

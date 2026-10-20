@@ -16,10 +16,10 @@ struct NotesPanel: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            NotesSidebar(module: module) {
+            NotesSidebar(module: module, newNote: {
                 module.newNote()
                 focusToken += 1
-            }
+            }, focusEditor: { focusToken += 1 })
             .frame(width: sidebarWidth)
             NotesEditorCard(module: module, focusToken: focusToken) { focusToken += 1 }
         }
@@ -29,15 +29,17 @@ struct NotesPanel: View {
     }
 }
 
-private let notesCardShape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+private let notesCardShape = ModuleStyle.shape(ModuleStyle.cardRadius)
 
 // MARK: - Liste
 
 struct NotesSidebar: View {
     @ObservedObject var module: NotesModule
     let newNote: () -> Void
+    /// Entrée dans la recherche : le clavier passe à l'éditeur.
+    let focusEditor: () -> Void
 
-    @FocusState private var searching: Bool
+    @State private var searching = false
     @State private var plusHovering = false
 
     var body: some View {
@@ -50,13 +52,14 @@ struct NotesSidebar: View {
                 Button(action: newNote) {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Palette.accent.onFill)
                         .frame(width: 20, height: 20)
                         .background(Circle().fill(Palette.accent.opacity(plusHovering ? 1 : 0.85)))
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .onHover { plusHovering = $0 }
+                .animation(ModuleStyle.hover, value: plusHovering)
                 .help(L("Nouvelle note", table: "Notes"))
                 .accessibilityLabel(L("Nouvelle note", table: "Notes"))
             }
@@ -71,7 +74,7 @@ struct NotesSidebar: View {
 
     private var list: some View {
         let visible = module.visibleNotes
-        return ScrollView(.vertical, showsIndicators: false) {
+        return FadingScrollView {
             LazyVStack(spacing: 2) {
                 ForEach(visible) { note in
                     NoteRow(note: note, selected: note.id == module.selectedID,
@@ -94,45 +97,27 @@ struct NotesSidebar: View {
     @ViewBuilder
     private var footer: some View {
         if module.deleted != nil {
-            Button(action: module.undoDelete) {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.uturn.backward").font(.system(size: 9.5, weight: .bold))
-                    Text("Annuler", tableName: "Notes").font(.system(size: 10.5, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 9)
-                .frame(height: 22)
+            ModuleCapsuleButton(title: L("Annuler", table: "Notes"), symbol: "arrow.uturn.backward",
+                                action: module.undoDelete)
                 .frame(maxWidth: .infinity)
-                .background(Capsule().fill(Color.white.opacity(0.14)))
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .help(L("Annuler la suppression", table: "Notes"))
-            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .help(L("Annuler la suppression", table: "Notes"))
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
         } else if let notice = module.notice {
-            Text(notice)
-                .font(.system(size: 10))
-                .foregroundColor(Palette.amber)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ModuleBanner(symbol: nil, text: notice, font: .system(size: 10), lines: nil, inset: 8)
         }
     }
 
+    /// Recherche : ↑ ↓ choisissent une note, Entrée passe à l'éditeur, Échap efface et rend le clavier,
+    /// comme dans le presse-papiers.
     private var search: some View {
         HStack(spacing: 5) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundColor(Palette.secondary)
-            TextField("", text: $module.query, prompt: Text("Rechercher", tableName: "Notes").foregroundColor(.white.opacity(0.4)))
-                .textFieldStyle(.plain)
-                .font(.system(size: 11))
-                .foregroundColor(Palette.primary)
-                .focused($searching)
-                .onExitCommand {
-                    module.query = ""
-                    searching = false
-                    NotchKeyboard.release(force: true)
-                }
+            ClipboardSearchField(text: $module.query, placeholder: L("Rechercher", table: "Notes"),
+                                 onFocus: { searching = $0 }, onMove: move, onSubmit: submit, onCancel: leaveSearch)
+                .frame(maxWidth: .infinity)
+                .frame(height: 18)
             if !module.query.isEmpty {
                 Button {
                     module.query = ""
@@ -140,15 +125,37 @@ struct NotesSidebar: View {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 10)).foregroundColor(Palette.secondary)
                 }
                 .buttonStyle(.plain)
+                .help(L("Effacer la recherche", table: "Notes"))
+                .accessibilityLabel(L("Effacer la recherche", table: "Notes"))
             }
         }
         .padding(.horizontal, 7)
-        .frame(height: 22)
+        .frame(height: 24)
         .background(Capsule().fill(Color.white.opacity(0.08)))
-        .onChange(of: searching) { isSearching in
-            if isSearching { NotchKeyboard.take() } else { NotchKeyboard.release() }
-        }
-        .onDisappear { NotchKeyboard.release() }
+        .overlay(Capsule().stroke(Palette.accent.opacity(searching ? 0.8 : 0), lineWidth: 1))
+        .animation(ModuleStyle.hover, value: searching)
+        .onDisappear { if searching { NotchKeyboard.release(force: true) } }
+    }
+
+    private func move(_ delta: Int) {
+        let visible = module.visibleNotes
+        guard !visible.isEmpty else { return }
+        let index = visible.firstIndex { $0.id == module.selectedID }
+        let next = index.map { min(max($0 + delta, 0), visible.count - 1) } ?? (delta > 0 ? 0 : visible.count - 1)
+        module.select(visible[next].id)
+    }
+
+    private func submit() {
+        let visible = module.visibleNotes
+        guard let first = visible.first else { return }
+        if !visible.contains(where: { $0.id == module.selectedID }) { module.select(first.id) }
+        focusEditor()
+    }
+
+    private func leaveSearch() {
+        module.query = ""
+        searching = false
+        NotchKeyboard.release(force: true)
     }
 }
 
@@ -193,7 +200,7 @@ struct NoteRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 7)
             .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .background(ModuleStyle.shape(ModuleStyle.itemRadius)
                 .fill(selected ? Palette.accent.opacity(0.22) : Color.white.opacity(hovering ? 0.07 : 0)))
             .contentShape(Rectangle())
         }
@@ -201,9 +208,11 @@ struct NoteRow: View {
         .overlay(alignment: .trailing) {
             if hovering {
                 HStack(spacing: 2) {
-                    NoteMiniButton(symbol: note.pinned ? "pin.slash" : "pin", label: note.pinned
-                                   ? L("Désépingler", table: "Notes") : L("Épingler", table: "Notes"), action: pin)
-                    NoteMiniButton(symbol: "trash", label: L("Supprimer", table: "Notes"), action: delete)
+                    ModuleIconButton(symbol: note.pinned ? "pin.slash" : "pin", label: note.pinned
+                                     ? L("Désépingler", table: "Notes") : L("Épingler", table: "Notes"),
+                                     box: 20, size: 9.5, action: pin)
+                    ModuleIconButton(symbol: "trash", label: L("Supprimer", table: "Notes"), box: 20, size: 9.5,
+                                     action: delete)
                 }
                 .padding(.horizontal, 2)
                 .background(Capsule().fill(Color(white: 0.17)))
@@ -212,29 +221,7 @@ struct NoteRow: View {
             }
         }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.1), value: hovering)
-    }
-}
-
-struct NoteMiniButton: View {
-    let symbol: String
-    let label: String
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundColor(Palette.primary.opacity(hovering ? 1 : 0.75))
-                .frame(width: 19, height: 19)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(label)
-        .accessibilityLabel(label)
+        .animation(ModuleStyle.hover, value: hovering)
     }
 }
 
@@ -263,7 +250,7 @@ struct NotesEditorCard: View {
         VStack(spacing: 0) {
             if let note = module.selectedNote {
                 NotesTextView(noteID: note.id, text: note.text,
-                              placeholder: L("Une idée, un numéro, une commande : écris-la ici.", table: "Notes"),
+                              placeholder: L("Écris une idée, un numéro, une commande…", table: "Notes"),
                               focusToken: focusToken,
                               onChange: { module.setText($0, for: note.id) },
                               onEscape: Self.leaveEditor)
@@ -289,26 +276,30 @@ struct NotesEditorCard: View {
         HStack(spacing: 4) {
             Text(NotesFormat.characters(note.text.count))
                 .font(.system(size: 10).monospacedDigit())
-                .foregroundColor(Palette.secondary.opacity(0.8))
+                .foregroundColor(Palette.secondary)
             Spacer(minLength: 0)
             Group {
-                NoteMiniButton(symbol: copied ? "checkmark" : "doc.on.doc",
-                               label: copied ? L("Copié", table: "Notes") : L("Copier tout le texte", table: "Notes")) {
+                ModuleIconButton(symbol: copied ? "checkmark" : "doc.on.doc",
+                                 label: copied ? L("Copié", table: "Notes") : L("Copier tout le texte", table: "Notes"),
+                                 box: 20, size: 9.5) {
                     module.copyAll(note.id)
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { copied = false }
                 }
-                NoteMiniButton(symbol: note.pinned ? "pin.slash" : "pin", label: note.pinned
-                               ? L("Désépingler", table: "Notes") : L("Épingler", table: "Notes")) {
+                ModuleIconButton(symbol: note.pinned ? "pin.slash" : "pin", label: note.pinned
+                                 ? L("Désépingler", table: "Notes") : L("Épingler", table: "Notes"),
+                                 box: 20, size: 9.5) {
                     module.togglePin(note.id)
                 }
-                NoteMiniButton(symbol: "trash", label: L("Supprimer", table: "Notes")) { module.delete(note.id) }
+                ModuleIconButton(symbol: "trash", label: L("Supprimer", table: "Notes"), box: 20, size: 9.5) {
+                    module.delete(note.id)
+                }
             }
             .opacity(hovering ? 1 : 0)
         }
         .padding(.horizontal, 10)
         .frame(height: 24)
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(ModuleStyle.hover, value: hovering)
     }
 
     /// Échap : le clavier retourne à l'app de devant.
@@ -447,7 +438,7 @@ final class NotesNSTextView: NSTextView {
                           height: max(0, bounds.height - 2 * textContainerInset.height))
         NSAttributedString(string: placeholder, attributes: [
             .font: font ?? NSFont.systemFont(ofSize: 12.5),
-            .foregroundColor: NSColor.white.withAlphaComponent(0.38),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.5),
         ]).draw(in: rect)
     }
 }
@@ -489,11 +480,11 @@ struct NotesSettingsView: View {
                 } label: {
                     Text("Fichier des notes", tableName: "Notes")
                 }
-                SettingsNote(String(format: L("Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ "
-                    + "une seconde après la dernière frappe, au changement de note et quand le panneau se replie.",
-                    table: "Notes"), NotesModule.maxNotes, (NotesModule.maxLength).formatted(.number.grouping(.automatic))))
             } header: {
                 Text("Notes rapides", tableName: "Notes")
+            } footer: {
+                SettingsNote(String(format: L("Texte brut : %d notes au plus, %@ caractères chacune.", table: "Notes"),
+                                    NotesModule.maxNotes, NotesModule.maxLength.formatted(.number.grouping(.automatic))))
             }
         }
     }

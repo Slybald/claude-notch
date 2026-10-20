@@ -65,7 +65,7 @@
 "Caféine : impossible d'empêcher la veille." = "Caféine : impossible d'empêcher la veille.";
 "Raccourci « activer »" = "Raccourci « activer »";
 "Raccourci « désactiver »" = "Raccourci « désactiver »";
-"macOS ne permet ni de lire ni de régler la Concentration. Un raccourci de l'app Raccourcis l'active ou la désactive ; l'état affiché est celui de ton dernier clic." = "macOS ne permet ni de lire ni de régler la Concentration. Un raccourci de l'app Raccourcis l'active ou la désactive ; l'état affiché est celui de ton dernier clic.";
+"Un raccourci l'active ou la coupe ; l'état affiché est celui de ton dernier clic." = "Un raccourci l'active ou la coupe ; l'état affiché est celui de ton dernier clic.";
 "Créer un raccourci…" = "Créer un raccourci…";
 "Aide sur Raccourcis" = "Aide sur Raccourcis";
 "Comment créer le raccourci « Définir la concentration »" = "Comment créer le raccourci « Définir la concentration »";
@@ -75,10 +75,10 @@
 "La caféine est visible dans les oreilles de la notch tant qu'elle est active." = "La caféine est visible dans les oreilles de la notch tant qu'elle est active.";
 "Autonomie : couper aussi le Bluetooth" = "Autonomie : couper aussi le Bluetooth";
 "Présentation : activer la Concentration" = "Présentation : activer la Concentration";
-"Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan." = "Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan.";
+"Normal rétablit l'état d'avant les scènes ; l'économie d'énergie demande Touch ID." = "Normal rétablit l'état d'avant les scènes ; l'économie d'énergie demande Touch ID.";
 "Passage automatique" = "Passage automatique";
 "Passer en Autonomie quand la batterie baisse" = "Passer en Autonomie quand la batterie baisse";
 "Seuil : %d %%" = "Seuil : %d %%";
-"Une seule fois par descente, sur batterie. La demande d'autorisation du système s'affiche à ce moment-là. Désactivé par défaut." = "Une seule fois par descente, sur batterie. La demande d'autorisation du système s'affiche à ce moment-là. Désactivé par défaut.";
+"Une seule fois par descente, sur batterie. Désactivé par défaut." = "Une seule fois par descente, sur batterie. Désactivé par défaut.";
 "+%d autre" = "+%d autre";
 "+%d autres" = "+%d autres";

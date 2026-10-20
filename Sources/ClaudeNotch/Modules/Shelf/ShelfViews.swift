@@ -13,17 +13,20 @@ struct ShelfPanel: View {
     static let spacing: CGFloat = 8
     static let minTileWidth: CGFloat = 76
     static let tileHeight: CGFloat = 88
-    static let bannerHeight: CGFloat = 32
+    static let bannerHeight = ModuleBanner.minHeight
 
     private var columns: Int { max(1, Int((width + Self.spacing) / (Self.minTileWidth + Self.spacing))) }
     private var tileWidth: CGFloat { (width - CGFloat(columns - 1) * Self.spacing) / CGFloat(columns) }
     private var hasBanner: Bool { module.undoItems != nil || module.notice != nil }
 
+    private var fullGridHeight: CGFloat {
+        let rows = (module.items.count + columns - 1) / columns
+        return CGFloat(rows) * Self.tileHeight + CGFloat(max(0, rows - 1)) * Self.spacing
+    }
+
     /// Toutes les rangées tant qu'elles tiennent, sinon la grille défile.
     private var gridHeight: CGFloat {
-        let rows = (module.items.count + columns - 1) / columns
-        let full = CGFloat(rows) * Self.tileHeight + CGFloat(max(0, rows - 1)) * Self.spacing
-        return min(full, maxHeight - (hasBanner ? Self.bannerHeight + Self.spacing : 0))
+        min(fullGridHeight, maxHeight - (hasBanner ? Self.bannerHeight + Self.spacing : 0))
     }
 
     var body: some View {
@@ -34,11 +37,11 @@ struct ShelfPanel: View {
                 grid
             }
             if module.undoItems != nil {
-                ShelfBanner(symbol: "trash", text: L("Étagère vidée", table: "Shelf"), color: Palette.secondary,
-                            action: (L("Annuler", table: "Shelf"), module.undoClear))
+                ModuleBanner(symbol: "trash", tone: .neutral, text: L("Étagère vidée", table: "Shelf"),
+                             action: ModuleAction(title: L("Annuler", table: "Shelf"), run: module.undoClear))
                     .transition(.opacity)
             } else if let notice = module.notice {
-                ShelfBanner(symbol: "exclamationmark.triangle.fill", text: notice, color: Palette.amber, action: nil)
+                ModuleBanner(symbol: "exclamationmark.triangle.fill", text: notice)
                     .transition(.opacity)
             }
         }
@@ -61,6 +64,7 @@ struct ShelfPanel: View {
             .background(Color.black.opacity(0.001).onTapGesture(perform: module.clearSelection))
         }
         .frame(height: gridHeight)
+        .bottomFade(fullGridHeight > gridHeight + 1)
         .overlay {
             if module.isDropTargeted { ShelfDropOverlay().transition(.opacity) }
         }
@@ -86,7 +90,7 @@ struct ShelfTile: View {
             if hovered { removeButton.transition(.opacity) }
         }
         .frame(width: width, height: ShelfPanel.tileHeight)
-        .animation(.easeOut(duration: 0.12), value: hovered)
+        .animation(ModuleStyle.hover, value: hovered)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: missing ? item.name + ", " + L("Introuvable", table: "Shelf") : item.name))
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -114,7 +118,7 @@ struct ShelfTile: View {
                     }
                 }
             // Deux lignes, coupé au milieu comme dans le Finder : l'extension reste visible.
-            Text(verbatim: item.name)
+            Text(verbatim: Self.breakable(item.name))
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundColor(missing ? Palette.secondary : Palette.primary)
                 .multilineTextAlignment(.center)
@@ -126,13 +130,18 @@ struct ShelfTile: View {
         .padding(.top, 4)
         .frame(width: width, height: ShelfPanel.tileHeight)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.rowRadius)
                 .fill(selected ? Palette.accent.opacity(0.22) : Color.white.opacity(hovered ? 0.07 : 0))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.rowRadius)
                 .strokeBorder(Palette.accent.opacity(selected ? 0.7 : 0), lineWidth: 1)
         )
+    }
+
+    /// Un nom sans espace se coupe après un point ou un tiret bas (« Budget. / numbers »), pas au milieu d'un mot.
+    static func breakable(_ name: String) -> String {
+        name.replacingOccurrences(of: ".", with: ".\u{200B}").replacingOccurrences(of: "_", with: "_\u{200B}")
     }
 
     private var removeButton: some View {
@@ -158,38 +167,22 @@ struct ShelfEmptyZone: View {
     let targeted: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundColor(Palette.accent)
-                .frame(height: 28)
-            if targeted {
-                Text("Déposer ici", tableName: "Shelf")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Palette.primary)
-            } else {
-                Text("Glisse des fichiers sur la notch", tableName: "Shelf")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Palette.primary)
-                Text("Ils restent ici, sous la main. Rien n'est copié : l'étagère garde un lien vers chaque fichier.",
-                     tableName: "Shelf")
-                    .font(.system(size: 11))
-                    .foregroundColor(Palette.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, minHeight: 112)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(targeted ? Palette.accent.opacity(0.14) : Palette.card)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(targeted ? Palette.accent : Color.white.opacity(0.14),
-                              style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-        )
+        ModuleEmptyState(symbol: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down",
+                         title: targeted ? L("Déposer ici", table: "Shelf")
+                             : L("Glisse des fichiers sur la notch", table: "Shelf"),
+                         detail: targeted ? nil : L("Ils restent ici, sous la main. Rien n'est copié : l'étagère garde "
+                             + "un lien vers chaque fichier.", table: "Shelf"))
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 112)
+            .background(
+                ModuleStyle.shape(ModuleStyle.cardRadius)
+                    .fill(targeted ? Palette.accent.opacity(0.14) : Palette.card)
+            )
+            .overlay(
+                ModuleStyle.shape(ModuleStyle.cardRadius)
+                    .strokeBorder(targeted ? Palette.accent : Color.white.opacity(0.14),
+                                  style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+            )
     }
 }
 
@@ -197,9 +190,9 @@ struct ShelfEmptyZone: View {
 struct ShelfDropOverlay: View {
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.6))
-            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.accent.opacity(0.14))
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.cardRadius).fill(Color.black.opacity(0.6))
+            ModuleStyle.shape(ModuleStyle.cardRadius).fill(Palette.accent.opacity(0.14))
+            ModuleStyle.shape(ModuleStyle.cardRadius)
                 .strokeBorder(Palette.accent, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
             HStack(spacing: 6) {
                 Image(systemName: "tray.and.arrow.down.fill")
@@ -212,42 +205,6 @@ struct ShelfDropOverlay: View {
             .background(Capsule().fill(Palette.accent.opacity(0.35)))
         }
         .allowsHitTesting(false)
-    }
-}
-
-/// Bandeau sous la grille : « Étagère vidée · Annuler », ou un message.
-struct ShelfBanner: View {
-    let symbol: String
-    let text: String
-    let color: Color
-    let action: (String, () -> Void)?
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(color)
-            Text(verbatim: text)
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundColor(Palette.primary)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            if let action {
-                Button(action: action.1) {
-                    Text(verbatim: action.0)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundColor(Palette.accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Palette.accent.opacity(0.14)))
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: ShelfPanel.bannerHeight)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.card))
     }
 }
 
@@ -266,36 +223,13 @@ struct ShelfHeaderAccessory: View {
                     .lineLimit(1)
                     .fixedSize()
                     .padding(.trailing, 4)
-                ShelfIconButton(symbol: "dot.radiowaves.left.and.right",
-                                help: L("AirDrop : la sélection, ou toute l'étagère", table: "Shelf")) {
+                ModuleIconButton(symbol: "dot.radiowaves.left.and.right",
+                                 label: L("AirDrop : la sélection, ou toute l'étagère", table: "Shelf")) {
                     module.airDrop(module.selectedOrAll)
                 }
-                ShelfIconButton(symbol: "trash", help: L("Tout vider", table: "Shelf"), action: module.clearAll)
+                ModuleIconButton(symbol: "trash", label: L("Tout vider", table: "Shelf"), action: module.clearAll)
             }
         }
-    }
-}
-
-struct ShelfIconButton: View {
-    let symbol: String
-    let help: String
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white.opacity(hovering ? 0.95 : 0.6))
-                .frame(width: 22, height: 20)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.white.opacity(hovering ? 0.1 : 0)))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(help)
-        .accessibilityLabel(Text(verbatim: help))
     }
 }
 
@@ -307,11 +241,9 @@ struct ShelfCompactView: View {
 
     var body: some View {
         if module.isDropTargeted || !module.items.isEmpty {
-            HStack(spacing: 8) {
-                Image(systemName: module.isDropTargeted ? "tray.and.arrow.down.fill" : "tray.full")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Palette.accent)
-                    .frame(width: 20)
+            ModuleSummaryRow(fill: module.isDropTargeted ? Palette.accent.opacity(0.16) : Palette.card,
+                             dashed: module.isDropTargeted ? Palette.accent : nil) {
+                ModuleSummaryIcon(symbol: module.isDropTargeted ? "tray.and.arrow.down.fill" : "tray.full")
                 Text(verbatim: module.isDropTargeted ? L("Déposer ici", table: "Shelf") : module.summary)
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundColor(Palette.primary)
@@ -326,18 +258,6 @@ struct ShelfCompactView: View {
                     }
                 }
             }
-            .frame(minHeight: 22)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(module.isDropTargeted ? Palette.accent.opacity(0.16) : Palette.card)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Palette.accent.opacity(module.isDropTargeted ? 1 : 0),
-                                  style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
-            )
         }
     }
 }
@@ -365,9 +285,8 @@ struct ShelfSettingsView: View {
             } header: {
                 Text("Étagère", tableName: "Shelf")
             } footer: {
-                SettingsNote(L("Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un "
-                    + "lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider "
-                    + "l'étagère en quittant », la liste est gardée d'un lancement à l'autre.", table: "Shelf"))
+                SettingsNote(L("Rien n'est copié : l'étagère garde un lien vers chaque fichier, même déplacé.",
+                               table: "Shelf"))
             }
         }
     }

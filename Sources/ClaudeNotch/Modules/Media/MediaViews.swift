@@ -20,8 +20,8 @@ struct MediaPanel: View {
                     .frame(width: module.showPlayer ? ((width - Self.spacing) * 0.46).rounded() : nil)
             }
             if !module.showPlayer, !module.showCalendar {
-                MediaMessage(symbol: "eye.slash", title: L("Lecteur et calendrier masqués", table: "Media"),
-                             detail: L("Réglages › Lecteur", table: "Media"))
+                cardMessage(symbol: "eye.slash", title: L("Lecteur et calendrier masqués", table: "Media"),
+                            detail: L("Réglages › Lecteur", table: "Media"))
                     .modifier(MediaCard())
             }
         }
@@ -35,55 +35,16 @@ struct MediaCard: ViewModifier {
         content
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.card))
+            .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Palette.card))
     }
 }
 
-/// État vide ou d'erreur : symbole, titre, une phrase, un bouton.
-struct MediaMessage: View {
-    let symbol: String
-    let title: String
-    var detail: String?
-    var progress = false
-    var action: (title: String, run: () -> Void)?
-
-    var body: some View {
-        VStack(spacing: 5) {
-            Group {
-                if progress {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: symbol)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(Palette.accent)
-                }
-            }
-            .frame(height: 22)
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Palette.primary)
-            if let detail {
-                Text(detail)
-                    .font(.system(size: 10.5))
-                    .foregroundColor(Palette.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let action {
-                Button(action: action.run) {
-                    Text(action.title)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Palette.accent.opacity(0.85)))
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 3)
-            }
-        }
-        .multilineTextAlignment(.center)
+/// État vide ou d'erreur d'une demi-carte : centré, un cran plus petit que dans les autres onglets.
+private func cardMessage(symbol: String, tint: Color = Palette.accent, title: String, detail: String? = nil,
+                         progress: Bool = false, action: ModuleAction? = nil) -> some View {
+    ModuleEmptyState(symbol: symbol, tint: tint, title: title, detail: detail, progress: progress, compact: true,
+                     action: action)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 }
 
 // MARK: - Lecteur
@@ -94,16 +55,18 @@ struct PlayerCard: View {
     var body: some View {
         Group {
             if module.playerStatus == .unavailable {
-                MediaMessage(symbol: "speaker.slash", title: L("Lecture en cours indisponible", table: "Media"),
-                             detail: L("macOS ne donne pas accès au morceau en cours.", table: "Media"),
-                             action: (L("Réessayer", table: "Media"), module.retryPlayer))
+                cardMessage(symbol: "speaker.slash", tint: Palette.amber,
+                            title: L("Lecture en cours indisponible", table: "Media"),
+                            detail: L("macOS ne donne pas accès au morceau en cours.", table: "Media"),
+                            action: ModuleAction(title: L("Réessayer", table: "Media"), style: .warning,
+                                                 run: module.retryPlayer))
             } else if let info = module.nowPlaying {
                 playing(info)
             } else if module.playerStatus == .checking {
-                MediaMessage(symbol: "music.note", title: L("Connexion au lecteur…", table: "Media"), progress: true)
+                cardMessage(symbol: "music.note", title: L("Connexion au lecteur…", table: "Media"), progress: true)
             } else {
-                MediaMessage(symbol: "music.note", title: L("Aucune lecture", table: "Media"),
-                             detail: L("Lance un morceau dans Musique, Spotify ou ton navigateur.", table: "Media"))
+                cardMessage(symbol: "music.note", title: L("Aucune lecture", table: "Media"),
+                            detail: L("Lance un morceau dans Musique, Spotify ou ton navigateur.", table: "Media"))
             }
         }
         .modifier(MediaCard())
@@ -117,6 +80,7 @@ struct PlayerCard: View {
                 }
                 .buttonStyle(.plain)
                 .help(String(format: L("Ouvrir %@", table: "Media"), info.appName ?? info.bundleIdentifier))
+                .accessibilityLabel(String(format: L("Ouvrir %@", table: "Media"), info.appName ?? info.bundleIdentifier))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(info.title)
                         .font(.system(size: 13, weight: .semibold))
@@ -129,7 +93,7 @@ struct PlayerCard: View {
                     if let app = info.appName {
                         Text(app)
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(.white.opacity(0.5))
                             .padding(.top, 1)
                     }
                 }
@@ -228,7 +192,7 @@ struct PlaybackProgress: View {
         }
         .font(.system(size: 10, weight: .medium).monospacedDigit())
         .foregroundColor(Palette.secondary)
-        .animation(.easeOut(duration: 0.12), value: dragFraction == nil)
+        .animation(ModuleStyle.hover, value: dragFraction == nil)
     }
 }
 
@@ -251,6 +215,7 @@ struct MediaControlButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(label)
         .accessibilityLabel(label)
     }
@@ -265,13 +230,14 @@ struct CalendarCard: View {
         Group {
             switch module.calendarAccess {
             case .notDetermined:
-                MediaMessage(symbol: "calendar", title: L("Ton agenda dans la notch", table: "Media"),
-                             action: (L("Autoriser l'accès au calendrier", table: "Media"),
-                                      module.requestCalendarAccess))
+                cardMessage(symbol: "calendar", title: L("Ton agenda dans la notch", table: "Media"),
+                            action: ModuleAction(title: L("Autoriser l'accès au calendrier", table: "Media"),
+                                                 style: .prominent, run: module.requestCalendarAccess))
             case .denied:
-                MediaMessage(symbol: "calendar.badge.exclamationmark",
-                             title: L("Accès au calendrier refusé", table: "Media"),
-                             action: (L("Ouvrir Réglages Système", table: "Media"), module.openCalendarPrivacySettings))
+                cardMessage(symbol: "calendar.badge.exclamationmark", tint: Palette.amber,
+                            title: L("Accès au calendrier refusé", table: "Media"),
+                            action: ModuleAction(title: L("Ouvrir Réglages Système", table: "Media"), style: .warning,
+                                                 run: module.openCalendarPrivacySettings))
             case .granted:
                 week
             }
@@ -292,11 +258,14 @@ struct CalendarCard: View {
                 }
             }
             if dayEvents.isEmpty {
-                Text(Calendar.current.isDateInToday(module.selectedDay)
-                     ? L("Rien aujourd'hui", table: "Media") : L("Rien ce jour-là", table: "Media"))
-                    .font(.system(size: 11))
-                    .foregroundColor(Palette.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack(spacing: 5) {
+                    Image(systemName: "calendar").font(.system(size: 11, weight: .medium))
+                    Text(Calendar.current.isDateInToday(module.selectedDay)
+                         ? L("Rien aujourd'hui", table: "Media") : L("Rien ce jour-là", table: "Media"))
+                }
+                .font(.system(size: 11))
+                .foregroundColor(Palette.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -306,11 +275,7 @@ struct CalendarCard: View {
                     }
                 }
                 // Plus de trois événements : la liste défile, le bas s'estompe pour le montrer.
-                .mask(VStack(spacing: 0) {
-                    Color.black
-                    LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: dayEvents.count > 3 ? 16 : 0)
-                })
+                .bottomFade(dayEvents.count > 3, height: 16)
             }
         }
     }
@@ -339,20 +304,11 @@ struct CalendarCard: View {
     }
 
     private func weekButton(_ symbol: String, label: String, by days: Int) -> some View {
-        Button {
+        ModuleIconButton(symbol: symbol, label: label, box: 20, size: 10, weight: .bold) {
             if let day = Calendar.current.date(byAdding: .day, value: days, to: module.selectedDay) {
                 module.selectedDay = day
             }
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white.opacity(0.7))
-                .frame(width: 18, height: 18)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .help(label)
-        .accessibilityLabel(label)
     }
 
     private func dayButton(_ day: Date, hasEvents: Bool) -> some View {
@@ -380,6 +336,8 @@ struct CalendarCard: View {
         }
         .buttonStyle(.plain)
         .animation(notchSpring, value: selected)
+        .accessibilityLabel(Text(day, format: .dateTime.weekday(.wide).day().month(.wide)))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -409,12 +367,13 @@ struct EventRow: View {
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+            .background(ModuleStyle.shape(ModuleStyle.itemRadius)
                 .fill(Color.white.opacity(hovering ? 0.08 : 0)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(L("Ouvrir dans Calendrier", table: "Media"))
     }
 }
@@ -440,7 +399,7 @@ struct MediaCompactView: View {
     private var summary: some View {
         VStack(alignment: .leading, spacing: 6) {
             if module.showPlayer, let info = module.nowPlaying {
-                row {
+                ModuleSummaryRow {
                     ArtworkView(image: module.artwork, size: 20)
                     Text(info.artist.map { "\(info.title) — \($0)" } ?? info.title)
                         .font(.system(size: 11.5, weight: .medium))
@@ -457,11 +416,8 @@ struct MediaCompactView: View {
                 // Relu chaque minute : un événement terminé laisse la place au suivant.
                 TimelineView(.everyMinute) { context in
                     let next = MediaCalendarMath.next(module.events, after: context.date)
-                    row {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Palette.accent)
-                            .frame(width: 20)
+                    ModuleSummaryRow {
+                        ModuleSummaryIcon(symbol: "calendar")
                         Text(next.map(MediaFormat.upcoming) ?? L("Aucun événement à venir", table: "Media"))
                             .font(.system(size: 11.5, weight: .medium))
                             .foregroundColor(next == nil ? Palette.secondary : Palette.primary)
@@ -472,15 +428,6 @@ struct MediaCompactView: View {
                 }
             }
         }
-    }
-
-    private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        HStack(spacing: 8, content: content)
-            .frame(minHeight: 22)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.card))
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -497,8 +444,6 @@ struct MediaSettingsView: View {
                 Toggle(isOn: $module.showPlayer) { Text("Afficher le lecteur", tableName: "Media") }
                 Toggle(isOn: $module.playerEars) { Text("Oreilles pendant la lecture", tableName: "Media") }
                     .disabled(!module.showPlayer)
-                SettingsNote(L("Notch repliée : la pochette et un égaliseur de part et d'autre de la notch tant qu'un "
-                    + "morceau joue et que Claude n'a rien à montrer.", table: "Media"))
                 LabeledContent {
                     Text(playerStatus)
                         .foregroundColor(module.playerStatus == .unavailable ? Palette.amber : .secondary)
@@ -507,6 +452,8 @@ struct MediaSettingsView: View {
                 }
             } header: {
                 Text("Lecture en cours", tableName: "Media")
+            } footer: {
+                SettingsNote(L("Notch repliée : pochette et égaliseur tant qu'un morceau joue.", table: "Media"))
             }
             Section {
                 Toggle(isOn: Binding(get: { module.showCalendar }, set: { isOn in
@@ -542,8 +489,7 @@ struct MediaSettingsView: View {
             } header: {
                 Text("Calendrier", tableName: "Media")
             } footer: {
-                SettingsNote(L("Lu seulement quand l'onglet est à l'écran. Un clic sur un événement l'ouvre dans "
-                    + "Calendrier.", table: "Media"))
+                SettingsNote(L("Lu seulement quand l'onglet est affiché. Un clic ouvre l'événement.", table: "Media"))
             }
         }
         .onAppear { module.refreshCalendarAccess() }

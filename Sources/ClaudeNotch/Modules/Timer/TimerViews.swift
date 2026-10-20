@@ -22,7 +22,7 @@ struct TimerPanel: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.card))
+        .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Palette.card))
         .animation(notchSpring, value: state.status)
         .animation(notchSpring, value: state.mode)
     }
@@ -273,7 +273,7 @@ struct TimerChip: View {
         Button(action: action) {
             Text(verbatim: "\(minutes)")
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundColor(selected ? .white : Palette.primary.opacity(0.9))
+                .foregroundColor(selected ? Palette.accent.onFill : Palette.primary.opacity(0.9))
                 .frame(width: 34, height: 24)
                 .background(Capsule().fill(selected ? Palette.accent.opacity(0.85)
                                            : Color.white.opacity(hovering ? 0.16 : 0.08)))
@@ -281,7 +281,9 @@ struct TimerChip: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(String(format: L("Lancer %d min", table: "Timer"), minutes))
+        .accessibilityLabel(String(format: L("Lancer %d min", table: "Timer"), minutes))
     }
 }
 
@@ -298,7 +300,7 @@ struct TimerRoundButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.38, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(prominent ? Palette.accent.onFill : .white)
                 .frame(width: size, height: size)
                 .background(Circle().fill(prominent ? Palette.accent.opacity(hovering ? 1 : 0.85)
                                           : Color.white.opacity(hovering ? 0.18 : 0.09)))
@@ -306,6 +308,7 @@ struct TimerRoundButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(label)
         .accessibilityLabel(label)
     }
@@ -325,7 +328,7 @@ struct TimerPill: View {
                 if let symbol { Image(systemName: symbol).font(.system(size: 10, weight: .bold)) }
                 Text(title).font(.system(size: 11.5, weight: .semibold))
             }
-            .foregroundColor(.white)
+            .foregroundColor(prominent ? Palette.accent.onFill : .white)
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 12)
@@ -336,6 +339,7 @@ struct TimerPill: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
     }
 }
 
@@ -352,13 +356,14 @@ struct DurationControl: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            step("minus", -1)
+            step("minus", -1, label: L("Diminuer la durée", table: "Timer"))
             TextField("", text: $draft)
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.center)
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
                 .foregroundColor(Palette.primary)
                 .frame(width: 38)
+                .accessibilityLabel(L("Durée libre : flèches, molette ou saisie", table: "Timer"))
                 .focused($focused)
                 .onSubmit(commit)
                 .onExitCommand {
@@ -370,13 +375,14 @@ struct DurationControl: View {
                 .font(.system(size: 11))
                 .foregroundColor(Palette.secondary)
                 .padding(.trailing, 4)
-            step("plus", 1)
+            step("plus", 1, label: L("Augmenter la durée", table: "Timer"))
         }
         .padding(.horizontal, 3)
         .frame(height: 26)
         .background(Capsule().fill(Color.white.opacity(hovering || focused ? 0.12 : 0.07)))
         .overlay(ScrollWheelCatcher { change in adjust(change) })
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .onAppear { draft = String(minutes) }
         .onChange(of: minutes) { value in if !focused { draft = String(value) } }
         .onChange(of: draft) { value in
@@ -400,7 +406,7 @@ struct DurationControl: View {
         .help(L("Durée libre : flèches, molette ou saisie", table: "Timer"))
     }
 
-    private func step(_ symbol: String, _ delta: Int) -> some View {
+    private func step(_ symbol: String, _ delta: Int, label: String) -> some View {
         Button {
             adjust(delta)
         } label: {
@@ -411,6 +417,8 @@ struct DurationControl: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     private func adjust(_ delta: Int) {
@@ -462,11 +470,9 @@ struct TimerCompactView: View {
 
     var body: some View {
         let state = module.state
-        HStack(spacing: 8) {
-            Image(systemName: state.status == .finished ? "checkmark.circle.fill" : module.phaseSymbol)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(state.status == .finished ? Palette.green : Palette.accent)
-                .frame(width: 20)
+        ModuleSummaryRow {
+            ModuleSummaryIcon(symbol: state.status == .finished ? "checkmark.circle.fill" : module.phaseSymbol,
+                              tint: state.status == .finished ? Palette.green : Palette.accent)
             if state.status == .finished {
                 Text(String(format: L("Terminé à %@", table: "Timer"), TimerFormat.time(state.finishedAt ?? module.now)))
                     .font(.system(size: 11.5, weight: .medium))
@@ -474,7 +480,7 @@ struct TimerCompactView: View {
                     .lineLimit(1)
             } else {
                 Text(TimerFormat.clock(module.displayedSeconds))
-                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundColor(state.status == .paused ? Palette.secondary : Palette.primary)
                 Text(module.label)
                     .font(.system(size: 11))
@@ -489,10 +495,6 @@ struct TimerCompactView: View {
                                  size: 22, action: module.togglePause)
             }
         }
-        .frame(minHeight: 22)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.card))
         .onAppear { DispatchQueue.main.async { module.viewAppeared() } }
         .onDisappear { module.viewDisappeared() }
     }
@@ -577,9 +579,10 @@ struct TimerSettingsView: View {
                     Text("Sessions avant la pause longue", tableName: "Timer")
                 }
                 Toggle(isOn: $module.autoStartBreaks) { Text("Lancer les pauses automatiquement", tableName: "Timer") }
-                SettingsNote(L("Les pauses démarrent seules ; la concentration attend que tu la lances.", table: "Timer"))
             } header: {
                 Text("Pomodoro", tableName: "Timer")
+            } footer: {
+                SettingsNote(L("Les pauses démarrent seules ; la concentration attend que tu la lances.", table: "Timer"))
             }
             Section {
                 Picker(selection: $module.soundName) {
@@ -605,8 +608,7 @@ struct TimerSettingsView: View {
             } header: {
                 Text("Fin du minuteur", tableName: "Timer")
             } footer: {
-                SettingsNote(L("L'autorisation des notifications est demandée au premier minuteur lancé. Sans elle, "
-                    + "le son et l'oreille « Terminé » suffisent.", table: "Timer"))
+                SettingsNote(L("Notifications : l'autorisation est demandée au premier minuteur lancé.", table: "Timer"))
             }
         }
         .onAppear(perform: module.refreshNotificationAccess)
