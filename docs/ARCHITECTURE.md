@@ -171,8 +171,8 @@ Apple Events and Bluetooth are already there) nor another module's files.
   session timer only runs while there are sessions; the root view does not observe `ClaudeMonitor` (it changes
   on every app switch), only the Claude tab does.
 - **Notch settings** (Settings › General and Appearance, `NotchShell`):
-  - Visibility `visibility.mode`: always (default; the old `alwaysVisible = false` becomes "when Claude is
-    open"), when Claude is open, during activity. Module ears show it in every mode. "Hide the notch" for 1 h,
+  - Visibility `visibility.mode`: always (fresh install; `alwaysVisible = false`, or no key but hooks already
+    installed by an earlier version, becomes "when Claude is open"; decided once and saved at first launch), when Claude is open, during activity. Module ears show it in every mode. "Hide the notch" for 1 h,
     until 8 am tomorrow or until turned back on (`visibility.hiddenUntil`, `distantFuture`): one `Timer` at the
     end date, only while hidden, re-read on wake. "Until turned back on" ends when the app is opened again
     (reopen event) or relaunched; reopening the app also opens the settings (no Dock or menu bar icon).

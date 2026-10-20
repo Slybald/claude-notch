@@ -339,7 +339,9 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(replyFromNotch, forKey: Key.replyFromNotch) }
     }
 
-    init(defaults: UserDefaults = .standard) {
+    /// `previousInstall` : une version antérieure tournait déjà sur ce Mac (nil : détection réelle, seulement pour
+    /// les réglages de l'app hors tests).
+    init(defaults: UserDefaults = .standard, previousInstall: Bool? = nil) {
         self.defaults = defaults
         func double(_ key: String, _ fallback: Double, _ range: ClosedRange<Double>) -> Double {
             let value = defaults.object(forKey: key) as? Double ?? fallback
@@ -348,8 +350,13 @@ final class Preferences: ObservableObject {
         func choice<T: RawRepresentable>(_ key: String, _ fallback: T) -> T where T.RawValue == String {
             defaults.string(forKey: key).flatMap(T.init) ?? fallback
         }
-        visibility = defaults.string(forKey: Key.visibility).flatMap(NotchVisibility.init)
-            ?? Self.migratedVisibility(alwaysVisible: defaults.object(forKey: Key.alwaysVisible) as? Bool)
+        let storedVisibility = defaults.string(forKey: Key.visibility).flatMap(NotchVisibility.init)
+        let initialVisibility = storedVisibility ?? Self.migratedVisibility(
+            alwaysVisible: defaults.object(forKey: Key.alwaysVisible) as? Bool,
+            previousInstall: previousInstall ?? (defaults == .standard && Self.isUpdateFromEarlierVersion()))
+        visibility = initialVisibility
+        // Décidé une fois : sinon les hooks posés au premier lancement feraient changer le défaut au lancement suivant.
+        if storedVisibility == nil { defaults.set(initialVisibility.rawValue, forKey: Key.visibility) }
         hiddenUntil = defaults.object(forKey: Key.hiddenUntil) as? Date
         autoUpdate = defaults.object(forKey: Key.autoUpdate) as? Bool ?? true
         launchAtLogin = LaunchAgent.isEnabled
@@ -387,9 +394,21 @@ final class Preferences: ObservableObject {
         replyFromNotch = defaults.bool(forKey: Key.replyFromNotch)
     }
 
-    /// Ancien « Toujours visible » : vrai → toujours, faux → quand Claude est ouvert ; jamais réglé → toujours.
-    static func migratedVisibility(alwaysVisible: Bool?) -> NotchVisibility {
-        alwaysVisible == false ? .whenClaudeOpen : .always
+    /// Ancien « Toujours visible » : vrai → toujours, faux → quand Claude est ouvert. Jamais réglé : une mise à jour
+    /// garde le comportement validé des versions 1.1 et avant (quand Claude est ouvert), une installation neuve
+    /// montre toujours la notch (ses onglets servent sans Claude).
+    static func migratedVisibility(alwaysVisible: Bool?, previousInstall: Bool) -> NotchVisibility {
+        switch alwaysVisible {
+        case true?: return .always
+        case false?: return .whenClaudeOpen
+        case nil: return previousInstall ? .whenClaudeOpen : .always
+        }
+    }
+
+    /// Hooks déjà posés par une version précédente (seule trace laissée à coup sûr par la 1.1). Jamais sous XCTest.
+    private static func isUpdateFromEarlierVersion() -> Bool {
+        guard NSClassFromString("XCTestCase") == nil else { return false }
+        return [.installed, .outdated, .scriptOutdated].contains(HookInstaller.standard.status())
     }
 
     /// Largeur du panneau déplié : demi-largeur en plein écran compact, sinon la largeur choisie.

@@ -91,7 +91,8 @@ after it restarts.
 
 Open **…** › **Settings…** (⌘,).
 
-- **Visibility**: always visible (the default), only while Claude is open, or only during an activity: a session
+- **Visibility**: always visible (the default on a fresh install; an update from 1.1 keeps "while Claude is
+  open"), only while Claude is open, or only during an activity: a session
   working, waiting or just finished, or a tab showing ears (a timer, the player).
 - **Hide the notch** for 1 hour, until tomorrow, or until you show it again. The same options are in the **…** menu
   and in the right-click menu of the collapsed notch.
@@ -470,7 +471,8 @@ reçoit les réponses qu'après son redémarrage.
 
 Ouvre **…** › **Réglages…** (⌘,).
 
-- **Visibilité** : toujours visible (par défaut), seulement quand Claude est ouvert, ou seulement pendant une
+- **Visibilité** : toujours visible (par défaut sur une installation neuve ; une mise à jour depuis la 1.1 garde
+  « quand Claude est ouvert »), seulement quand Claude est ouvert, ou seulement pendant une
   activité : une session qui travaille, attend ou vient de finir, ou un onglet qui affiche des oreilles (minuteur,
   lecteur).
 - **Masquer la notch** pendant 1 h, jusqu'à demain, ou jusqu'à ce que tu la réaffiches. Les mêmes choix sont dans le

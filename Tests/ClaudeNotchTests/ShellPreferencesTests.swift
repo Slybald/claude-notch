@@ -29,6 +29,22 @@ final class ShellPreferencesTests: XCTestCase {
         XCTAssertEqual(Preferences(defaults: off).visibility, .whenClaudeOpen, "valeur illisible : migration")
     }
 
+    /// Jamais réglé : une mise à jour garde « quand Claude est ouvert » (validé en 1.1), une installation neuve
+    /// montre toujours la notch ; le choix est enregistré au premier lancement et ne bouge plus ensuite.
+    func testUnsetVisibilityDependsOnPreviousInstall() {
+        let update = makeEphemeralDefaults(self)
+        XCTAssertEqual(Preferences(defaults: update, previousInstall: true).visibility, .whenClaudeOpen)
+        XCTAssertEqual(Preferences(defaults: update, previousInstall: false).visibility, .whenClaudeOpen, "figé")
+
+        let fresh = makeEphemeralDefaults(self)
+        XCTAssertEqual(Preferences(defaults: fresh, previousInstall: false).visibility, .always)
+        XCTAssertEqual(Preferences(defaults: fresh, previousInstall: true).visibility, .always, "figé")
+
+        let explicit = makeEphemeralDefaults(self)
+        explicit.set(true, forKey: "alwaysVisible")
+        XCTAssertEqual(Preferences(defaults: explicit, previousInstall: true).visibility, .always, "choix explicite")
+    }
+
     /// Table de vérité de la règle, mode par mode.
     func testVisibilityRuleTruthTable() {
         typealias Inputs = NotchVisibilityRule.Inputs
