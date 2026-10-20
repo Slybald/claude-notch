@@ -95,17 +95,28 @@
 "Bienvenue dans Claude Notch" = "Bienvenue dans Claude Notch";
 "Mettre à jour Claude Notch" = "Mettre à jour Claude Notch";
 "Tes sessions Claude Code, d'un coup d'œil." = "Tes sessions Claude Code, d'un coup d'œil.";
+"Des onglets utiles, dans la notch." = "Des onglets utiles, dans la notch.";
+"Ouvrir la notch" = "Ouvrir la notch";
+"Survole-la. Ouverture au clic et raccourci clavier se règlent dans les réglages." = "Survole-la. Ouverture au clic et raccourci clavier se règlent dans les réglages.";
+"Lecteur et calendrier, réglages rapides, étagère, presse-papiers, minuteur et notes. Choisis-les et range-les dans Réglages › Onglets." = "Lecteur et calendrier, réglages rapides, étagère, presse-papiers, minuteur et notes. Choisis-les et range-les dans Réglages › Onglets.";
+"Réglages" = "Réglages";
+"Menu « … » du panneau, ou rouvre Claude Notch. Clic droit sur la notch pour la masquer." = "Menu « … » du panneau, ou rouvre Claude Notch. Clic droit sur la notch pour la masquer.";
 "Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac." = "Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac.";
 "Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch continue de suivre tes sessions." = "Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch continue de suivre tes sessions.";
 "Glisse d'abord Claude Notch dans Applications" = "Glisse d'abord Claude Notch dans Applications";
 "L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier Applications, puis rouvre-la depuis là." = "L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier Applications, puis rouvre-la depuis là.";
 "CE QUI SERA MODIFIÉ" = "CE QUI SERA MODIFIÉ";
+"INTÉGRATION CLAUDE CODE" = "INTÉGRATION CLAUDE CODE";
+"Claude Code est installé sur ce Mac. Avec ses hooks, l'onglet Claude suit tes sessions : état, outil en cours, tâches, permissions." = "Claude Code est installé sur ce Mac. Avec ses hooks, l'onglet Claude suit tes sessions : état, outil en cours, tâches, permissions.";
+"Tu utilises Claude Code ? Active l'onglet Claude dans Réglages › Onglets." = "Tu utilises Claude Code ? Active l'onglet Claude dans Réglages › Onglets.";
 "Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté." = "Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté.";
 "Petit script qui relaie chaque événement à l'app, en local (127.0.0.1)." = "Petit script qui relaie chaque événement à l'app, en local (127.0.0.1).";
 "Disponible une fois l'app dans Applications." = "Disponible une fois l'app dans Applications.";
 "Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message.";
 "Hooks à jour. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks à jour. Les sessions déjà ouvertes apparaîtront à leur prochain message.";
 "Plus tard" = "Plus tard";
+"Installer les hooks" = "Installer les hooks";
+"Commencer" = "Commencer";
 "Mettre à jour les hooks" = "Mettre à jour les hooks";
 "Fermer" = "Fermer";
 
@@ -113,11 +124,13 @@
 "Mise à jour des hooks impossible" = "Mise à jour des hooks impossible";
 "Désinstaller Claude Notch ?" = "Désinstaller Claude Notch ?";
 "Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh et le lancement à l'ouverture de session. L'app se fermera ensuite." = "Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh et le lancement à l'ouverture de session. L'app se fermera ensuite.";
+"Le lancement à l'ouverture de session sera retiré. L'app se fermera ensuite." = "Le lancement à l'ouverture de session sera retiré. L'app se fermera ensuite.";
 "Désinstaller" = "Désinstaller";
 "Annuler" = "Annuler";
 "Désinstallation interrompue" = "Désinstallation interrompue";
 "Claude Notch est désinstallé" = "Claude Notch est désinstallé";
 "Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage." = "Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage.";
+"Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications." = "Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications.";
 "Afficher dans le Finder" = "Afficher dans le Finder";
 "Quitter" = "Quitter";
 
@@ -194,8 +207,9 @@
 "Panneau normal" = "Panneau normal";
 "Notch masquée" = "Notch masquée";
 "Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de chaque onglet). Les oreilles restent les mêmes." = "Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de chaque onglet). Les oreilles restent les mêmes.";
+"Compact : demi-largeur, seulement le résumé de chaque onglet. Les oreilles restent les mêmes." = "Compact : demi-largeur, seulement le résumé de chaque onglet. Les oreilles restent les mêmes.";
 "Activé" = "Activé";
-"Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan. Claude reste toujours actif." = "Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan. Claude reste toujours actif.";
+"Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan." = "Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan.";
 "Onglet à l'ouverture" = "Onglet à l'ouverture";
 "Dernier utilisé" = "Dernier utilisé";
 "Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude." = "Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude.";
@@ -210,6 +224,7 @@
 "Notch repliée" = "Notch repliée";
 "Afficher les oreilles" = "Afficher les oreilles";
 "De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours)." = "De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours).";
+"De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)." = "De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours).";
 "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide." = "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide.";
 "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic." = "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic.";
 "Licences" = "Licences";
@@ -250,6 +265,7 @@
 "La notch reste toujours à l'écran." = "La notch reste toujours à l'écran.";
 "Tant que Claude Desktop ou une session Claude Code est ouverte." = "Tant que Claude Desktop ou une session Claude Code est ouverte.";
 "Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages.";
+"Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages.";
 "Réafficher" = "Réafficher";
 "Aussi par le raccourci, ou en rouvrant Claude Notch." = "Aussi par le raccourci, ou en rouvrant Claude Notch.";
 "Masquer" = "Masquer";

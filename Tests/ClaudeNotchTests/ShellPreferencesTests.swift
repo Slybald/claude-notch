@@ -29,20 +29,40 @@ final class ShellPreferencesTests: XCTestCase {
         XCTAssertEqual(Preferences(defaults: off).visibility, .whenClaudeOpen, "valeur illisible : migration")
     }
 
-    /// Jamais réglé : une mise à jour garde « quand Claude est ouvert » (validé en 1.1), une installation neuve
-    /// montre toujours la notch ; le choix est enregistré au premier lancement et ne bouge plus ensuite.
-    func testUnsetVisibilityDependsOnPreviousInstall() {
-        let update = makeEphemeralDefaults(self)
-        XCTAssertEqual(Preferences(defaults: update, previousInstall: true).visibility, .whenClaudeOpen)
-        XCTAssertEqual(Preferences(defaults: update, previousInstall: false).visibility, .whenClaudeOpen, "figé")
+    /// Réparation unique de la 1.2.0, qui avait enregistré « quand Claude est ouvert » d'elle-même chez qui avait les
+    /// hooks : sans l'ancienne clé, retour à « toujours », une seule fois. Un choix venu de la 1.1 reste.
+    func testOneTimeRepairOfThe120VisibilityDefault() {
+        let saved120 = makeEphemeralDefaults(self)
+        saved120.set("whenClaudeOpen", forKey: "visibility.mode")
+        XCTAssertEqual(Preferences(defaults: saved120).visibility, .always, "défaut posé par la 1.2.0 : réparé")
+        XCTAssertEqual(saved120.string(forKey: "visibility.mode"), "always", "enregistré")
+        XCTAssertEqual(saved120.object(forKey: "visibility.defaultFixed121") as? Bool, true, "témoin posé")
+        // Choisi ensuite : la réparation ne repasse pas.
+        Preferences(defaults: saved120).visibility = .whenClaudeOpen
+        XCTAssertEqual(Preferences(defaults: saved120).visibility, .whenClaudeOpen, "une seule fois")
+
+        // « Toujours visible » décoché en 1.1 : un vrai choix, gardé.
+        let from11 = makeEphemeralDefaults(self)
+        from11.set(false, forKey: "alwaysVisible")
+        from11.set("whenClaudeOpen", forKey: "visibility.mode")
+        XCTAssertEqual(Preferences(defaults: from11).visibility, .whenClaudeOpen)
+
+        let activity = makeEphemeralDefaults(self)
+        activity.set("duringActivity", forKey: "visibility.mode")
+        XCTAssertEqual(Preferences(defaults: activity).visibility, .duringActivity, "autre mode : intact")
 
         let fresh = makeEphemeralDefaults(self)
-        XCTAssertEqual(Preferences(defaults: fresh, previousInstall: false).visibility, .always)
-        XCTAssertEqual(Preferences(defaults: fresh, previousInstall: true).visibility, .always, "figé")
+        XCTAssertEqual(Preferences(defaults: fresh).visibility, .always, "installation neuve")
+        XCTAssertNil(fresh.object(forKey: "visibility.mode"), "clé absente : toujours, rien à enregistrer")
+    }
 
-        let explicit = makeEphemeralDefaults(self)
-        explicit.set(true, forKey: "alwaysVisible")
-        XCTAssertEqual(Preferences(defaults: explicit, previousInstall: true).visibility, .always, "choix explicite")
+    /// Sans l'onglet Claude, « Quand Claude est ouvert » n'est plus proposé et vaut « Toujours ».
+    func testVisibilityWithoutClaudeTab() {
+        XCTAssertEqual(NotchVisibility.choices(claudeEnabled: true), [.always, .whenClaudeOpen, .duringActivity])
+        XCTAssertEqual(NotchVisibility.choices(claudeEnabled: false), [.always, .duringActivity])
+        XCTAssertEqual(NotchVisibility.whenClaudeOpen.effective(claudeEnabled: false), .always)
+        XCTAssertEqual(NotchVisibility.whenClaudeOpen.effective(claudeEnabled: true), .whenClaudeOpen)
+        XCTAssertEqual(NotchVisibility.duringActivity.effective(claudeEnabled: false), .duringActivity)
     }
 
     /// Table de vérité de la règle, mode par mode.

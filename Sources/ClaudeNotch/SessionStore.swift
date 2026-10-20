@@ -156,6 +156,16 @@ final class SessionStore: ObservableObject {
         updateTimer()
     }
 
+    /// Onglet Claude désactivé : sessions oubliées, plus de timer ni de lecture de transcript. Elles reviennent à
+    /// leur prochain événement une fois l'onglet réactivé.
+    func stop() {
+        started = false
+        endedIds = []
+        transcripts = [:]
+        if !sessions.isEmpty { sessions = [:] }
+        updateTimer()
+    }
+
     private func updateTimer() {
         if started, !sessions.isEmpty, timer == nil {
             let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
@@ -166,7 +176,7 @@ final class SessionStore: ObservableObject {
             timer.tolerance = 0.2
             RunLoop.main.add(timer, forMode: .common)
             self.timer = timer
-        } else if sessions.isEmpty, let timer {
+        } else if !started || sessions.isEmpty, let timer {
             timer.invalidate()
             self.timer = nil
         }

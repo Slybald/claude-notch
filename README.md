@@ -49,11 +49,14 @@ Interface available in English and French (follows the system language). Screens
 
 ## Tabs
 
-The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default. In
-**Settings › Tabs** you can hide a tab (a hidden tab does no work), change the order, or pick the tab that opens
-by default. The panel reopens on the last tab you used, or on Claude when a session needs you.
+The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default, except Claude
+when Claude Code is not found on the Mac. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
+change the order, or pick the tab that opens by default. The panel reopens on the last tab you used, or on Claude
+when a session needs you.
 
-- **Claude**: your sessions, with their state, permissions, questions and plans. The only tab that cannot be hidden.
+- **Claude**: your sessions, with their state, permissions, questions and plans. Optional: on first launch it is
+  on only if Claude Code is found on the Mac (`~/.claude` or `$CLAUDE_CONFIG_DIR`). Off, nothing Claude-related
+  runs: no process scan, no session tracking, hook events ignored.
 - **Player**: the track playing in Music, Spotify or your browser, with artwork, progress (drag to seek) and
   controls. Below it, a week view of your calendar: click an event to open it in Calendar.
 - **Quick Settings**: Wi-Fi, Bluetooth, Focus, Low Power Mode, caffeine (keeps the Mac awake for 1 h, 2 h or
@@ -91,9 +94,9 @@ after it restarts.
 
 Open **…** › **Settings…** (⌘,).
 
-- **Visibility**: always visible (the default on a fresh install; an update from 1.1 keeps "while Claude is
-  open"), only while Claude is open, or only during an activity: a session
-  working, waiting or just finished, or a tab showing ears (a timer, the player).
+- **Visibility**: always visible (the default), only while Claude is open (offered with the Claude tab on), or
+  only during an activity: a session working, waiting or just finished, or a tab showing ears (a timer, the
+  player).
 - **Hide the notch** for 1 hour, until tomorrow, or until you show it again. The same options are in the **…** menu
   and in the right-click menu of the collapsed notch.
 - **Opening**: on hover (with an opening delay) or on click. **Close on click outside** keeps the panel open until
@@ -134,15 +137,17 @@ accesses you granted (calendar, Bluetooth, Automation, folders). Older versions 
 that changes with every build: when you move to the first release signed with the certificate, macOS asks for
 these accesses one last time, then no longer.
 
-On first launch, a window offers to install the Claude Code hooks. It adds Claude Notch's entries to
-`~/.claude/settings.json` (a timestamped backup is written next to it first, and your existing hooks are kept)
-and installs the hook script in `~/.claude/hooks/`. You can reinstall them later from the **…** menu ›
-**Install Claude Code Hooks**. Sessions that were already open show up at their next message.
+On first launch, a welcome window presents the notch. If Claude Code is found on the Mac, it also offers to
+install the Claude Code hooks (or later): they add Claude Notch's entries to `~/.claude/settings.json` (a
+timestamped backup is written next to it first, and your existing hooks are kept) and install the hook script in
+`~/.claude/hooks/`. You can install them later from **Settings › Claude**. Sessions that were already open show up
+at their next message. Without Claude Code, nothing is said about the hooks; if you start using it, turn on the
+Claude tab in **Settings › Tabs**.
 
 ### Requirements
 
 - macOS 13 Ventura or later, Apple silicon or Intel.
-- Claude Code (CLI, or the Code tab of Claude Desktop).
+- For the Claude tab only: Claude Code (CLI, or the Code tab of Claude Desktop).
 - Claude Code configuration in `~/.claude`. `CLAUDE_CONFIG_DIR` is not supported by the app: the hooks are
   always installed in `~/.claude`.
 
@@ -426,12 +431,13 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 ### Onglets
 
 La notch déployée est une rangée d'onglets. Clique sur un onglet, ou survole-le un instant. Tous les onglets sont
-activés par défaut. Dans **Réglages › Onglets**, tu peux masquer un onglet (un onglet masqué ne fait aucun
-travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Le panneau se rouvre sur le dernier onglet
+activés par défaut, sauf Claude si Claude Code n'est pas sur le Mac. Dans **Réglages › Onglets**, tu peux masquer
+un onglet (un onglet masqué ne fait aucun travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Le panneau se rouvre sur le dernier onglet
 utilisé, ou sur Claude quand une session a besoin de toi.
 
-- **Claude** : tes sessions, avec leur état, leurs permissions, leurs questions et leurs plans. C'est le seul onglet
-  qu'on ne peut pas masquer.
+- **Claude** : tes sessions, avec leur état, leurs permissions, leurs questions et leurs plans. En option : au
+  premier lancement, il n'est activé que si Claude Code est sur le Mac (`~/.claude` ou `$CLAUDE_CONFIG_DIR`).
+  Désactivé, rien de Claude ne tourne : ni scan des processus, ni suivi des sessions, événements des hooks ignorés.
 - **Lecteur** : le morceau en cours dans Musique, Spotify ou ton navigateur, avec la pochette, la progression
   (glisse pour avancer) et les commandes. Dessous, une vue de la semaine de ton calendrier : un clic sur un
   événement l'ouvre dans Calendrier.
@@ -471,9 +477,8 @@ reçoit les réponses qu'après son redémarrage.
 
 Ouvre **…** › **Réglages…** (⌘,).
 
-- **Visibilité** : toujours visible (par défaut sur une installation neuve ; une mise à jour depuis la 1.1 garde
-  « quand Claude est ouvert »), seulement quand Claude est ouvert, ou seulement pendant une
-  activité : une session qui travaille, attend ou vient de finir, ou un onglet qui affiche des oreilles (minuteur,
+- **Visibilité** : toujours visible (par défaut), seulement quand Claude est ouvert (proposé avec l'onglet Claude
+  activé), ou seulement pendant une activité : une session qui travaille, attend ou vient de finir, ou un onglet qui affiche des oreilles (minuteur,
   lecteur).
 - **Masquer la notch** pendant 1 h, jusqu'à demain, ou jusqu'à ce que tu la réaffiches. Les mêmes choix sont dans le
   menu **…** et dans le menu du clic droit sur la notch repliée.
@@ -516,16 +521,17 @@ accès que tu as accordés (calendrier, Bluetooth, Automation, dossiers). Les ve
 signées ad hoc, une signature qui change à chaque build : au passage à la première release signée avec le
 certificat, macOS redemande ces accès une dernière fois, puis plus jamais.
 
-Au premier lancement, une fenêtre propose d'installer les hooks de Claude Code. Elle ajoute les entrées de
-Claude Notch dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à côté avant, tes hooks
-existants sont conservés) et installe le script de hook dans `~/.claude/hooks/`. Tu peux les réinstaller
-plus tard depuis le menu **…** › **Installer les hooks Claude Code**. Une session déjà ouverte apparaît à son prochain
-message.
+Au premier lancement, une fenêtre de bienvenue présente la notch. Si Claude Code est sur le Mac, elle propose
+aussi d'installer les hooks de Claude Code (ou plus tard) : ils ajoutent les entrées de Claude Notch dans
+`~/.claude/settings.json` (une sauvegarde horodatée est faite à côté avant, tes hooks existants sont conservés) et
+installent le script de hook dans `~/.claude/hooks/`. Tu peux les installer plus tard depuis **Réglages › Claude**.
+Une session déjà ouverte apparaît à son prochain message. Sans Claude Code, rien sur les hooks ; si tu t'y mets,
+active l'onglet Claude dans **Réglages › Onglets**.
 
 #### Prérequis
 
 - macOS 13 Ventura ou plus récent, Apple silicon ou Intel.
-- Claude Code (CLI, ou onglet Code de Claude Desktop).
+- Pour l'onglet Claude seulement : Claude Code (CLI, ou onglet Code de Claude Desktop).
 - Configuration de Claude Code dans `~/.claude`. `CLAUDE_CONFIG_DIR` n'est pas pris en charge par l'app :
   les hooks sont toujours installés dans `~/.claude`.
 

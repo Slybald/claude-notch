@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Network
+import os
 
 /// Mini serveur HTTP local (127.0.0.1:47823) qui reçoit les événements relayés par le script de hook.
 ///
@@ -26,6 +27,15 @@ final class HookServer {
     private let handler: Handler
     private let queue = DispatchQueue(label: AppIdentity.bundleId + ".server", qos: .userInitiated)
     private var listener: NWListener?
+    private let paused = OSAllocatedUnfairLock(initialState: false)
+
+    /// Onglet Claude désactivé : le port reste ouvert (rien ne tourne au repos), mais les événements sont ignorés
+    /// sans remonter les processus, et `/permission` et `/inbox` répondent 204 tout de suite (le terminal garde la
+    /// main). Écrit sur le main thread, lu sur la queue du serveur.
+    var isPaused: Bool {
+        get { paused.withLock { $0 } }
+        set { paused.withLock { $0 = newValue } }
+    }
 
     init(port: UInt16 = HookServer.defaultPort, access: HookAccess = HookAccess(), replies: ReplyCenter = .shared,
          handler: @escaping Handler) {
@@ -111,6 +121,9 @@ final class HookServer {
         if request.path == "/health" { return reply(204, "No Content", on: connection) }
         guard access.accepts(request.headers[HookAccess.headerKey]) else {
             return reply(401, "Unauthorized", on: connection)
+        }
+        if isPaused, request.method == "POST", ["/hook", "/permission", "/inbox"].contains(request.path) {
+            return reply(204, "No Content", on: connection)
         }
         switch (request.method, request.path) {
         case ("POST", "/hook"):

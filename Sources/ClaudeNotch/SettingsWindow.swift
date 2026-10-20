@@ -155,9 +155,9 @@ struct SettingsView: View {
     @ViewBuilder
     private var detail: some View {
         switch selection ?? .general {
-        case .general: GeneralSettings(prefs: prefs)
+        case .general: GeneralSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled)
         case .tabs: TabsSettings(prefs: prefs, registry: registry)
-        case .appearance: AppearanceSettings(prefs: prefs)
+        case .appearance: AppearanceSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled)
         case .privacy: PrivacySettings(prefs: prefs)
         case .module(let id): registry.module(id)?.makeSettingsView()
         case .updates: UpdateSettings(updater: updater, prefs: prefs)
@@ -194,6 +194,7 @@ struct SettingsNote: View {
 
 private struct GeneralSettings: View {
     @ObservedObject var prefs: Preferences
+    let claudeEnabled: Bool
     @ObservedObject var hotKeys: HotKeyCenter = .shared
     @State private var confirmReset = false
 
@@ -207,8 +208,8 @@ private struct GeneralSettings: View {
                 Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
             }
             Section("Visibilité") {
-                Picker("Afficher la notch", selection: $prefs.visibility) {
-                    ForEach(NotchVisibility.allCases) { mode in
+                Picker("Afficher la notch", selection: NotchMoreMenu.visibility(prefs, claudeEnabled: claudeEnabled)) {
+                    ForEach(NotchVisibility.choices(claudeEnabled: claudeEnabled)) { mode in
                         Text(NotchMoreMenu.title(mode)).tag(mode)
                     }
                 }
@@ -245,8 +246,10 @@ private struct GeneralSettings: View {
                     Text("Panneau normal").tag(FullScreenBehavior.normal)
                     Text("Notch masquée").tag(FullScreenBehavior.hidden)
                 }
-                SettingsNote(L("Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de "
-                    + "chaque onglet). Les oreilles restent les mêmes."))
+                SettingsNote(claudeEnabled
+                    ? L("Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de "
+                        + "chaque onglet). Les oreilles restent les mêmes.")
+                    : L("Compact : demi-largeur, seulement le résumé de chaque onglet. Les oreilles restent les mêmes."))
             }
             Section("Écran") {
                 Picker("Écran de la notch", selection: $prefs.screenChoice) {
@@ -279,12 +282,15 @@ private struct GeneralSettings: View {
     }
 
     private var visibilityNote: String {
-        switch prefs.visibility {
+        switch prefs.visibility.effective(claudeEnabled: claudeEnabled) {
         case .always: return L("La notch reste toujours à l'écran.")
         case .whenClaudeOpen: return L("Tant que Claude Desktop ou une session Claude Code est ouverte.")
-        case .duringActivity:
+        case .duringActivity where claudeEnabled:
             return L("Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). "
                 + "Au repos, rouvre Claude Notch pour retrouver ces réglages.")
+        case .duringActivity:
+            return L("Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour "
+                + "retrouver ces réglages.")
         }
     }
 
@@ -374,7 +380,7 @@ private struct TabsSettings: View {
                 Text("Onglets")
             } footer: {
                 SettingsNote(L("Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, "
-                    + "même en arrière-plan. Claude reste toujours actif."))
+                    + "même en arrière-plan."))
             }
             Section {
                 Picker("Onglet à l'ouverture", selection: $prefs.defaultTab) {
@@ -383,7 +389,9 @@ private struct TabsSettings: View {
                         Text(registry.module(id)?.title ?? id).tag(id)
                     }
                 }
-                SettingsNote(L("Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude."))
+                if registry.isClaudeEnabled {
+                    SettingsNote(L("Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude."))
+                }
             }
         }
     }
@@ -402,7 +410,6 @@ private struct TabsSettings: View {
                                            set: { registry.setEnabled(id, $0) }))
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .disabled(id == ModuleRegistry.claudeId)
         }
     }
 }
@@ -411,6 +418,7 @@ private struct TabsSettings: View {
 
 private struct AppearanceSettings: View {
     @ObservedObject var prefs: Preferences
+    let claudeEnabled: Bool
 
     private var customColor: Binding<Color> {
         Binding(get: { prefs.accent },
@@ -446,7 +454,7 @@ private struct AppearanceSettings: View {
     var body: some View {
         SettingsPane {
             Section("Aperçu") {
-                NotchAppearancePreview(prefs: prefs)
+                NotchAppearancePreview(prefs: prefs, claudeEnabled: claudeEnabled)
                     .padding(.vertical, 4)
             }
             Section("Couleur d'accent") {
@@ -533,8 +541,10 @@ private struct AppearanceSettings: View {
             }
             Section("Notch repliée") {
                 Toggle("Afficher les oreilles", isOn: $prefs.showEars)
-                SettingsNote(L("De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et "
-                    + "le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours)."))
+                SettingsNote(claudeEnabled
+                    ? L("De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et "
+                        + "le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours).")
+                    : L("De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)."))
                 Toggle("Teinter aussi la notch repliée", isOn: $prefs.tintCollapsed)
                 SettingsNote(L("Écrans sans encoche seulement : sur une vraie encoche, elle reste noire."))
             }
@@ -561,6 +571,8 @@ private struct AppearanceSettings: View {
 /// dégradé, pour juger l'opacité ; la bande du haut reste opaque comme sur la vraie notch.
 struct NotchAppearancePreview: View {
     @ObservedObject var prefs: Preferences
+    /// Sans l'onglet Claude, l'onglet actif de l'aperçu est le lecteur.
+    var claudeEnabled = true
 
     static let scale: CGFloat = 0.5
     static let height: CGFloat = 150
@@ -605,16 +617,17 @@ struct NotchAppearancePreview: View {
     private var header: some View {
         HStack(spacing: 5) {
             HStack(spacing: 3) {
-                Image(systemName: "sparkle")
+                Image(systemName: claudeEnabled ? "sparkle" : "play.fill")
                     .foregroundColor(prefs.accent)
-                Text(verbatim: "Claude")
+                if claudeEnabled { Text(verbatim: "Claude") }
             }
             .font(.system(size: 7, weight: .semibold))
             .foregroundColor(.white)
             .padding(.horizontal, 5)
             .frame(height: 12)
             .background(Capsule().fill(Color.white.opacity(0.12)))
-            ForEach(["play.fill", "switch.2", "tray", "doc.on.clipboard", "timer"], id: \.self) { symbol in
+            ForEach((claudeEnabled ? ["play.fill"] : []) + ["switch.2", "tray", "doc.on.clipboard", "timer"],
+                    id: \.self) { symbol in
                 Image(systemName: symbol)
                     .font(.system(size: 7, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
@@ -739,7 +752,8 @@ private struct AboutSettings: View {
                     }
                 }
                 .padding(.vertical, 4)
-                Text("Tes sessions Claude Code, d'un coup d'œil.")
+                Text(registry.isClaudeEnabled ? L("Tes sessions Claude Code, d'un coup d'œil.")
+                     : L("Des onglets utiles, dans la notch."))
                 Link(destination: Self.repository) {
                     Text(verbatim: "github.com/Slybald/claude-notch")
                 }

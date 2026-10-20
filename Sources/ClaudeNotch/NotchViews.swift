@@ -72,7 +72,8 @@ struct NotchRootView: View {
     private var expanded: Bool { model.isExpanded }
     private var compact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
     private var ears: EarsChoice {
-        EarsChoice.choose(claude: store.indicator, module: registry.moduleEars, showEars: prefs.showEars)
+        EarsChoice.choose(claude: registry.isClaudeEnabled ? store.indicator : .none, module: registry.moduleEars,
+                          showEars: prefs.showEars)
     }
     private var showsEars: Bool { ears != .none }
     /// Ressort choisi dans les réglages, ou fondu simple avec « Réduire les animations ».
@@ -502,7 +503,7 @@ struct ExpandedPanel: View {
     private var headerRow: some View {
         HStack(spacing: 6) {
             if compact {
-                registry.module(ModuleRegistry.claudeId)?.makeTabIcon()
+                if registry.isClaudeEnabled { registry.module(ModuleRegistry.claudeId)?.makeTabIcon() }
                 Spacer(minLength: 8)
             } else {
                 NotchTabBar(modules: registry.enabled, selection: $selection, animation: tabAnimation)
@@ -520,7 +521,7 @@ struct ExpandedPanel: View {
                 Spacer(minLength: 8)
                 selected?.makeHeaderAccessory()
             }
-            NotchMoreMenu(prefs: prefs, actions: actions)
+            NotchMoreMenu(prefs: prefs, claudeEnabled: registry.isClaudeEnabled, actions: actions)
         }
     }
 
@@ -606,9 +607,10 @@ struct NotchTabBar: View {
     }
 }
 
-/// Menu « … » de l'en-tête.
+/// Menu « … » de l'en-tête. Sans l'onglet Claude, rien de Claude : ni sessions, ni état des hooks.
 struct NotchMoreMenu: View {
     @ObservedObject var prefs: Preferences
+    let claudeEnabled: Bool
     let actions: NotchActions
 
     var body: some View {
@@ -616,8 +618,8 @@ struct NotchMoreMenu: View {
             Button("Réglages…", action: actions.openSettings)
                 .keyboardShortcut(",", modifiers: .command)
             Divider()
-            Picker("Afficher la notch", selection: $prefs.visibility) {
-                ForEach(NotchVisibility.allCases) { mode in
+            Picker("Afficher la notch", selection: Self.visibility(prefs, claudeEnabled: claudeEnabled)) {
+                ForEach(NotchVisibility.choices(claudeEnabled: claudeEnabled)) { mode in
                     Text(NotchMoreMenu.title(mode)).tag(mode)
                 }
             }
@@ -630,9 +632,11 @@ struct NotchMoreMenu: View {
             }
             Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
             Divider()
-            Button("Effacer les sessions terminées", action: actions.clearEnded)
-            Divider()
-            HookMenuItems(setup: .shared)
+            if claudeEnabled {
+                Button("Effacer les sessions terminées", action: actions.clearEnded)
+                Divider()
+            }
+            HookMenuItems(setup: .shared, claudeEnabled: claudeEnabled)
             Divider()
             UpdateMenuItems(updater: .shared, prefs: prefs)
             Divider()
@@ -647,6 +651,11 @@ struct NotchMoreMenu: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+    }
+
+    /// Sélecteur de visibilité : sans l'onglet Claude, « Quand Claude est ouvert » s'affiche comme « Toujours ».
+    static func visibility(_ prefs: Preferences, claudeEnabled: Bool) -> Binding<NotchVisibility> {
+        Binding(get: { prefs.visibility.effective(claudeEnabled: claudeEnabled) }, set: { prefs.visibility = $0 })
     }
 
     static func title(_ mode: NotchVisibility) -> String {

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Créé après la migration : les préférences lisent le LaunchAgent à leur création.
@@ -12,7 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         replaceLegacyInstance()
         AppIdentity.migrateLegacyInstall()
         core.start()
-        HookSetup.shared.showOnboardingIfNeeded()
+        HookSetup.shared.showOnboardingIfNeeded(claudeEnabled: core.isClaudeEnabled, prefs: core.prefs)
     }
 
     /// App rouverte (Finder, Spotlight) alors qu'elle tourne : sans icône dans le Dock ni la barre des menus, c'est
@@ -60,6 +61,7 @@ final class AppCore {
     let updater = Updater.shared
     private var server: HookServer?
     private var notch: NotchController?
+    private var cancellables = Set<AnyCancellable>()
 
     init(tools: ToolsFeed = ToolsFeed(), activityLog: ActivityLog = ActivityLog()) {
         self.tools = tools
@@ -77,6 +79,14 @@ final class AppCore {
     }
 
     func start() {
+        // Premier lancement : l'onglet Claude n'est activé d'office que si Claude Code est sur ce Mac.
+        prefs.decideClaudeTab(claudeCodePresent: { HookInstaller.claudeCodeOnThisMac })
+        // Relancer l'app vaut réactivation (seuls les masquages à durée survivent au relancement).
+        if prefs.hiddenUntil == .distantFuture { prefs.showAgain() }
+        // Créée avant le serveur (rien n'est encore affiché) : ses onglets disent si les hooks sont écoutés.
+        let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
+        self.notch = notch
+
         let server = HookServer(handler: Self.hookHandler(store: store, log: activityLog))
         server.stateProvider = { [weak self] in self?.debugState() ?? [:] }
         server.onFailure = { error in
@@ -84,6 +94,13 @@ final class AppCore {
             NSLog("ClaudeNotch : serveur de hooks indisponible (%@), arrêt.", String(describing: error))
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
+        self.server = server
+        // Onglet Claude : appliqué tout de suite, puis à chaud à chaque changement.
+        notch.registry.$enabled
+            .map { $0.contains { $0.id == ModuleRegistry.claudeId } }
+            .removeDuplicates()
+            .sink { [weak self] isOn in self?.setClaudeTracking(isOn) }
+            .store(in: &cancellables)
         do {
             try server.start()
         } catch {
@@ -91,21 +108,30 @@ final class AppCore {
             NSApp.terminate(nil)
             return
         }
-        self.server = server
 
-        monitor.start()
-        store.start()
         jobs.start()
         updater.isBusy = { [store] in store.hasBusySessions }
         updater.start()
 
-        // Relancer l'app vaut réactivation (seuls les masquages à durée survivent au relancement).
-        if prefs.hiddenUntil == .distantFuture { prefs.showAgain() }
-        let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
         notch.start()
-        self.notch = notch
         MainMenu.install(openSettings: { [weak notch] in notch?.openSettings() })
     }
+
+    /// Onglet Claude activé : hooks écoutés, sessions et processus `claude` suivis. Désactivé : plus rien de tout
+    /// cela (scan, observation de Claude Desktop, transcripts) et les demandes tenues sont rendues au terminal.
+    private func setClaudeTracking(_ isOn: Bool) {
+        server?.isPaused = !isOn
+        if isOn {
+            monitor.start()
+            store.start()
+        } else {
+            monitor.stop()
+            store.stop()
+            ReplyCenter.shared.releaseAll()
+        }
+    }
+
+    var isClaudeEnabled: Bool { notch?.registry.isClaudeEnabled ?? false }
 
     func openSettings() {
         notch?.openSettings()

@@ -57,15 +57,53 @@ final class ModuleTests: XCTestCase {
         prefs.tabEnabled = ["c": true, "a": false, "claude": false]
         settle()
         XCTAssertEqual(registry.ordered.map { $0.id }, ["b", "claude", "a", "c"])
-        XCTAssertEqual(registry.enabled.map { $0.id }, ["b", "claude", "c"], "Claude ne se désactive pas")
+        XCTAssertEqual(registry.enabled.map { $0.id }, ["b", "c"], "Claude se désactive comme les autres")
+        XCTAssertFalse(registry.isClaudeEnabled)
 
         registry.move(from: IndexSet(integer: 3), to: 0)
         settle()
         XCTAssertEqual(prefs.tabOrder, ["c", "b", "claude", "a"])
-        registry.setEnabled("claude", false)
+        registry.setEnabled("claude", true)
         settle()
-        XCTAssertTrue(registry.isEnabled("claude"))
+        XCTAssertTrue(registry.isClaudeEnabled)
         XCTAssertEqual(registry.enabled.map { $0.id }, ["c", "b", "claude"])
+    }
+
+    /// Onglet Claude décidé une fois, selon la présence de Claude Code, puis jamais redécidé.
+    func testClaudeTabDecidedOnceFromDetection() {
+        let prefs = Preferences(defaults: makeEphemeralDefaults(self))
+        prefs.decideClaudeTab(claudeCodePresent: { false })
+        XCTAssertEqual(prefs.tabEnabled["claude"], false, "pas de Claude Code : onglet désactivé")
+        prefs.decideClaudeTab(claudeCodePresent: { XCTFail("déjà décidé : pas de nouvelle détection"); return true })
+        XCTAssertEqual(prefs.tabEnabled["claude"], false)
+
+        let withClaude = Preferences(defaults: makeEphemeralDefaults(self))
+        withClaude.decideClaudeTab(claudeCodePresent: { true })
+        XCTAssertEqual(withClaude.tabEnabled["claude"], true)
+
+        // Mise à jour depuis la 1.2.0 : les autres onglets choisis sont gardés.
+        let update = Preferences(defaults: makeEphemeralDefaults(self))
+        update.tabEnabled = ["media": false]
+        update.decideClaudeTab(claudeCodePresent: { true })
+        XCTAssertEqual(update.tabEnabled, ["media": false, "claude": true])
+    }
+
+    /// Détection : `~/.claude` ou `$CLAUDE_CONFIG_DIR` (dossier), rien d'autre ; jamais réelle sous XCTest.
+    func testClaudeCodeDetection() throws {
+        let home = try makeTemporaryDirectory(self)
+        XCTAssertFalse(HookInstaller.claudeCodePresent(home: home, environment: [:]))
+        let custom = home.appendingPathComponent("config-claude")
+        XCTAssertFalse(HookInstaller.claudeCodePresent(home: home, environment: ["CLAUDE_CONFIG_DIR": custom.path]))
+        try Data().write(to: custom)
+        XCTAssertFalse(HookInstaller.claudeCodePresent(home: home, environment: ["CLAUDE_CONFIG_DIR": custom.path]),
+                       "un fichier n'est pas un dossier de configuration")
+        try FileManager.default.removeItem(at: custom)
+        try FileManager.default.createDirectory(at: custom, withIntermediateDirectories: true)
+        XCTAssertTrue(HookInstaller.claudeCodePresent(home: home, environment: ["CLAUDE_CONFIG_DIR": custom.path]))
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".claude"),
+                                                withIntermediateDirectories: true)
+        XCTAssertTrue(HookInstaller.claudeCodePresent(home: home, environment: [:]))
+        XCTAssertFalse(HookInstaller.claudeCodeOnThisMac, "jamais le vrai Mac sous XCTest")
     }
 
     /// Rien ne tourne panneau replié, sauf un module qui le demande ; un module désactivé s'arrête.
@@ -147,6 +185,14 @@ final class ModuleTests: XCTestCase {
         prefs.tabEnabled["media"] = false
         settle()
         XCTAssertEqual(registry.initialTab(claudeNeedsAttention: false), "claude", "onglet désactivé : le premier")
+
+        // Onglet Claude désactivé : jamais de bascule vers lui, le premier onglet activé par défaut.
+        prefs.tabEnabled["claude"] = false
+        prefs.lastTab = "claude"
+        prefs.defaultTab = Preferences.lastTabChoice
+        settle()
+        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: true), "quicksettings", "Claude désactivé")
+        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: false), "quicksettings")
     }
 
     /// Le module Claude n'active la section outils que panneau ouvert, et oublie ses volets à la fermeture.
