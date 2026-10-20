@@ -14,6 +14,14 @@ func makeTemporaryDirectory(_ testCase: XCTestCase) throws -> URL {
     return url
 }
 
+/// Domaine UserDefaults jetable, supprimé à la fin du test : jamais les vrais réglages de l'app.
+func makeEphemeralDefaults(_ testCase: XCTestCase) -> UserDefaults {
+    let name = "claude-notch-tests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: name)!
+    testCase.addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+    return defaults
+}
+
 /// /usr/bin/python3 en mode isolé, pour comparer avec hooks_config.py et json.dump.
 enum Python {
     static let path = "/usr/bin/python3"

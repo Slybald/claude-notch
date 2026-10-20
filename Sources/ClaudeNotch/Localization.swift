@@ -5,17 +5,20 @@ import Foundation
 // Hors de l'app (swift test), Bundle.main n'a aucune traduction : la clé, donc le français, est rendue.
 //
 // Text("littéral") de SwiftUI se traduit seul. Tout texte visible construit en String passe par L(…).
-// LocalizationTests vérifie que chaque clé utilisée a sa traduction anglaise.
+// LocalizationTests vérifie que chaque clé utilisée a sa traduction anglaise, table par table.
+//
+// Chaque module a sa propre table (Resources/<langue>.lproj/<Module>.strings) : L("Lecteur", table: "Media"),
+// ou Text("…", tableName: "Media") en SwiftUI. Sans table : Localizable.
 
-/// Texte traduit dans la langue de l'interface.
-func L(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
+/// Texte traduit dans la langue de l'interface, lu dans `table` (nil = Localizable).
+func L(_ key: String, table: String? = nil) -> String {
+    NSLocalizedString(key, tableName: table, comment: "")
 }
 
 /// Clé au singulier ou au pluriel selon `count`, traduite mais pas encore formatée :
 /// `String(format: L(n, one: "%d agent", other: "%d agents"), n)`.
-func L(_ count: Int, one: String, other: String) -> String {
-    L(Localization.usesSingular(count) ? one : other)
+func L(_ count: Int, one: String, other: String, table: String? = nil) -> String {
+    L(Localization.usesSingular(count) ? one : other, table: table)
 }
 
 enum Localization {

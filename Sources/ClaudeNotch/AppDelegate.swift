@@ -92,6 +92,7 @@ final class AppCore {
         let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
         notch.start()
         self.notch = notch
+        MainMenu.install(openSettings: { [weak notch] in notch?.openSettings() })
     }
 
     /// Instantané lisible de l'état, servi par `GET /state` (diagnostic local).
@@ -126,6 +127,7 @@ final class AppCore {
             "untrackedCli": monitor.cliPids.subtracting(store.trackedPids).count,
         ]
         state["ears"] = store.earsText
+        state["sessionTimer"] = store.isTicking
         state["notch"] = notch?.debugInfo
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged

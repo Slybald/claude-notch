@@ -1,4 +1,3 @@
-import Combine
 import Foundation
 
 /// LaunchAgent `~/Library/LaunchAgents/io.github.slybald.claudenotch.plist` : lancement à l'ouverture de session.
@@ -69,34 +68,5 @@ enum LaunchAgent {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try data.write(to: plistURL(in: directory), options: .atomic)
-    }
-}
-
-/// Préférences de l'app, observables par la vue.
-final class Preferences: ObservableObject {
-    static let shared = Preferences()
-
-    private static let alwaysVisibleKey = "alwaysVisible"
-    private static let autoUpdateKey = "autoUpdate"
-
-    @Published var alwaysVisible: Bool {
-        didSet { UserDefaults.standard.set(alwaysVisible, forKey: Self.alwaysVisibleKey) }
-    }
-
-    @Published var launchAtLogin: Bool {
-        didSet {
-            if launchAtLogin != LaunchAgent.isEnabled { LaunchAgent.setEnabled(launchAtLogin) }
-        }
-    }
-
-    /// Activée par défaut ; désactivée, les nouvelles versions sont seulement signalées dans le menu.
-    @Published var autoUpdate: Bool {
-        didSet { UserDefaults.standard.set(autoUpdate, forKey: Self.autoUpdateKey) }
-    }
-
-    init() {
-        alwaysVisible = UserDefaults.standard.bool(forKey: Self.alwaysVisibleKey)
-        autoUpdate = UserDefaults.standard.object(forKey: Self.autoUpdateKey) as? Bool ?? true
-        launchAtLogin = LaunchAgent.isEnabled
     }
 }

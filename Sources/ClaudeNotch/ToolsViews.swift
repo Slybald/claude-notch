@@ -249,7 +249,7 @@ struct RepoRow: View {
                 if repo.noUpstream {
                     badge(L("sans upstream"), Palette.secondary)
                 }
-                if repo.ahead > 0 { badge("↑\(repo.ahead)", Palette.orange) }
+                if repo.ahead > 0 { badge("↑\(repo.ahead)", Palette.accent) }
                 if repo.behind > 0 { badge("↓\(repo.behind)", Palette.amber) }
                 if changes > 0 {
                     HStack(spacing: 3) {

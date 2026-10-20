@@ -29,6 +29,14 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Claude Notch sends commands to other apps, for example to control music playback, only when you use a feature that needs it.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Claude Notch uses Bluetooth to show the status of your connected devices, only if you turn this feature on.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Claude Notch runs optional companion tools that read files on your Desktop.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

@@ -7,19 +7,22 @@ final class NotchViewModel: ObservableObject {
     @Published var isExpanded = false
     @Published var notchSize = CGSize(width: 200, height: 32)
     @Published var hasNotch = false
-    /// Volet ouvert dans la section outils ; tout est replié à chaque ouverture du panneau.
-    @Published var toolsPane: ToolsPane?
+    /// Onglet affiché (identifiant de module).
+    @Published var selectedTab = ModuleRegistry.claudeId
+    /// Une app est en plein écran sur l'écran de la notch.
+    @Published var isFullScreen = false
     /// Taille réelle de la forme noire, mesurée par la vue. Sert aux zones de survol.
     var contentSize: CGSize = .zero
 }
 
 struct NotchActions {
-    var activate: (Session) -> Void
-    var openDesktop: () -> Void
-    var clearEnded: () -> Void
-    var quit: () -> Void
+    var activate: (Session) -> Void = { _ in }
+    var openDesktop: () -> Void = {}
+    var clearEnded: () -> Void = {}
+    var quit: () -> Void = {}
     /// Révèle un fichier (ou un dépôt) dans le Finder.
     var revealFile: (String) -> Void = { _ in }
+    var openSettings: () -> Void = {}
 }
 
 final class NotchPanel: NSPanel {
@@ -37,24 +40,29 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
 
 /// Fenêtre de la notch : position, survol, ouverture/fermeture, visibilité.
 final class NotchController {
-    static let expandedWidth: CGFloat = 540
-    static let maxExpandedHeight: CGFloat = 420
     static let earWidth: CGFloat = 36
-    private static let panelSize = CGSize(width: 640, height: 480)
+    /// Assez large pour le grand panneau (620 pt), ses rayons et son ombre.
+    static let panelSize = CGSize(width: 700, height: 480)
     private static let fakeNotchWidth: CGFloat = 200
-    private static let openDelay: TimeInterval = 0.08
-    private static let closeDelay: TimeInterval = 0.25
     private static let hideDelay: TimeInterval = 3
+    /// Après un changement de Space, le temps que l'animation se termine.
+    private static let spaceSettleDelay: TimeInterval = 0.4
+    /// Au-dessus de la barre des menus (24) et de ses icônes (25).
+    static let windowLevel = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
 
     let model = NotchViewModel()
+    let registry: ModuleRegistry
+    let panel: NotchPanel
 
     private let store: SessionStore
     private let monitor: ClaudeMonitor
     private let prefs: Preferences
-    private let tools: ToolsFeed
-    private let panel: NotchPanel
+    private let claude: ClaudeModule
+    private let settings: SettingsWindow
 
     private var screenFrame = CGRect.zero
+    /// Écran de la notch, pour la détection du plein écran.
+    private var displayID: CGDirectDisplayID?
     private var notchRect = CGRect.zero
     private var eventMonitors: [Any] = []
     private var pollTimer: Timer?
@@ -71,7 +79,9 @@ final class NotchController {
         self.store = store
         self.monitor = monitor
         self.prefs = prefs
-        self.tools = tools
+        claude = ClaudeModule(store: store, monitor: monitor, tools: tools, prefs: prefs)
+        registry = ModuleRegistry(modules: ModuleRegistry.standardModules(claude: claude), prefs: prefs)
+        settings = SettingsWindow(prefs: prefs, registry: registry)
 
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize),
                            styleMask: [.borderless, .nonactivatingPanel],
@@ -79,10 +89,11 @@ final class NotchController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+        // Avant `level` : ce setter remet le niveau à `.floating` (3, mesuré), sous la barre des menus.
+        panel.isFloatingPanel = true
+        panel.level = Self.windowLevel
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.becomesKeyOnlyIfNeeded = true
-        panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
@@ -97,10 +108,11 @@ final class NotchController {
             openDesktop: { [weak self] in self?.openDesktop() },
             clearEnded: { [weak self] in self?.store.clearEnded() },
             quit: { NSApp.terminate(nil) },
-            revealFile: { [weak self] path in self?.reveal(path) }
+            revealFile: { [weak self] path in self?.reveal(path) },
+            openSettings: { [weak self] in self?.openSettings() }
         )
-        let root = NotchRootView(model: model, store: store, monitor: monitor, prefs: prefs, tools: tools,
-                                 actions: actions)
+        claude.actions = actions
+        let root = NotchRootView(model: model, store: store, registry: registry, prefs: prefs, actions: actions)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.sizingOptions = []
         hosting.frame = NSRect(origin: .zero, size: Self.panelSize)
@@ -110,11 +122,19 @@ final class NotchController {
         updateGeometry()
         installMouseMonitors()
         observeChanges()
+        updateFullScreen()
         updateVisibility()
     }
 
+    /// Réglages… (menu « … », ⌘,).
+    func openSettings() {
+        suppressUntilExit = true
+        collapse()
+        settings.show()
+    }
+
     var debugInfo: [String: Any] {
-        [
+        var info: [String: Any] = [
             "shown": isShown,
             "expanded": model.isExpanded,
             "hasNotch": model.hasNotch,
@@ -123,7 +143,33 @@ final class NotchController {
             "contentSize": [model.contentSize.width, model.contentSize.height],
             "ignoresMouse": panel.ignoresMouseEvents,
             "polling": pollTimer != nil,
+            "level": panel.level.rawValue,
+            "isOnActiveSpace": panel.isOnActiveSpace,
+            "isVisible": panel.isVisible,
+            "occlusionVisible": panel.occlusionState.contains(.visible),
+            "fullScreen": model.isFullScreen,
+            "fullScreenBehavior": prefs.fullScreenBehavior.rawValue,
+            "selectedTab": model.selectedTab,
+            "modules": registry.debugInfo,
         ]
+        // Niveau vu par le serveur de fenêtres : celui qui compte face à la barre des menus et au plein écran.
+        info["windowServerLevel"] = Self.windowServerLevel(of: panel)
+        if let screen = panel.screen {
+            info["screen"] = [
+                "name": screen.localizedName,
+                "frame": [screen.frame.minX, screen.frame.minY, screen.frame.width, screen.frame.height],
+            ]
+        }
+        info["frontmostApp"] = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        return info
+    }
+
+    /// Couche (`kCGWindowLayer`) de la fenêtre selon CGWindowList ; nil si elle n'est pas à l'écran.
+    static func windowServerLevel(of window: NSWindow) -> Int? {
+        guard window.windowNumber > 0,
+              let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(window.windowNumber))
+                as? [[String: Any]] else { return nil }
+        return (list.first?[kCGWindowLayer as String] as? NSNumber)?.intValue
     }
 
     // MARK: - Géométrie
@@ -134,6 +180,7 @@ final class NotchController {
         let frame = screen.frame
         screenFrame = frame
 
+        displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
         if screen.safeAreaInsets.top > 0,
            let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
             let height = screen.safeAreaInsets.top
@@ -177,7 +224,7 @@ final class NotchController {
         let width: CGFloat
         let height: CGFloat
         if model.isExpanded {
-            width = max(size.width, Self.expandedWidth) + 8
+            width = max(size.width, prefs.expandedWidth(compact: isCompact)) + 8
             height = max(size.height, notchRect.height + 40) + 8
         } else {
             width = max(size.width, notchRect.width) + 8
@@ -208,7 +255,7 @@ final class NotchController {
                     if !self.menuTracking, !self.isInsideZone(NSEvent.mouseLocation) { self.collapse() }
                 }
                 closeWork = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.closeDelay, execute: work)
+                DispatchQueue.main.asyncAfter(deadline: .now() + prefs.closeDelay, execute: work)
             }
         } else if inside, !suppressUntilExit {
             guard openWork == nil else { return }
@@ -218,22 +265,25 @@ final class NotchController {
                 if self.isShown, !self.suppressUntilExit, self.isInsideZone(NSEvent.mouseLocation) { self.expand() }
             }
             openWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.openDelay, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + prefs.openDelay, execute: work)
         } else {
             openWork?.cancel()
             openWork = nil
         }
     }
 
+    private var isCompact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
+
     private func expand() {
         guard !model.isExpanded else { return }
         panel.ignoresMouseEvents = false
+        model.selectedTab = registry.initialTab(claudeNeedsAttention: store.indicator == .attention)
         model.isExpanded = true
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        if prefs.hapticFeedback {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        }
         startPolling()
-        tools.setActive(true)
-        // État des hooks pour le menu « … » (settings.json a pu changer depuis).
-        HookSetup.shared.refresh()
+        registry.setPanelOpen(true)
     }
 
     private func collapse() {
@@ -242,10 +292,12 @@ final class NotchController {
         closeWork?.cancel()
         closeWork = nil
         stopPolling()
-        tools.setActive(false)
         panel.ignoresMouseEvents = true
-        if model.isExpanded { model.isExpanded = false }
-        if model.toolsPane != nil { model.toolsPane = nil }
+        if model.isExpanded {
+            model.isExpanded = false
+            if prefs.lastTab != model.selectedTab { prefs.lastTab = model.selectedTab }
+        }
+        registry.setPanelOpen(false)
     }
 
     /// 15 Hz, seulement déplié : rattrape les mouvements que les moniteurs ne voient pas.
@@ -337,7 +389,8 @@ final class NotchController {
     // MARK: - Visibilité
 
     private func observeChanges() {
-        Publishers.Merge3(store.objectWillChange, monitor.objectWillChange, prefs.objectWillChange)
+        Publishers.Merge4(store.objectWillChange, monitor.objectWillChange, prefs.objectWillChange,
+                          registry.objectWillChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateVisibility() }
             .store(in: &cancellables)
@@ -346,6 +399,7 @@ final class NotchController {
         observers.append((center, center.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                      object: nil, queue: .main) { [weak self] _ in
             self?.updateGeometry()
+            self?.updateFullScreen()
         }))
         observers.append((center, center.addObserver(forName: NSMenu.didBeginTrackingNotification,
                                                      object: nil, queue: .main) { [weak self] _ in
@@ -360,14 +414,44 @@ final class NotchController {
         let workspace = NSWorkspace.shared.notificationCenter
         observers.append((workspace, workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
                                                            object: nil, queue: .main) { [weak self] _ in
-            guard let self, self.isShown else { return }
-            self.updateGeometry()
-            self.panel.orderFrontRegardless()
+            self?.spaceDidChange()
+        }))
+        observers.append((workspace, workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                                           object: nil, queue: .main) { [weak self] _ in
+            self?.updateFullScreen()
         }))
     }
 
+    private func spaceDidChange() {
+        updateFullScreen()
+        if isShown {
+            updateGeometry()
+            panel.orderFrontRegardless()
+        }
+        // L'animation de changement de Space peut repasser devant, et la fenêtre plein écran n'est pas encore
+        // toujours listée : on vérifie de nouveau une fois l'animation finie.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.spaceSettleDelay) { [weak self] in
+            guard let self else { return }
+            self.updateFullScreen()
+            if self.isShown { self.panel.orderFrontRegardless() }
+        }
+    }
+
+    /// Événementiel (Space, app activée, écrans) : jamais de scrutation.
+    private func updateFullScreen() {
+        let fullScreen = displayID.map { FullScreenDetector.frontmostAppIsFullScreen(onDisplay: $0) } ?? false
+        guard fullScreen != model.isFullScreen else { return }
+        model.isFullScreen = fullScreen
+        updateVisibility()
+    }
+
+    /// Plein écran avec le réglage « masquée ».
+    private var hiddenForFullScreen: Bool { model.isFullScreen && prefs.fullScreenBehavior == .hidden }
+
     private var shouldShow: Bool {
-        prefs.alwaysVisible || monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions
+        guard !hiddenForFullScreen else { return false }
+        return prefs.alwaysVisible || monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions
+            || registry.moduleEars != nil
     }
 
     private func updateVisibility() {
@@ -379,18 +463,25 @@ final class NotchController {
                 updateGeometry()
                 panel.orderFrontRegardless()
             }
+        } else if isShown, hiddenForFullScreen {
+            hide()
         } else if isShown, hideWork == nil {
             // Délai anti-clignotement.
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 self.hideWork = nil
-                guard !self.shouldShow else { return }
-                self.isShown = false
-                self.collapse()
-                self.panel.orderOut(nil)
+                if !self.shouldShow { self.hide() }
             }
             hideWork = work
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.hideDelay, execute: work)
         }
+    }
+
+    private func hide() {
+        hideWork?.cancel()
+        hideWork = nil
+        isShown = false
+        collapse()
+        panel.orderOut(nil)
     }
 }

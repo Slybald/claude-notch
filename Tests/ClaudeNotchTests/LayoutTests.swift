@@ -5,19 +5,15 @@ import XCTest
 
 /// La vue doit remonter la taille réelle de la forme : le contrôleur s'en sert pour les zones de survol.
 final class LayoutTests: XCTestCase {
+    /// Panneau standard + 2 × 12 de rayon haut.
+    private static let standardWidth = PanelSize.standard.width + 24
+
     func testContentSizeIsReported() {
-        _ = NSApplication.shared
-        let store = SessionStore()
-        store.handle(HookEvent(raw: ["hook_event_name": "UserPromptSubmit", "session_id": "s", "cwd": "/p", "prompt": "x"]),
-                     context: ProcessContext())
-        let model = NotchViewModel()
-        model.notchSize = CGSize(width: 185, height: 32)
-        let actions = NotchActions(activate: { _ in }, openDesktop: {}, clearEnded: {}, quit: {})
-        let root = NotchRootView(model: model, store: store, monitor: ClaudeMonitor(), prefs: Preferences(),
-                                 tools: ToolsFeed(paths: Self.absentPaths), actions: actions)
-        let hosting = FirstMouseHostingView(rootView: root)
+        let notch = NotchHarness(self, store: .working(1))
+        let model = notch.model
+        let hosting = FirstMouseHostingView(rootView: notch.root)
         hosting.sizingOptions = []
-        hosting.frame = CGRect(x: 0, y: 0, width: 640, height: 480)
+        hosting.frame = CGRect(origin: .zero, size: NotchController.panelSize)
         let window = NSPanel(contentRect: hosting.frame, styleMask: [.borderless, .nonactivatingPanel],
                              backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -31,13 +27,55 @@ final class LayoutTests: XCTestCase {
 
         model.isExpanded = true
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
-        XCTAssertEqual(model.contentSize.width, NotchController.expandedWidth + 24, accuracy: 1)
+        XCTAssertEqual(model.contentSize.width, Self.standardWidth, accuracy: 1)
         XCTAssertGreaterThan(model.contentSize.height, 80)
+
+        // Plein écran, réglage compact : demi-largeur.
+        model.isFullScreen = true
+        RunLoop.main.run(until: Date().addingTimeInterval(1.0))
+        XCTAssertEqual(model.contentSize.width, Preferences.compactPanelWidth + 24, accuracy: 1)
 
         model.isExpanded = false
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
-        XCTAssertEqual(model.contentSize.width, 185 + 72 + 12, accuracy: 1)
+        XCTAssertEqual(model.contentSize.width, 185 + 72 + 12, accuracy: 1, "replié : les oreilles ne changent pas")
         XCTAssertEqual(model.contentSize.height, 32, accuracy: 1)
+        window.close()
+    }
+
+    /// Taille du panneau choisie dans les réglages, et plein écran « normal » qui la garde.
+    func testPanelSizeFollowsPreferences() {
+        for size in PanelSize.allCases {
+            let notch = NotchHarness(self, store: .working(1))
+            notch.prefs.panelSize = size
+            notch.model.isExpanded = true
+            XCTAssertEqual(notch.measure().width, size.width + 24, accuracy: 1, size.rawValue)
+        }
+        let notch = NotchHarness(self, store: .working(1))
+        notch.prefs.fullScreenBehavior = .normal
+        notch.model.isFullScreen = true
+        notch.model.isExpanded = true
+        XCTAssertEqual(notch.measure().width, Self.standardWidth, accuracy: 1)
+    }
+
+    /// Oreilles : désactivées, la notch repliée est exactement la notch ; un module peut les occuper.
+    func testEarsFollowPreferencesAndModules() {
+        let notch = NotchHarness(self, store: .working(1))
+        notch.prefs.showEars = false
+        XCTAssertEqual(notch.measure().width, 185 + 12, accuracy: 1)
+
+        let idle = NotchHarness(self)
+        let timer = FakeModule(id: "fake", ears: ModuleEars(symbol: "timer", text: "4:59"), keepsRunning: true)
+        let registry = ModuleRegistry(modules: [idle.claude, timer], prefs: idle.prefs)
+        registry.reconcile()
+        let root = NotchRootView(model: idle.model, store: idle.store, registry: registry, prefs: idle.prefs,
+                                 actions: NotchActions())
+        let hosting = FirstMouseHostingView(rootView: root)
+        hosting.frame = CGRect(origin: .zero, size: NotchController.panelSize)
+        let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertEqual(idle.model.contentSize.width, 185 + 72 + 12, accuracy: 1, "oreilles du module")
         window.close()
     }
 
@@ -58,35 +96,22 @@ final class LayoutTests: XCTestCase {
         tools.refreshNow()
         XCTAssertTrue(tools.hasContent)
 
-        func store(sessions: Int) -> SessionStore {
-            let store = SessionStore()
-            for index in 0..<sessions {
-                let sid = "s\(index)"
-                store.handle(HookEvent(raw: ["hook_event_name": "UserPromptSubmit", "session_id": sid,
-                                             "cwd": "/p/\(sid)", "prompt": "x"]), context: ProcessContext())
-                store.handle(HookEvent(raw: ["hook_event_name": "PreToolUse", "session_id": sid, "cwd": "/p/\(sid)",
-                                             "tool_name": "Bash", "tool_use_id": "t\(index)",
-                                             "tool_input": ["command": "npm test"]]), context: ProcessContext())
-            }
-            return store
-        }
-
         // Une session : la section ouverte agrandit la forme, donc la zone de survol.
-        let few = store(sessions: 1)
+        let few = SessionStore.working(1)
         let base = measure(few, ToolsFeed(paths: Self.absentPaths), pane: nil)
         let closed = measure(few, tools, pane: nil)
         let files = measure(few, tools, pane: .files)
         let git = measure(few, tools, pane: .git)
-        XCTAssertEqual(closed.width, NotchController.expandedWidth + 24, accuracy: 1)
+        XCTAssertEqual(closed.width, Self.standardWidth, accuracy: 1)
         XCTAssertGreaterThan(closed.height, base.height + 40)
         XCTAssertGreaterThan(files.height, closed.height + 80)
         XCTAssertGreaterThan(git.height, closed.height + 30)
 
         // Beaucoup de sessions : la liste cède la place, le tout reste sous 460 pt (fenêtre de 480 moins l'ombre).
-        let many = store(sessions: 8)
+        let many = SessionStore.working(8)
         let crowdedBase = measure(many, ToolsFeed(paths: Self.absentPaths), pane: nil)
-        XCTAssertEqual(crowdedBase.height, 32 + ExpandedPanel.headerHeight + 10 + 296 + 14, accuracy: 1,
-                       "sans outils : bande de la barre des menus, en-tête dessous, liste à 296")
+        XCTAssertEqual(crowdedBase.height, 32 + ExpandedPanel.headerHeight + 10 + ClaudePanel.maxListHeight + 14,
+                       accuracy: 1, "sans outils : bande de la barre des menus, onglets dessous, liste à 296")
         for pane in [nil, ToolsPane.files, ToolsPane.git] {
             let size = measure(many, tools, pane: pane)
             XCTAssertLessThanOrEqual(size.height, 461, "volet \(String(describing: pane))")
@@ -94,25 +119,26 @@ final class LayoutTests: XCTestCase {
         }
     }
 
+    /// Les onglets vides ne débordent pas, quelle que soit la taille du panneau.
+    func testEveryTabFitsInPanel() {
+        for size in PanelSize.allCases {
+            let notch = NotchHarness(self, store: .working(8))
+            notch.prefs.panelSize = size
+            notch.model.isExpanded = true
+            for module in notch.registry.enabled {
+                notch.model.selectedTab = module.id
+                let measured = notch.measure(settle: 0.4)
+                XCTAssertEqual(measured.width, size.width + 24, accuracy: 1, "\(module.id) \(size.rawValue)")
+                XCTAssertLessThanOrEqual(measured.height, 461, "\(module.id) \(size.rawValue)")
+            }
+        }
+    }
+
     private func measure(_ store: SessionStore, _ tools: ToolsFeed, pane: ToolsPane?) -> CGSize {
-        let model = NotchViewModel()
-        model.notchSize = CGSize(width: 185, height: 32)
-        model.isExpanded = true
-        model.toolsPane = pane
-        let actions = NotchActions(activate: { _ in }, openDesktop: {}, clearEnded: {}, quit: {})
-        let root = NotchRootView(model: model, store: store, monitor: ClaudeMonitor(), prefs: Preferences(),
-                                 tools: tools, actions: actions)
-        let hosting = FirstMouseHostingView(rootView: root)
-        hosting.sizingOptions = []
-        hosting.frame = CGRect(x: 0, y: 0, width: 640, height: 480)
-        let window = NSPanel(contentRect: hosting.frame, styleMask: [.borderless, .nonactivatingPanel],
-                             backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = hosting
-        window.orderFrontRegardless()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
-        window.close()
-        return model.contentSize
+        let notch = NotchHarness(self, store: store, tools: tools)
+        notch.model.isExpanded = true
+        notch.claude.toolsPane = pane
+        return notch.measure()
     }
 
     /// Diagnostic : contexte résolu pour un vrai processus (`CLAUDE_NOTCH_PROBE_PID`).
