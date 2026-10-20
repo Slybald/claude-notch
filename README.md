@@ -73,15 +73,38 @@ and installs the hook script in `~/.claude/hooks/`. You can reinstall them later
 - Claude Code configuration in `~/.claude`. `CLAUDE_CONFIG_DIR` is not supported by the app: the hooks are
   always installed in `~/.claude`.
 
+## Updates
+
+Claude Notch updates itself from the [Releases](https://github.com/Slybald/claude-notch/releases) page.
+
+- 60 seconds after launch, then every 6 hours, the app asks GitHub for the latest release
+  (`api.github.com`; only the app version is sent, in the User-Agent). Drafts and pre-releases are ignored.
+- A newer version is downloaded with its signature (`ClaudeNotch-<version>.dmg.sig`) and installed only if
+  its Ed25519 signature matches the public key built into the app. A DMG without a signature, or with an
+  invalid one, is refused and nothing is installed.
+- At launch, a new version is installed right away; later on, only when no session is running or waiting
+  for you (otherwise the app tries again every 10 minutes). The app then restarts by itself and the **…** menu
+  shows "Updated to X".
+- Automatic installation needs the app in `/Applications` or `~/Applications`, in a folder you can write to.
+  Otherwise the **…** menu offers to open the release page.
+- To turn it off: **…** menu › uncheck **Automatic Updates**. New versions are then only announced in the
+  menu, with an **Install** button. **Check for Updates** checks right away.
+- Apps built from source (`scripts/build.sh`, `scripts/install.sh`) never update themselves: the menu shows
+  "Development build: updates disabled".
+
 ## Privacy
 
-- Everything stays on your Mac. Claude Notch sends no data anywhere: no analytics, no outgoing network request.
+- Everything stays on your Mac. Claude Notch sends no data about you or your sessions: no analytics. Its only
+  outgoing requests are the update check to `api.github.com` and the download of new versions from GitHub
+  (see [Updates](#updates)).
 - The app listens on `127.0.0.1:47823` only, on the loopback interface: it cannot be reached from the network.
 - The hook script only talks to that local address, with `curl`.
 - What the app reads: the hook events, the end of the transcript of a running session (to detect Esc),
   Claude Code's task files, the process list (to find the host app).
 - What the app writes: two local logs in `~/Library/Application Support/ClaudeNotch/` (see
-  [Shared logs](#shared-logs)), and the hooks in `~/.claude` when you ask for it.
+  [Shared logs](#shared-logs)), the hooks in `~/.claude` when you ask for it, and during an update the DMG in
+  `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
+  the old one.
 
 ## How it works
 
@@ -170,18 +193,25 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
 ```
 
 - `VERSION=1.2.3 scripts/build.sh` sets the app version (default: `CFBundleShortVersionString` of
-  `Resources/Info.plist`).
+  `Resources/Info.plist`). `RELEASE_CHANNEL=1` marks the app as a release build
+  (`ClaudeNotchUpdateChannel = release` in its Info.plist): only those update themselves.
 - `scripts/install.sh` builds and installs from source; `scripts/uninstall.sh` removes it.
 - Translations: `Resources/en.lproj` and `Resources/fr.lproj`. The French text in the code is the key;
   `LocalizationTests` checks that every key used in the code has an English translation.
 - PNG snapshots of the panel, with sample data: `CLAUDE_NOTCH_SNAPSHOT_DIR=/some/folder swift test --filter SnapshotTests`.
-- **Publishing a release**: push a `vX.Y.Z` tag. GitHub Actions runs the tests, builds the universal app in
-  version X.Y.Z, makes the DMG and creates the release with the DMG and its SHA-256.
+- **Publishing a release** = pushing a `vX.Y.Z` tag. GitHub Actions runs the tests, builds the universal app
+  in version X.Y.Z with `RELEASE_CHANNEL=1`, makes the DMG, signs it with the `UPDATE_SIGNING_KEY` secret
+  (`scripts/update-signing.swift`, the job fails if signing fails or if the key does not match the one built
+  into the app) and creates the release with the DMG, its SHA-256 and its signature. Installed copies pick it
+  up on their own.
 
   ```sh
-  git tag v1.0.0
-  git push origin v1.0.0
+  git tag v1.1.0
+  git push origin v1.1.0
   ```
+
+  The private signing key is also in the maintainer's keychain. Losing it breaks automatic updates for every
+  existing installation: they only accept DMGs signed with that key.
 
 ## License
 
@@ -253,16 +283,40 @@ message.
 - Configuration de Claude Code dans `~/.claude`. `CLAUDE_CONFIG_DIR` n'est pas pris en charge par l'app :
   les hooks sont toujours installés dans `~/.claude`.
 
+### Mises à jour
+
+Claude Notch se met à jour seule depuis la page [Releases](https://github.com/Slybald/claude-notch/releases).
+
+- 60 secondes après le lancement, puis toutes les 6 heures, l'app demande à GitHub la dernière release
+  (`api.github.com` ; seule la version de l'app part, dans le User-Agent). Brouillons et préversions sont
+  ignorés.
+- Une version plus récente est téléchargée avec sa signature (`ClaudeNotch-<version>.dmg.sig`) et n'est
+  installée que si sa signature Ed25519 correspond à la clé publique intégrée à l'app. Un DMG sans signature,
+  ou à la signature invalide, est refusé et rien n'est installé.
+- Au lancement, la nouvelle version s'installe tout de suite ; ensuite, seulement quand aucune session n'est
+  en cours ni ne t'attend (sinon l'app réessaie toutes les 10 minutes). L'app redémarre alors seule et le
+  menu **…** affiche « Mis à jour en X ».
+- L'installation automatique demande que l'app soit dans `/Applications` ou `~/Applications`, dans un dossier
+  où tu peux écrire. Sinon, le menu **…** propose d'ouvrir la page de la release.
+- Pour la désactiver : menu **…** › décoche **Mises à jour automatiques**. Les nouvelles versions sont alors
+  seulement signalées dans le menu, avec un bouton **Installer**. **Rechercher les mises à jour** vérifie
+  tout de suite.
+- Une app compilée depuis les sources (`scripts/build.sh`, `scripts/install.sh`) ne se met jamais à jour
+  seule : le menu affiche « Build de développement : mises à jour désactivées ».
+
 ### Confidentialité
 
-- Tout reste sur ton Mac. Claude Notch n'envoie aucune donnée : pas de statistiques, aucune requête réseau
-  sortante.
+- Tout reste sur ton Mac. Claude Notch n'envoie aucune donnée sur toi ni sur tes sessions : pas de
+  statistiques. Ses seules requêtes sortantes sont la recherche de mise à jour sur `api.github.com` et le
+  téléchargement des nouvelles versions depuis GitHub (voir [Mises à jour](#mises-à-jour)).
 - L'app n'écoute que sur `127.0.0.1:47823`, sur l'interface de bouclage : elle est injoignable depuis le réseau.
 - Le script de hook ne parle qu'à cette adresse locale, avec `curl`.
 - Ce que l'app lit : les événements de hook, la fin du transcript d'une session en cours (pour détecter
   Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte).
 - Ce que l'app écrit : deux journaux locaux dans `~/Library/Application Support/ClaudeNotch/` (voir
-  [Registres partagés](#registres-partagés)), et les hooks dans `~/.claude` quand tu le demandes.
+  [Registres partagés](#registres-partagés)), les hooks dans `~/.claude` quand tu le demandes et, pendant une
+  mise à jour, le DMG dans `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la
+  nouvelle app à la place de l'ancienne.
 
 ### Fonctionnement
 
@@ -353,19 +407,26 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifi�
 ```
 
 - `VERSION=1.2.3 scripts/build.sh` fixe la version de l'app (par défaut : `CFBundleShortVersionString` de
-  `Resources/Info.plist`).
+  `Resources/Info.plist`). `RELEASE_CHANNEL=1` marque l'app comme build de release
+  (`ClaudeNotchUpdateChannel = release` dans son Info.plist) : seules celles-là se mettent à jour seules.
 - `scripts/install.sh` compile et installe depuis les sources ; `scripts/uninstall.sh` retire tout.
 - Traductions : `Resources/en.lproj` et `Resources/fr.lproj`. Le texte français du code sert de clé ;
   `LocalizationTests` vérifie que chaque clé utilisée dans le code a sa traduction anglaise.
 - Captures PNG du panneau, avec des données fictives :
   `CLAUDE_NOTCH_SNAPSHOT_DIR=/un/dossier swift test --filter SnapshotTests`.
-- **Publier une version** : pousse un tag `vX.Y.Z`. GitHub Actions lance les tests, compile l'app universelle
-  en version X.Y.Z, fabrique le DMG et crée la release avec le DMG et son SHA-256.
+- **Publier une version** = pousser un tag `vX.Y.Z`. GitHub Actions lance les tests, compile l'app universelle
+  en version X.Y.Z avec `RELEASE_CHANNEL=1`, fabrique le DMG, le signe avec le secret `UPDATE_SIGNING_KEY`
+  (`scripts/update-signing.swift` ; le job échoue si la signature échoue ou si la clé ne correspond pas à
+  celle intégrée à l'app) et crée la release avec le DMG, son SHA-256 et sa signature. Les installations
+  existantes la récupèrent seules.
 
   ```sh
-  git tag v1.0.0
-  git push origin v1.0.0
+  git tag v1.1.0
+  git push origin v1.1.0
   ```
+
+  La clé privée de signature est aussi dans le trousseau du mainteneur. La perdre casse la mise à jour
+  automatique de toutes les installations existantes : elles n'acceptent que les DMG signés avec cette clé.
 
 ### Licence
 

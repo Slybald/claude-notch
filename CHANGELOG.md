@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-20
+
+### Added
+
+- Automatic updates from GitHub releases: check 60 s after launch, then every 6 hours; the DMG is installed only
+  if its Ed25519 signature matches the public key built into the app; the app is swapped by renames with a
+  rollback, then restarts by itself. A new version is installed at launch, or later when no session is running
+  or waiting for you. Only apps built for a release update themselves.
+- **…** menu: version line ("Updating to X…", "Updated to X"), **Automatic Updates** (on by default),
+  **Check for Updates**, **Install** when automatic updates are off, or the release page when the app cannot
+  replace itself (outside `/Applications` and `~/Applications`, or folder not writable).
+- `GET /state`: `version` and `updater` keys.
+- Release workflow: release builds (`RELEASE_CHANNEL=1`), signed DMG (`.dmg.sig` published next to the DMG and
+  its SHA-256); a failed signature fails the job.
+
+### Changed
+
+- After an update, when only the bundled hook script changed, it is reinstalled silently at launch, without
+  the first-launch window and without touching `settings.json`.
+- The app now makes outgoing requests to GitHub (update check and download). Nothing about you or your
+  sessions is sent.
+
 ## [1.0.0] - 2026-10-19
 
 First public release.
@@ -28,4 +50,5 @@ First public release.
 - Universal app (Apple silicon and Intel), macOS 13 or later, distributed as a DMG built by GitHub Actions
   from version tags.
 
+[1.1.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.0.0
