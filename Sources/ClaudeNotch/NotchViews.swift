@@ -405,8 +405,7 @@ struct ExpandedPanel: View {
         .onPreferenceChange(RowsBelowListKey.self) { height in rowsBelowList = height }
     }
 
-    /// La bande à hauteur de barre des menus reste vide : les icônes de la barre des menus (et les menus de l'app
-    /// au premier plan) se dessinent par-dessus la notch, quel que soit le niveau de la fenêtre. L'en-tête vient dessous.
+    /// La bande à hauteur de barre des menus reste vide : son milieu est la notch physique. L'en-tête vient dessous.
     private var header: some View {
         VStack(spacing: 0) {
             Color.clear.frame(height: notchSize.height)

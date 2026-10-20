@@ -46,8 +46,16 @@ organised and why some choices were made, so they are not undone by accident.
   hosting view layout on every frame (~10 % CPU).
 - **Shape size** is reported through `NotchSizeKey` with a `max` reduce (a plain `nextValue()` let a sibling's
   default value win, leaving the hover zone at zero). The expanded panel stays under 460 pt.
-- **Menu bar**: its icons are drawn above the notch window whatever its level, so the menu-bar-high band stays
-  empty and the header sits below it. The collapsed ears still live in the menu bar.
+- **Window level**: `isFloatingPanel = true` must be set *before* `level`: that setter resets the level to
+  `.floating` (3, measured with `CGWindowListCopyWindowInfo`, see `WindowLevelTests`). At level 3 the menu bar
+  (24) and its icons were drawn above the notch and a full-screen app hid it; this is what an earlier version of
+  this page described as "menu bar icons are drawn above the notch whatever its level", which was wrong. The
+  panel now sits at `mainMenu + 3` (27), checked by `/state` (`level`, `windowServerLevel`), and is ordered front
+  again 0.4 s after each Space change.
+- **Menu bar band**: the expanded panel keeps a menu-bar-high empty band and the header sits below it: the
+  middle of that band is the physical notch (nothing visible there) and, at level 27, the band covers the menu
+  bar items on both sides while the panel is open. The collapsed ears also live in that band, next to the
+  notch, and are drawn above the menu bar.
 - **Protected folders** (Documents, Desktop, Downloads): never touched on the main thread (a macOS permission
   prompt would freeze the notch), and not at all when no companion tool is installed.
 - **Companion tools** run from `JobRunner`, not launchd: macOS denies protected folders to launchd jobs, while

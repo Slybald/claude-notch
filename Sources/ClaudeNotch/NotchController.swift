@@ -45,6 +45,8 @@ final class NotchController {
     private static let openDelay: TimeInterval = 0.08
     private static let closeDelay: TimeInterval = 0.25
     private static let hideDelay: TimeInterval = 3
+    /// Au-dessus de la barre des menus (24) et de ses icônes (25).
+    static let windowLevel = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
 
     let model = NotchViewModel()
 
@@ -52,7 +54,7 @@ final class NotchController {
     private let monitor: ClaudeMonitor
     private let prefs: Preferences
     private let tools: ToolsFeed
-    private let panel: NotchPanel
+    let panel: NotchPanel
 
     private var screenFrame = CGRect.zero
     private var notchRect = CGRect.zero
@@ -79,10 +81,11 @@ final class NotchController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+        // Avant `level` : ce setter remet le niveau à `.floating` (3, mesuré), sous la barre des menus.
+        panel.isFloatingPanel = true
+        panel.level = Self.windowLevel
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.becomesKeyOnlyIfNeeded = true
-        panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
@@ -114,7 +117,7 @@ final class NotchController {
     }
 
     var debugInfo: [String: Any] {
-        [
+        var info: [String: Any] = [
             "shown": isShown,
             "expanded": model.isExpanded,
             "hasNotch": model.hasNotch,
@@ -123,7 +126,29 @@ final class NotchController {
             "contentSize": [model.contentSize.width, model.contentSize.height],
             "ignoresMouse": panel.ignoresMouseEvents,
             "polling": pollTimer != nil,
+            "level": panel.level.rawValue,
+            "isOnActiveSpace": panel.isOnActiveSpace,
+            "isVisible": panel.isVisible,
+            "occlusionVisible": panel.occlusionState.contains(.visible),
         ]
+        // Niveau vu par le serveur de fenêtres : celui qui compte face à la barre des menus et au plein écran.
+        info["windowServerLevel"] = Self.windowServerLevel(of: panel)
+        if let screen = panel.screen {
+            info["screen"] = [
+                "name": screen.localizedName,
+                "frame": [screen.frame.minX, screen.frame.minY, screen.frame.width, screen.frame.height],
+            ]
+        }
+        info["frontmostApp"] = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        return info
+    }
+
+    /// Couche (`kCGWindowLayer`) de la fenêtre selon CGWindowList ; nil si elle n'est pas à l'écran.
+    static func windowServerLevel(of window: NSWindow) -> Int? {
+        guard window.windowNumber > 0,
+              let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(window.windowNumber))
+                as? [[String: Any]] else { return nil }
+        return (list.first?[kCGWindowLayer as String] as? NSNumber)?.intValue
     }
 
     // MARK: - Géométrie
@@ -363,6 +388,11 @@ final class NotchController {
             guard let self, self.isShown else { return }
             self.updateGeometry()
             self.panel.orderFrontRegardless()
+            // L'animation de changement de Space peut repasser devant : on réaffirme une fois qu'elle est finie.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self, self.isShown else { return }
+                self.panel.orderFrontRegardless()
+            }
         }))
     }
 
