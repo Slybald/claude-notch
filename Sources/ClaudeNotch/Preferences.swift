@@ -89,7 +89,7 @@ enum AnimationSpeed: String, CaseIterable, Identifiable {
 /// Masquage temporaire de la notch.
 enum HideDuration: String, CaseIterable, Identifiable {
     case oneHour
-    /// Jusqu'au début du jour suivant (minuit).
+    /// Jusqu'au lendemain 8 h (minuit couperait court une soirée : masquée à 23 h 30, revenue à 0 h).
     case untilTomorrow
     case untilReactivated
 
@@ -100,8 +100,9 @@ enum HideDuration: String, CaseIterable, Identifiable {
         case .oneHour:
             return now.addingTimeInterval(3600)
         case .untilTomorrow:
-            let today = calendar.startOfDay(for: now)
-            return calendar.date(byAdding: .day, value: 1, to: today) ?? now.addingTimeInterval(86_400)
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))
+            return tomorrow.flatMap { calendar.date(bySettingHour: 8, minute: 0, second: 0, of: $0) }
+                ?? now.addingTimeInterval(86_400)
         case .untilReactivated:
             return .distantFuture
         }
@@ -404,9 +405,31 @@ final class Preferences: ObservableObject {
         return min(max(stepped, customWidthRange.lowerBound), customWidthRange.upperBound)
     }
 
-    /// Fond du panneau déplié, opaque (l'opacité est appliquée par la vue).
+    /// Fond du panneau déplié, opaque (l'opacité est appliquée par la vue). Un fond libre trop clair est assombri.
     var panelColor: Color {
-        Color(hex: panelBackground.hex ?? customBackgroundHex) ?? .black
+        if let hex = panelBackground.hex { return Color(hex: hex) ?? .black }
+        return Self.readable(Color(hex: customBackgroundHex) ?? .black)
+    }
+
+    /// Luminance relative maximale d'un fond libre (les fonds proposés sont sous 0,03) : le texte blanc garde un
+    /// contraste ≥ 9:1, le texte atténué et l'accent restent lisibles (à 0,18, le seuil WCAG du blanc, ils ne
+    /// l'étaient plus).
+    static let maxBackgroundLuminance = 0.06
+
+    /// Même teinte, assombrie jusqu'à `maxBackgroundLuminance` si besoin (le panneau est toujours en thème sombre).
+    static func readable(_ color: Color) -> Color {
+        guard let srgb = NSColor(color).usingColorSpace(.sRGB) else { return color }
+        func linear(_ c: CGFloat) -> Double {
+            let c = Double(c)
+            return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        func encoded(_ c: Double) -> Double { c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1 / 2.4) - 0.055 }
+        let rgb = [srgb.redComponent, srgb.greenComponent, srgb.blueComponent].map(linear)
+        let luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+        guard luminance > maxBackgroundLuminance else { return color }
+        // En lumière linéaire, multiplier les trois composantes garde la teinte et divise la luminance d'autant.
+        let dark = rgb.map { encoded($0 * maxBackgroundLuminance / luminance) }
+        return Color(.sRGB, red: dark[0], green: dark[1], blue: dark[2])
     }
 
     // MARK: Masquage temporaire

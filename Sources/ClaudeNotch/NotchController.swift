@@ -779,6 +779,10 @@ final class NotchController {
                 self.prefs.hide(duration, now: self.now())
             })
         }
+        durations.addItem(.separator())
+        let hint = NSMenuItem(title: HiddenNotice.howToShowAgain(hotKey: prefs.hideHotKey), action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        durations.addItem(hint)
         hide.submenu = durations
         menu.addItem(hide)
         menu.addItem(.separator())

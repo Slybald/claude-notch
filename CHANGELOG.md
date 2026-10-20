@@ -11,11 +11,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Tabs: the expanded notch is a row of tabs (Claude, then Player, Quick Settings, Shelf, Clipboard, Timer and
   Notes, still empty). Click a tab or hover it briefly; the notch reopens on the last tab, or on Claude when a
   session needs you.
-- Settings window (**…** menu › **Settings…**, ⌘,): open at login, always visible, hover delays, haptic
+- Settings window (**…** menu › **Settings…**, ⌘,): open at login, visibility, hover delays, haptic
   feedback, full-screen behavior, tabs (on/off, order, default tab), accent color, panel size, background
   opacity, ears, Claude hooks, updates, about and licenses.
 - Full screen: when an app is full screen on the notch's screen, the expanded panel becomes compact (half
   width, running sessions only), stays normal, or the notch hides, as set in Settings.
+- Notch settings: show the notch always, while Claude is open or during activity; hide it for an hour, until
+  tomorrow morning or until turned back on (also from a right click on the notch); open on hover or on click,
+  close on a click outside; two optional global shortcuts (open the panel with the keyboard, hide the notch);
+  screen choice (built-in, main, under the mouse or by name) with a virtual notch on screens without one; free
+  panel width, background color, shadow, animation speed (simple fade with Reduce Motion); hide the notch from
+  screenshots and screen sharing; reset to defaults. Opening the app again while it runs shows a hidden notch
+  and the settings.
 - `GET /state`: window level seen by the window server, Space, occlusion, screen, front app, full-screen state,
   tab and running modules.
 

@@ -197,8 +197,8 @@ private struct GeneralSettings: View {
     @ObservedObject var hotKeys: HotKeyCenter = .shared
     @State private var confirmReset = false
 
-    /// Écrans branchés (le choix par nom les liste).
-    private var screenNames: [String] { NSScreen.screens.map(\.localizedName) }
+    /// Écrans branchés, numérotés s'ils portent le même nom (le choix par nom les liste).
+    private var screenNames: [String] { NotchScreenPicker.labels(NSScreen.screens.map(ScreenCandidate.init)) }
     private func now() -> Date { Date() }
 
     var body: some View {
@@ -283,7 +283,8 @@ private struct GeneralSettings: View {
         case .always: return L("La notch reste toujours à l'écran.")
         case .whenClaudeOpen: return L("Tant que Claude Desktop ou une session Claude Code est ouverte.")
         case .duringActivity:
-            return L("Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture).")
+            return L("Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). "
+                + "Au repos, rouvre Claude Notch pour retrouver ces réglages.")
         }
     }
 
@@ -316,8 +317,7 @@ private struct GeneralSettings: View {
 
     /// Écrans nommés : ceux qui sont branchés, plus celui choisi s'il est débranché.
     private var namedChoices: [String] {
-        var names: [String] = []
-        for name in screenNames where !names.contains(name) { names.append(name) }
+        var names = screenNames
         let fixed = [ScreenChoice.builtin, ScreenChoice.main, ScreenChoice.mouse]
         if !fixed.contains(prefs.screenChoice), !names.contains(prefs.screenChoice) { names.append(prefs.screenChoice) }
         return names
@@ -504,6 +504,7 @@ private struct AppearanceSettings: View {
                     } label: {
                         Text("Fond libre")
                     }
+                    SettingsNote(L("Une couleur claire est assombrie : le texte du panneau reste lisible."))
                 }
                 LabeledContent {
                     HStack(spacing: 10) {

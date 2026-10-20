@@ -62,7 +62,19 @@ enum NotchScreenPicker {
         case ScreenChoice.builtin: return builtin
         case ScreenChoice.main: return 0
         case ScreenChoice.mouse: return screens.firstIndex { contains($0.frame, mouse) } ?? builtin
-        default: return screens.firstIndex { $0.name == choice } ?? builtin
+        default: return labels(screens).firstIndex(of: choice) ?? builtin
+        }
+    }
+
+    /// Noms proposés et mémorisés : deux écrans du même modèle deviennent « DELL U2720Q » et « DELL U2720Q (2) ».
+    /// shortcut: numérotés dans l'ordre de `NSScreen.screens` ; passer à l'UUID d'affichage si cet ordre s'avère
+    /// instable entre deux branchements.
+    static func labels(_ screens: [ScreenCandidate]) -> [String] {
+        var seen: [String: Int] = [:]
+        return screens.map { screen in
+            let count = (seen[screen.name] ?? 0) + 1
+            seen[screen.name] = count
+            return count == 1 ? screen.name : "\(screen.name) (\(count))"
         }
     }
 
@@ -102,17 +114,28 @@ enum NotchMotion {
     }
 }
 
-/// Texte du rappel « Notch masquée jusqu'à … ».
+/// Texte du rappel « Notch masquée jusqu'à … » : l'heure de fin, précédée de « demain » ou de la date au besoin.
 enum HiddenNotice {
     static func text(until: Date, now: Date, calendar: Calendar = .current) -> String {
         if until == .distantFuture { return L("Notch masquée jusqu'à réactivation") }
-        guard calendar.isDate(until, inSameDayAs: now) else { return L("Notch masquée jusqu'à demain") }
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.dateStyle = .none
         formatter.timeStyle = .short
+        if calendar.isDate(until, inSameDayAs: now) {
+            return String(format: L("Notch masquée jusqu'à %@"), formatter.string(from: until))
+        }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(until, inSameDayAs: tomorrow) {
+            return String(format: L("Notch masquée jusqu'à demain, %@"), formatter.string(from: until))
+        }
+        formatter.dateStyle = .short
         return String(format: L("Notch masquée jusqu'à %@"), formatter.string(from: until))
+    }
+
+    /// Comment la réafficher, en pied des menus « Masquer la notch » (sans icône, rien d'autre ne le dit).
+    static func howToShowAgain(hotKey: HotKeyChoice) -> String {
+        hotKey == .none ? L("Pour la réafficher : rouvrir Claude Notch")
+            : String(format: L("Pour la réafficher : %@ ou rouvrir Claude Notch"), hotKey.title)
     }
 }
 

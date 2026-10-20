@@ -240,14 +240,16 @@
 "Jusqu'à demain" = "Jusqu'à demain";
 "Jusqu'à réactivation" = "Jusqu'à réactivation";
 "Notch masquée jusqu'à réactivation" = "Notch masquée jusqu'à réactivation";
-"Notch masquée jusqu'à demain" = "Notch masquée jusqu'à demain";
+"Notch masquée jusqu'à demain, %@" = "Notch masquée jusqu'à demain, %@";
+"Pour la réafficher : rouvrir Claude Notch" = "Pour la réafficher : rouvrir Claude Notch";
+"Pour la réafficher : %@ ou rouvrir Claude Notch" = "Pour la réafficher : %@ ou rouvrir Claude Notch";
 "Notch masquée jusqu'à %@" = "Notch masquée jusqu'à %@";
 "Aucun" = "Aucun";
 "⌃⌥Espace" = "⌃⌥Espace";
 "Visibilité" = "Visibilité";
 "La notch reste toujours à l'écran." = "La notch reste toujours à l'écran.";
 "Tant que Claude Desktop ou une session Claude Code est ouverte." = "Tant que Claude Desktop ou une session Claude Code est ouverte.";
-"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture)." = "Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture).";
+"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages.";
 "Réafficher" = "Réafficher";
 "Aussi par le raccourci, ou en rouvrant Claude Notch." = "Aussi par le raccourci, ou en rouvrant Claude Notch.";
 "Masquer" = "Masquer";
@@ -289,6 +291,7 @@
 "Bleu nuit" = "Bleu nuit";
 "Personnalisé" = "Personnalisé";
 "Fond libre" = "Fond libre";
+"Une couleur claire est assombrie : le texte du panneau reste lisible." = "Une couleur claire est assombrie : le texte du panneau reste lisible.";
 "Ombre du panneau" = "Ombre du panneau";
 "Animations" = "Animations";
 "Vitesse" = "Vitesse";

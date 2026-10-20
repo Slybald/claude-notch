@@ -72,11 +72,15 @@ final class ShellPreferencesTests: XCTestCase {
         XCTAssertTrue(prefs.isHidden(at: now.addingTimeInterval(3599)))
         XCTAssertFalse(prefs.isHidden(at: now.addingTimeInterval(3600)), "échu pile à l'heure")
 
+        // « Jusqu'à demain » : 8 h le lendemain, pas minuit (masquée à 23 h 30, elle serait revenue 30 min après).
         prefs.hide(.untilTomorrow, now: now, calendar: calendar)
-        let midnight = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 21)))
-        XCTAssertEqual(prefs.hiddenUntil, midnight)
-        XCTAssertTrue(prefs.isHidden(at: midnight.addingTimeInterval(-1)))
-        XCTAssertFalse(prefs.isHidden(at: midnight))
+        let tomorrowMorning = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 8)))
+        XCTAssertEqual(prefs.hiddenUntil, tomorrowMorning)
+        XCTAssertTrue(prefs.isHidden(at: tomorrowMorning.addingTimeInterval(-1)))
+        XCTAssertFalse(prefs.isHidden(at: tomorrowMorning))
+        let lateEvening = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 23,
+                                                                           minute: 30)))
+        XCTAssertEqual(HideDuration.untilTomorrow.end(from: lateEvening, calendar: calendar), tomorrowMorning)
 
         prefs.hide(.untilReactivated, now: now, calendar: calendar)
         XCTAssertEqual(prefs.hiddenUntil, .distantFuture)
@@ -101,11 +105,24 @@ final class ShellPreferencesTests: XCTestCase {
         let morning = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 9)))
         XCTAssertEqual(HiddenNotice.text(until: .distantFuture, now: morning, calendar: calendar),
                        "Notch masquée jusqu'à réactivation")
-        XCTAssertEqual(HiddenNotice.text(until: morning.addingTimeInterval(86_400), now: morning, calendar: calendar),
-                       "Notch masquée jusqu'à demain")
         let sameDay = HiddenNotice.text(until: morning.addingTimeInterval(3600), now: morning, calendar: calendar)
         XCTAssertTrue(sameDay.hasPrefix("Notch masquée jusqu'à "), sameDay)
+        XCTAssertFalse(sameDay.contains("demain"), sameDay)
         XCTAssertTrue(sameDay.contains("10"), "heure de fin affichée : \(sameDay)")
+        // 23 h 30 + 1 h : le lendemain à 0 h 30, avec l'heure (pas un simple « demain »).
+        let late = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 23, minute: 30)))
+        let pastMidnight = HiddenNotice.text(until: late.addingTimeInterval(3600), now: late, calendar: calendar)
+        XCTAssertTrue(pastMidnight.hasPrefix("Notch masquée jusqu'à demain, "), pastMidnight)
+        XCTAssertTrue(pastMidnight.contains("30"), "heure de fin affichée : \(pastMidnight)")
+        let tomorrow = HiddenNotice.text(until: HideDuration.untilTomorrow.end(from: morning, calendar: calendar),
+                                         now: morning, calendar: calendar)
+        XCTAssertTrue(tomorrow.hasPrefix("Notch masquée jusqu'à demain, "), tomorrow)
+        XCTAssertTrue(tomorrow.contains("8"), "heure de fin affichée : \(tomorrow)")
+        // Plus loin (horloge changée, valeur écrite à la main) : la date aussi.
+        let later = HiddenNotice.text(until: morning.addingTimeInterval(3 * 86_400), now: morning, calendar: calendar)
+        XCTAssertTrue(later.hasPrefix("Notch masquée jusqu'à "), later)
+        XCTAssertFalse(later.contains("demain"), later)
+        XCTAssertTrue(later.contains("23"), "jour affiché : \(later)")
     }
 
     // MARK: - Taille, couleurs, comportement
@@ -136,6 +153,37 @@ final class ShellPreferencesTests: XCTestCase {
         prefs.customPanelWidth = nil
         prefs.panelSize = .large
         XCTAssertEqual(Preferences(defaults: defaults).expandedWidth(compact: false), PanelSize.large.width)
+    }
+
+    /// Fond libre clair : assombri (même teinte) pour que le texte blanc du panneau garde un contraste ≥ 9:1.
+    func testLightCustomBackgroundIsDarkened() throws {
+        func luminance(_ color: Color) throws -> Double {
+            let srgb = try XCTUnwrap(NSColor(color).usingColorSpace(.sRGB))
+            func linear(_ c: CGFloat) -> Double {
+                let c = Double(c)
+                return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear(srgb.redComponent) + 0.7152 * linear(srgb.greenComponent)
+                + 0.0722 * linear(srgb.blueComponent)
+        }
+        let prefs = Preferences(defaults: makeEphemeralDefaults(self))
+        prefs.panelBackground = .custom
+        for hex in ["F2F2F2", "FFFFFF", "FFE066", "8FD3FF"] {
+            prefs.customBackgroundHex = hex
+            let light = try luminance(prefs.panelColor)
+            XCTAssertLessThanOrEqual(light, Preferences.maxBackgroundLuminance + 0.002, hex)
+            XCTAssertGreaterThanOrEqual((1 + 0.05) / (light + 0.05), 9, "contraste du texte blanc · \(hex)")
+            XCTAssertGreaterThan(light, Preferences.maxBackgroundLuminance - 0.02, "assombri juste ce qu'il faut · \(hex)")
+        }
+        // Même teinte : le jaune reste plus rouge que bleu.
+        prefs.customBackgroundHex = "FFE066"
+        let yellow = try XCTUnwrap(NSColor(prefs.panelColor).usingColorSpace(.sRGB))
+        XCTAssertGreaterThan(yellow.redComponent, yellow.blueComponent + 0.2)
+        // Fonds sombres inchangés.
+        for hex in ["3A1F5D", "1C1C1E", "000000"] {
+            prefs.customBackgroundHex = hex
+            XCTAssertEqual(prefs.panelColor.hexString, hex)
+        }
     }
 
     func testColorsAndBehaviorPersist() {

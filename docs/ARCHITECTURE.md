@@ -37,7 +37,8 @@ organised and why some choices were made, so they are not undone by accident.
 - `SessionStore`: per-session state machine, task lists (`~/.claude/tasks/<session_id>/`), Esc detection.
 - `NotchController` (window, hover, visibility, full screen), `NotchViews` (root, ears, panel, tab bar,
   session cards), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
-  on the notch's screen.
+  on the notch's screen. `NotchShell`: rules tested without a real screen (visibility, screen choice, real or
+  virtual notch, "hidden until" text). `HotKeys`: global shortcuts and the keys of the panel.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
   per module: `Claude/` (sessions, compact summary, Claude settings; `ReplyCenter` and `ReplyViews` for
   replies from the notch), and the empty `Media/`,
@@ -147,6 +148,23 @@ Apple Events and Bluetooth are already there) nor another module's files.
   hosting view layout on every frame (~10 % CPU). Modules are stopped while collapsed unless they ask; the 1 s
   session timer only runs while there are sessions; the root view does not observe `ClaudeMonitor` (it changes
   on every app switch), only the Claude tab does.
+- **Notch settings** (Settings › General and Appearance, `NotchShell`):
+  - Visibility `visibility.mode`: always (default; the old `alwaysVisible = false` becomes "when Claude is
+    open"), when Claude is open, during activity. Module ears show it in every mode. "Hide the notch" for 1 h,
+    until 8 am tomorrow or until turned back on (`visibility.hiddenUntil`, `distantFuture`): one `Timer` at the
+    end date, only while hidden, re-read on wake. "Until turned back on" ends when the app is opened again
+    (reopen event) or relaunched; reopening the app also opens the settings (no Dock or menu bar icon).
+  - Screen `display.screen`: built-in (with the notch), main, under the mouse (follows it while collapsed, on
+    mouse events only) or a screen by name (identical models are numbered). Without a notch, a 200 pt virtual
+    notch is drawn at the top center, as high as that screen's menu bar.
+  - Global shortcuts (`keyboard.*`, a short list, never the same one twice): Carbon `RegisterEventHotKey`, no
+    Accessibility permission; a combination macOS refuses is reported in the settings. Opened with the shortcut,
+    the panel takes the keyboard (`NotchKeyboard.take`) and stays open when the mouse leaves: ← → and ⌘1…9
+    switch tabs (not in compact full screen), Esc closes and gives the keyboard back, and so does a click
+    outside or the shortcut again.
+  - The window is 800 × 480 pt so the widest custom panel (720 pt), its radii and shadow fit. A light custom
+    background is darkened (relative luminance ≤ 0.06): the panel is always dark-themed, its text white.
+  - "Invisible in screenshots" sets `sharingType = .none`; it does not touch the window level.
 - **Shape size** is reported through `NotchSizeKey` with a `max` reduce (a plain `nextValue()` let a sibling's
   default value win, leaving the hover zone at zero). The expanded panel stays under 460 pt.
 - **Window level**: `isFloatingPanel = true` must be set *before* `level`: that setter resets the level to

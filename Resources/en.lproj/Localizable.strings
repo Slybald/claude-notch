@@ -240,14 +240,16 @@
 "Jusqu'à demain" = "Until Tomorrow";
 "Jusqu'à réactivation" = "Until I Turn It Back On";
 "Notch masquée jusqu'à réactivation" = "Notch hidden until you turn it back on";
-"Notch masquée jusqu'à demain" = "Notch hidden until tomorrow";
+"Notch masquée jusqu'à demain, %@" = "Notch hidden until tomorrow, %@";
+"Pour la réafficher : rouvrir Claude Notch" = "To show it again: open Claude Notch again";
+"Pour la réafficher : %@ ou rouvrir Claude Notch" = "To show it again: %@ or open Claude Notch again";
 "Notch masquée jusqu'à %@" = "Notch hidden until %@";
 "Aucun" = "None";
 "⌃⌥Espace" = "⌃⌥Space";
 "Visibilité" = "Visibility";
 "La notch reste toujours à l'écran." = "The notch always stays on screen.";
 "Tant que Claude Desktop ou une session Claude Code est ouverte." = "While Claude Desktop or a Claude Code session is open.";
-"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture)." = "When Claude is working or waiting for you, or a tab reports something (timer, playback).";
+"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "When Claude is working or waiting for you, or a tab reports something (timer, playback). When idle, open Claude Notch again to get back to these settings.";
 "Réafficher" = "Show Again";
 "Aussi par le raccourci, ou en rouvrant Claude Notch." = "Also with the shortcut, or by opening Claude Notch again.";
 "Masquer" = "Hide";
@@ -289,6 +291,7 @@
 "Bleu nuit" = "Midnight Blue";
 "Personnalisé" = "Custom";
 "Fond libre" = "Custom Background";
+"Une couleur claire est assombrie : le texte du panneau reste lisible." = "A light color is darkened so the panel's text stays readable.";
 "Ombre du panneau" = "Panel Shadow";
 "Animations" = "Animations";
 "Vitesse" = "Speed";

@@ -51,6 +51,19 @@ final class ShellControllerTests: XCTestCase {
         XCTAssertEqual(NotchScreenPicker.pick(ScreenChoice.builtin, among: [Self.external, oldAir], mouse: .zero), 1)
     }
 
+    /// Deux écrans du même modèle : numérotés dans la liste, et le second reste choisissable.
+    func testIdenticalScreensAreNumbered() {
+        var twin = Self.external
+        twin.frame.origin.x += 2560
+        twin.visibleFrame.origin.x += 2560
+        let screens = [Self.builtin, Self.external, twin]
+        XCTAssertEqual(NotchScreenPicker.labels(screens), ["Écran Retina intégré", "DELL U2720Q", "DELL U2720Q (2)"])
+        XCTAssertEqual(NotchScreenPicker.pick("DELL U2720Q", among: screens, mouse: .zero), 1)
+        XCTAssertEqual(NotchScreenPicker.pick("DELL U2720Q (2)", among: screens, mouse: .zero), 2)
+        XCTAssertEqual(NotchScreenPicker.pick("DELL U2720Q (2)", among: [Self.builtin, Self.external], mouse: .zero), 0,
+                       "second écran débranché : l'écran intégré")
+    }
+
     func testRealNotchAndVirtualNotchGeometry() {
         let real = NotchScreenPicker.notchRect(on: Self.builtin, menuBarThickness: 24)
         XCTAssertTrue(real.hasNotch)

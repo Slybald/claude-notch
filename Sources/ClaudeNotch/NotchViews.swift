@@ -619,6 +619,8 @@ struct NotchMoreMenu: View {
                 ForEach(HideDuration.allCases) { duration in
                     Button(NotchController.title(duration)) { prefs.hide(duration) }
                 }
+                Divider()
+                Text(HiddenNotice.howToShowAgain(hotKey: prefs.hideHotKey))
             }
             Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
             Divider()

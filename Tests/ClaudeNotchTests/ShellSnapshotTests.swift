@@ -26,6 +26,11 @@ final class ShellSnapshotTests: XCTestCase {
             $0.panelBackground = .custom
             $0.customBackgroundHex = "3A1F5D"
         }.root, "shell-background-custom", outputDir)
+        // Fond libre presque blanc : assombri, le texte reste lisible.
+        try render(notch {
+            $0.panelBackground = .custom
+            $0.customBackgroundHex = "F2F2F2"
+        }.root, "shell-background-custom-light", outputDir)
         try render(notch {
             $0.panelBackground = .graphite
             $0.backgroundOpacity = 0.75
