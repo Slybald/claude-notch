@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   tabs, while Claude is working or has just finished; when Claude is waiting for you it stays alone. Turn it off
   in **Settings › Appearance › Collapsed Notch** ("Alternate Claude and the Other Ears").
 
+### Changed
+
+- Low Power Mode: the first click on the tile asks for the password once and, in the same system prompt, adds the
+  rule that lets later switches go through without it (the prompt says so). The note at the bottom of the tab is
+  gone. "Remove the authorization" in Settings stops this automatic setup.
+
 ## [1.2.1] - 2026-10-20
 
 ### Added
