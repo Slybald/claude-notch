@@ -20,3 +20,4 @@
 "Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie." = "Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie.";
 "Limite de %d notes atteinte" = "Limite de %d notes atteinte";
 "Note limitée à %d caractères" = "Note limitée à %d caractères";
+"Notes illisibles : copie gardée dans %@" = "Notes illisibles : copie gardée dans %@";

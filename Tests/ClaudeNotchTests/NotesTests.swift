@@ -229,6 +229,7 @@ final class NotesTests: XCTestCase {
         let aside = rig.fileURL.appendingPathExtension("corrupt")
         XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), "{ \"notes\": [oups")
         XCTAssertFalse(FileManager.default.fileExists(atPath: rig.fileURL.path), "pas de fichier vide à la place")
+        XCTAssertEqual(module.notice, "Notes illisibles : copie gardée dans notes.json.corrupt", "dit où elles sont")
 
         rig.write(module, "nouvelle vie")
         module.stop()
@@ -242,6 +243,64 @@ final class NotesTests: XCTestCase {
         let module = rig.startedModule()
         XCTAssertEqual(module.notes.count, 1)
         XCTAssertTrue(FileManager.default.fileExists(atPath: rig.fileURL.appendingPathExtension("corrupt").path))
+    }
+
+    /// Le fichier existe mais ne se lit pas (droits) : il n'est pas pris pour « absent » puis écrasé.
+    func testExistingButUnreadableFileIsSetAsideNotOverwritten() throws {
+        let rig = try NotesRig(self)
+        let json = "{\"version\":1,\"notes\":[{\"id\":\"\(UUID().uuidString)\",\"text\":\"précieuse\"}]}"
+        try Data(json.utf8).write(to: rig.fileURL)
+        let aside = rig.fileURL.appendingPathExtension("corrupt")
+        XCTAssertEqual(chmod(rig.fileURL.path, 0o000), 0)
+        addTeardownBlock {
+            chmod(rig.fileURL.path, 0o600)
+            chmod(aside.path, 0o600)
+        }
+
+        let module = rig.startedModule()
+        XCTAssertEqual(module.notes.count, 1, "juste la note vide")
+        XCTAssertEqual(module.notice, "Notes illisibles : copie gardée dans notes.json.corrupt")
+        rig.write(module, "autre chose")
+        module.stop()
+
+        XCTAssertEqual(try rig.savedNotes().map(\.text), ["autre chose"])
+        chmod(aside.path, 0o600)
+        XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), json, "l'ancien fichier est intact")
+    }
+
+    /// Une entrée invalide n'emporte pas les autres : les bonnes notes restent, l'original est copié en `.corrupt`.
+    func testOneInvalidNoteDoesNotTakeTheOthers() throws {
+        let rig = try NotesRig(self)
+        let good = UUID()
+        let json = "{\"version\":1,\"notes\":[{\"id\":\"\(good.uuidString)\",\"text\":\"bonne\"},"
+            + "{\"id\":\"pas-un-uuid\",\"text\":\"cassée\"},42,{\"text\":\"sans identifiant\"}]}"
+        try Data(json.utf8).write(to: rig.fileURL)
+
+        let module = rig.startedModule()
+        XCTAssertEqual(module.notes.map(\.id), [good])
+        XCTAssertEqual(module.selectedID, good)
+        XCTAssertEqual(module.notice, "Notes illisibles : copie gardée dans notes.json.corrupt")
+        let aside = rig.fileURL.appendingPathExtension("corrupt")
+        XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), json, "copie, pas déplacement")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: rig.fileURL.path), "le fichier d'origine reste en place")
+
+        module.togglePin(good)
+        module.stop()
+        XCTAssertNil(module.notice, "le message disparaît au repli")
+        XCTAssertEqual(try rig.savedNotes().map(\.id), [good])
+        XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), json, "l'original n'est pas touché par l'écriture")
+        XCTAssertEqual(rig.timers.pending.count, 0, "aucun minuteur pour le message")
+    }
+
+    func testAFullyValidFileKeepsNoCopyAndNoNotice() throws {
+        let rig = try NotesRig(self)
+        let writer = rig.startedModule()
+        rig.write(writer, "une")
+        writer.stop()
+        let module = rig.startedModule()
+        XCTAssertEqual(module.notes.count, 1)
+        XCTAssertNil(module.notice)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rig.fileURL.appendingPathExtension("corrupt").path))
     }
 
     func testNoteDecodingToleratesMissingOptionalFields() throws {
@@ -298,19 +357,39 @@ final class NotesTests: XCTestCase {
         XCTAssertEqual(try rig.savedNotes().count, 1, "supprimée pour de bon")
     }
 
-    func testOnlyTheLastDeletionCanBeUndone() throws {
+    /// Deux suppressions rapprochées : « Annuler » rend la dernière, puis l'avant-dernière.
+    func testSeveralDeletionsAreUndoneLastFirst() throws {
         let rig = try NotesRig(self)
         let module = rig.startedModule()
         let a = rig.write(module, "a")
         let b = rig.write(module, "b")
-        rig.write(module, "c")
+        let c = rig.write(module, "c")
         module.delete(a)
         module.delete(b)
         XCTAssertEqual(module.deleted?.id, b)
         XCTAssertEqual(rig.timers.pending.count, 1, "un seul délai d'annulation")
+        XCTAssertEqual(module.notes.map(\.id), [c])
+
         module.undoDelete()
         XCTAssertEqual(module.notes.count, 2)
-        XCTAssertFalse(module.notes.contains { $0.id == a })
+        XCTAssertEqual(module.deleted?.id, a, "la précédente reste annulable")
+        XCTAssertEqual(rig.timers.pending.count, 1, "le délai repart")
+        module.undoDelete()
+        XCTAssertEqual(Set(module.notes.map(\.id)), [a, b, c])
+        XCTAssertNil(module.deleted)
+        XCTAssertTrue(rig.timers.pending.isEmpty)
+        module.undoDelete()
+        XCTAssertEqual(module.notes.count, 3, "plus rien à annuler")
+    }
+
+    func testTheUndoHistoryIsBounded() throws {
+        let rig = try NotesRig(self)
+        let module = rig.startedModule()
+        let ids = (0..<(NotesModule.maxUndo + 3)).map { rig.write(module, "note \($0)") }
+        ids.forEach(module.delete)
+        XCTAssertEqual(module.deletedNotes.count, NotesModule.maxUndo)
+        XCTAssertEqual(module.deleted?.id, ids.last)
+        XCTAssertEqual(module.deletedNotes.first?.id, ids[3], "les plus anciennes sont oubliées")
     }
 
     func testDeletingTheLastNoteLeavesAnEmptyOneReady() throws {
@@ -325,7 +404,7 @@ final class NotesTests: XCTestCase {
         XCTAssertEqual(try rig.savedNotes().count, 0)
     }
 
-    func testPanelCollapseDropsEmptyNotesAndTheUndo() throws {
+    func testPanelCollapseDropsEmptyNotesButKeepsTheUndoUntilItsDeadline() throws {
         let rig = try NotesRig(self)
         let module = rig.startedModule()
         let a = rig.write(module, "a")
@@ -333,11 +412,35 @@ final class NotesTests: XCTestCase {
         module.delete(a)
         module.newNote()
         XCTAssertEqual(module.notes.count, 2, "b et la note vide")
+        rig.clock.advance(2)
         module.stop()
         XCTAssertEqual(module.notes.map(\.text), ["b"])
-        XCTAssertNil(module.deleted)
+        XCTAssertEqual(module.deleted?.id, a, "replier n'efface pas l'annulation")
+        XCTAssertTrue(rig.timers.pending.isEmpty, "replié : aucun minuteur en attente")
+
+        rig.clock.advance(1)
         module.start()
         XCTAssertEqual(module.selectedNote?.text, "b")
+        XCTAssertEqual(module.deleted?.id, a)
+        XCTAssertEqual(try XCTUnwrap(rig.timers.pending.first?.delay), NotesModule.undoDelay - 3, accuracy: 0.001,
+                       "il reste le temps d'origine, pas un nouveau délai")
+        module.undoDelete()
+        XCTAssertEqual(Set(module.notes.map(\.text)), ["a", "b"])
+    }
+
+    func testUndoIsForgottenWhenThePanelReopensAfterTheDeadline() throws {
+        let rig = try NotesRig(self)
+        let module = rig.startedModule()
+        let a = rig.write(module, "a")
+        rig.write(module, "b")
+        module.delete(a)
+        module.stop()
+        rig.clock.advance(NotesModule.undoDelay + 1)
+        module.start()
+        XCTAssertNil(module.deleted)
+        XCTAssertTrue(rig.timers.pending.isEmpty)
+        module.undoDelete()
+        XCTAssertEqual(module.notes.map(\.text), ["b"])
     }
 
     func testLeavingAnEmptyNoteRemovesIt() throws {

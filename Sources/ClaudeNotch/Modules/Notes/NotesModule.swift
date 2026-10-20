@@ -73,6 +73,10 @@ struct Note: Codable, Identifiable, Equatable {
 /// - Plafonds : 200 notes, 100 000 caractères par note (à la frappe et au collage ; un fichier déjà plus gros n'est
 ///   jamais tronqué à la lecture).
 /// - Une note vide n'est jamais enregistrée : elle disparaît quand on en change ou quand le panneau se replie.
+/// - Suppression : jusqu'à `maxUndo` notes restent restaurables (la dernière d'abord) pendant `undoDelay` secondes
+///   après la dernière suppression, panneau replié compris (l'échéance est une date, sans minuteur en veille).
+/// - Une entrée illisible du fichier n'emporte pas les autres : les notes valides sont chargées, le fichier
+///   d'origine est copié en `.corrupt` et un message le dit tant que le panneau reste ouvert.
 /// - Clavier : voir `NotchKeyboard` ; le panneau le rend à l'app de devant au repli (`releaseKeyboard`).
 final class NotesModule: NotchModule {
     let id = "notes"
@@ -85,11 +89,38 @@ final class NotesModule: NotchModule {
     static let searchThreshold = 8
     static let saveDelay: TimeInterval = 1
     static let undoDelay: TimeInterval = 5
+    static let maxUndo = 10
     static let noticeDelay: TimeInterval = 4
 
     struct FileContent: Codable {
         var version = 1
         var notes: [Note]
+        /// Entrées illisibles ignorées à la lecture (jamais écrit).
+        var skipped = 0
+
+        private enum CodingKeys: String, CodingKey { case version, notes }
+
+        init(notes: [Note]) { self.notes = notes }
+
+        /// Une note invalide est ignorée, pas le fichier entier.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+            var list = try container.nestedUnkeyedContainer(forKey: .notes)
+            var notes: [Note] = []
+            while !list.isAtEnd {
+                if let note = try? list.decode(Note.self) {
+                    notes.append(note)
+                } else {
+                    skipped += 1
+                    // Sans cette lecture, l'index ne bouge pas après un échec : boucle sans fin.
+                    _ = try? list.decode(AnyEntry.self)
+                }
+            }
+            self.notes = notes
+        }
+
+        private struct AnyEntry: Decodable {}
     }
 
     // MARK: État
@@ -98,8 +129,8 @@ final class NotesModule: NotchModule {
     @Published private(set) var notes: [Note] = []
     @Published private(set) var selectedID: UUID?
     @Published var query = ""
-    /// Dernière note supprimée, restaurable pendant `undoDelay`.
-    @Published private(set) var deleted: Note?
+    /// Notes supprimées, restaurables pendant `undoDelay` (la dernière en dernier).
+    @Published private(set) var deletedNotes: [Note] = []
     /// Message bref sous la liste (plafond atteint).
     @Published private(set) var notice: String?
 
@@ -114,6 +145,7 @@ final class NotesModule: NotchModule {
     private var loaded = false
     private var terminateObserver: NSObjectProtocol?
     private var cancelUndo: (() -> Void)?
+    private var undoDeadline: Date?
     private var cancelNotice: (() -> Void)?
 
     init(directory: URL = ModuleDataDirectory.standard, clock: @escaping () -> Date = Date.init,
@@ -148,6 +180,7 @@ final class NotesModule: NotchModule {
     func start() {
         loadIfNeeded()
         ensureSelection()
+        resumeUndo()
         guard terminateObserver == nil else { return }
         // Sans file : exécuté tout de suite, avant la sortie du processus.
         terminateObserver = center.addObserver(forName: NSApplication.willTerminateNotification, object: nil,
@@ -158,11 +191,11 @@ final class NotesModule: NotchModule {
     func stop() {
         if let terminateObserver { center.removeObserver(terminateObserver) }
         terminateObserver = nil
+        // Le délai d'annulation continue de courir (sa date) ; plus aucun minuteur n'attend pendant le repli.
         cancelUndo?()
         cancelUndo = nil
         cancelNotice?()
         cancelNotice = nil
-        if deleted != nil { deleted = nil }
         if notice != nil { notice = nil }
         if !query.isEmpty { query = "" }
         purgeEmpty(keeping: nil)
@@ -178,8 +211,12 @@ final class NotesModule: NotchModule {
     private func loadIfNeeded() {
         guard !loaded else { return }
         loaded = true
-        guard let content = file.load() else { return }
-        notes = content.notes.sorted(by: Note.isOrderedBefore)
+        let content = file.load { $0.skipped > 0 }
+        if let aside = file.asideURL {
+            // Sans minuteur : le message reste jusqu'au repli, il ne se perd pas si l'onglet n'est pas à l'écran.
+            notice = String(format: L("Notes illisibles : copie gardée dans %@", table: "Notes"), aside.lastPathComponent)
+        }
+        if let content { notes = content.notes.sorted(by: Note.isOrderedBefore) }
     }
 
     private func save() {
@@ -200,6 +237,9 @@ final class NotesModule: NotchModule {
     }
 
     // MARK: Sélection
+
+    /// La note que « Annuler » rend.
+    var deleted: Note? { deletedNotes.last }
 
     var selectedNote: Note? { selectedID.flatMap { id in notes.first { $0.id == id } } }
 
@@ -295,7 +335,7 @@ final class NotesModule: NotchModule {
         copyToPasteboard(note.text)
     }
 
-    /// Supprime et garde la note `undoDelay` secondes pour l'annuler.
+    /// Supprime et garde la note `undoDelay` secondes pour l'annuler (avec les précédentes, `maxUndo` au plus).
     func delete(_ id: UUID) {
         guard let index = notes.firstIndex(where: { $0.id == id }) else { return }
         let note = notes[index]
@@ -303,12 +343,8 @@ final class NotesModule: NotchModule {
         updated.remove(at: index)
         notes = updated
         if !note.text.isEmpty {
-            deleted = note
-            cancelUndo?()
-            cancelUndo = scheduler.after(Self.undoDelay) { [weak self] in
-                self?.cancelUndo = nil
-                self?.deleted = nil
-            }
+            deletedNotes = Array((deletedNotes + [note]).suffix(Self.maxUndo))
+            armUndo()
         }
         if selectedID == id {
             // Le voisin dans la liste prend la place ; sinon une note vide.
@@ -319,10 +355,9 @@ final class NotesModule: NotchModule {
     }
 
     func undoDelete() {
-        guard let note = deleted, !notes.contains(where: { $0.id == note.id }) else { return }
-        cancelUndo?()
-        cancelUndo = nil
-        deleted = nil
+        guard let note = deletedNotes.popLast() else { return }
+        armUndo()
+        guard !notes.contains(where: { $0.id == note.id }) else { return }
         purgeEmpty(keeping: nil)
         var updated = notes
         updated.append(note)
@@ -330,6 +365,35 @@ final class NotesModule: NotchModule {
         notes = updated
         selectedID = note.id
         save()
+    }
+
+    /// (Re)lance le délai d'annulation depuis maintenant ; rien à annuler : plus de délai.
+    private func armUndo() {
+        cancelUndo?()
+        cancelUndo = nil
+        guard !deletedNotes.isEmpty else { undoDeadline = nil; return }
+        undoDeadline = clock().addingTimeInterval(Self.undoDelay)
+        waitForUndoExpiry(Self.undoDelay)
+    }
+
+    private func waitForUndoExpiry(_ delay: TimeInterval) {
+        cancelUndo = scheduler.after(delay) { [weak self] in
+            self?.cancelUndo = nil
+            self?.undoDeadline = nil
+            self?.deletedNotes = []
+        }
+    }
+
+    /// Le panneau se rouvre : l'annulation vaut encore jusqu'à son échéance, sinon elle est oubliée.
+    private func resumeUndo() {
+        guard !deletedNotes.isEmpty, cancelUndo == nil else { return }
+        let left = undoDeadline?.timeIntervalSince(clock()) ?? 0
+        if left > 0 {
+            waitForUndoExpiry(left)
+        } else {
+            undoDeadline = nil
+            deletedNotes = []
+        }
     }
 
     private func show(notice text: String) {

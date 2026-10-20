@@ -3,7 +3,7 @@ import SwiftUI
 import XCTest
 @testable import ClaudeNotch
 
-/// Rendus PNG de l'onglet Notes rapides (vide, rempli, long avec recherche, annulation, largeurs, réglages) et
+/// Rendus PNG de l'onglet Notes rapides (vide, rempli, long avec recherche, annulation, fichier abîmé, largeurs, réglages) et
 /// mise en page. Ne fait rien sans `CLAUDE_NOTCH_SNAPSHOT_DIR`, sauf les mesures.
 final class NotesSnapshotTests: XCTestCase {
     /// Des notes sans donnée personnelle, étalées dans le temps pour que les dates relatives varient.
@@ -78,6 +78,14 @@ final class NotesSnapshotTests: XCTestCase {
         // Suppression récente : « Annuler la suppression ».
         manyModule.delete(manyModule.notes[1].id)
         try show(manyModule, "notes-undo")
+
+        // Fichier en partie illisible : les bonnes notes, et où est la copie.
+        let damaged = try NotesRig(self)
+        let hourAgo = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3_600))
+        let json = "{\"version\":1,\"notes\":[{\"id\":\"\(UUID().uuidString)\",\"text\":\"Courses : lait, œufs, pain\","
+            + "\"updated\":\"\(hourAgo)\"},{\"id\":\"cassé\",\"text\":\"x\"}]}"
+        try Data(json.utf8).write(to: damaged.fileURL)
+        try show(damaged.startedModule(), "notes-salvaged")
 
         // Réglages › Notes rapides.
         let pair = scene(module)
