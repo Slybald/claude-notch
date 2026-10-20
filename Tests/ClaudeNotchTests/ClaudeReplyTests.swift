@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 @testable import ClaudeNotch
@@ -305,6 +306,78 @@ final class ClaudeReplyTests: XCTestCase {
         XCTAssertNil(late.replies[0])
     }
 
+    // MARK: - Sessions sans terminal
+
+    func testHeadlessDetection() {
+        XCTAssertTrue(ReplyCenter.isHeadless(["claude", "-p", "Bonjour"]))
+        XCTAssertTrue(ReplyCenter.isHeadless(["claude", "--print"]))
+        XCTAssertTrue(ReplyCenter.isHeadless(["claude", "--output-format", "stream-json", "--verbose",
+                                              "--input-format", "stream-json"]), "SDK, onglet Code de Claude Desktop")
+        XCTAssertTrue(ReplyCenter.isHeadless(["claude", "--input-format=stream-json"]))
+        XCTAssertFalse(ReplyCenter.isHeadless(["claude"]))
+        XCTAssertFalse(ReplyCenter.isHeadless(["claude", "--resume", "abc", "explique -p"]))
+        XCTAssertFalse(ReplyCenter.isHeadless(["claude", "--", "-p"]), "prompt après --")
+        XCTAssertFalse(ReplyCenter.isHeadless(["-p"]), "argv[0] ignoré")
+        XCTAssertFalse(ReplyCenter.isHeadless([]))
+    }
+
+    /// `claude -p`, SDK, onglet Code de Claude Desktop : Claude attend la fin de l'attente avant de lire le prompt.
+    /// Elle est rendue tout de suite, et on ne peut pas écrire à la session.
+    func testHeadlessSessionIsNotHeld() throws {
+        let headless = Process()
+        headless.executableURL = URL(fileURLWithPath: "/bin/sh")
+        // « ; exit 0 » : sh garde son argv au lieu de laisser la place à sleep.
+        headless.arguments = ["-c", "sleep 30; exit 0", "claude", "--input-format", "stream-json"]
+        let interactive = Process()
+        interactive.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        interactive.arguments = ["30"]
+        try headless.run()
+        try interactive.run()
+        defer {
+            headless.terminate()
+            interactive.terminate()
+        }
+
+        let waited = Box<String>()
+        replies.wait(sessionId: "s1", pid: headless.processIdentifier) { waited.replies.append($0) }
+        XCTAssertEqual(waited.replies.count, 1)
+        XCTAssertNil(waited.replies[0])
+        XCTAssertTrue(replies.waiting.isEmpty)
+        XCTAssertEqual(replies.headless, ["s1"])
+        XCTAssertNil(replies.send("Bonjour", to: "s1"), "rien ne le remettrait")
+        XCTAssertNil(replies.queued["s1"])
+
+        let held = Box<String>()
+        replies.wait(sessionId: "s2", pid: interactive.processIdentifier) { held.replies.append($0) }
+        XCTAssertTrue(held.replies.isEmpty, "session dans un terminal : l'attente est tenue")
+        XCTAssertEqual(replies.waiting, ["s2"])
+
+        replies.observe(HookEvent(raw: ["hook_event_name": "SessionEnd", "session_id": "s1"]))
+        XCTAssertTrue(replies.headless.isEmpty)
+    }
+
+    // MARK: - Carte
+
+    /// Outils MCP, Skill, Agent : la carte montre tout ce qui part, pas seulement le nom de l'outil.
+    func testPermissionShowsWholeToolInput() {
+        let mcp = ReplyCenter.permission(tool: "mcp__slack__post_message",
+                                         input: ["channel": "#general", "text": "Déploiement fini"])
+        XCTAssertEqual(mcp.note, "post_message")
+        XCTAssertEqual(mcp.detail, ##"{"channel":"#general","text":"Déploiement fini"}"##)
+        XCTAssertTrue(mcp.isCode)
+        let agent = ReplyCenter.permission(tool: "Agent", input: ["description": "Explore", "prompt": "Supprime tout"])
+        XCTAssertTrue(agent.detail?.contains("Supprime tout") ?? false, "prompt de l'agent visible")
+        let skill = ReplyCenter.permission(tool: "Skill", input: ["skill": "deploy", "args": "--prod"])
+        XCTAssertTrue(skill.detail?.contains("--prod") ?? false, "arguments du skill visibles")
+        XCTAssertEqual(ReplyCenter.permission(tool: "mcp__web__open", input: ["url": "https://example.com/a"]).detail,
+                       #"{"url":"https://example.com/a"}"#)
+        XCTAssertNil(ReplyCenter.permission(tool: "mcp__x__ping", input: [:]).detail)
+        // Entrée énorme : bornée, et assez longue pour que la carte la dise coupée.
+        let huge = ReplyCenter.permission(tool: "mcp__x__y", input: ["text": String(repeating: "a", count: 10_000)])
+        XCTAssertEqual(huge.detail?.count, 2000)
+        XCTAssertTrue(RequestCard.isLong(huge.detail ?? ""))
+    }
+
     func testSanitizeRemovesControlsAndCapsSize() {
         XCTAssertEqual(ReplyCenter.sanitize("a\u{1B}[2J\u{7}b\r\nc\rd\u{2028}e\tf\u{0}"), "a[2Jb\nc\nd\ne\tf")
         XCTAssertEqual(ReplyCenter.sanitize("  \n "), "")
@@ -355,14 +428,18 @@ final class ClaudeReplyTests: XCTestCase {
         XCTAssertTrue(store.sessions["s2"]?.activeTools.isEmpty ?? false, "l'outil refusé ne tournera pas")
     }
 
+    private func makeModule(_ store: SessionStore) -> ClaudeModule {
+        let config = FileManager.default.temporaryDirectory.appendingPathComponent("claude-notch-no-config")
+        return ClaudeModule(store: store, monitor: ClaudeMonitor(), tools: ToolsFeed(paths: LayoutTests.absentPaths),
+                            prefs: prefs, hooks: HookSetup(installer: HookInstaller(configDirectory: config,
+                                                                                  bundledHook: nil)),
+                            replies: replies)
+    }
+
     /// Le module relie la décision à la session.
     func testModuleDecisionUpdatesSession() {
         let store = SessionStore()
-        let config = FileManager.default.temporaryDirectory.appendingPathComponent("claude-notch-no-config")
-        let module = ClaudeModule(store: store, monitor: ClaudeMonitor(), tools: ToolsFeed(paths: LayoutTests.absentPaths),
-                                  prefs: prefs, hooks: HookSetup(installer: HookInstaller(configDirectory: config,
-                                                                                        bundledHook: nil)),
-                                  replies: replies)
+        let module = makeModule(store)
         store.send("PreToolUse", "s1", ["tool_name": "Bash", "tool_use_id": "t1", "tool_input": ["command": "make"]])
         store.send("PermissionRequest", "s1", ["tool_name": "Bash", "tool_input": ["command": "make"]])
         let (request, box) = hold(permission(input: ["command": "make"]))
@@ -371,5 +448,27 @@ final class ClaudeReplyTests: XCTestCase {
         XCTAssertEqual(box.replies.count, 1)
         XCTAssertEqual(store.sessions["s1"]?.phase, .tool)
         XCTAssertTrue(module.drafts.texts.isEmpty, "saisie de la demande oubliée")
+    }
+
+    /// Identifiants de session réels : des UUID. Le message en cours d'une session survit au tri des demandes, à
+    /// la décision prise pour une autre session et au repli du panneau.
+    func testMessageDraftSurvivesWithUUIDSessions() {
+        _ = NSApplication.shared
+        let a = "11111111-1111-4111-8111-111111111111", b = "22222222-2222-4222-8222-222222222222"
+        let module = makeModule(SessionStore())
+        let (request, _) = hold(permission(a, input: ["command": "ls"]))
+        module.drafts.texts[ReplyDrafts.key(request.id)] = "motif"
+        module.drafts.composing = b
+        module.drafts.messages[b] = "message en cours pour B"
+
+        module.decide(request, .allow)
+        XCTAssertEqual(module.drafts.messages[b], "message en cours pour B")
+        XCTAssertEqual(module.drafts.composing, b)
+        XCTAssertTrue(module.drafts.texts.isEmpty, "saisie de la demande réglée oubliée")
+
+        module.stop()
+        XCTAssertEqual(module.drafts.messages[b], "message en cours pour B", "gardé pour la prochaine ouverture")
+        module.drafts.prune(keeping: [])
+        XCTAssertEqual(module.drafts.messages[b], "message en cours pour B")
     }
 }

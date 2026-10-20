@@ -10,6 +10,7 @@ import Foundation
 ///   notch, ~590 s sinon. Le dialogue du terminal reste utilisable pendant ce temps : la première réponse gagne.
 /// - `/inbox` (hooks SessionStart et Stop en `asyncRewake`) : une seule attente par session. Un message envoyé
 ///   depuis la notch lui est remis et réveille Claude ; sans attente, il reste en file (FIFO) jusqu'à la suivante.
+///   Session sans terminal (`claude -p`, SDK, onglet Code de Claude Desktop) : rendue tout de suite, pas de message.
 ///
 /// Une décision n'existe qu'en réponse à la requête d'un hook, après un clic : jamais de « toujours autoriser »,
 /// jamais d'autorisation par défaut. Réglage désactivé : tout est rendu tout de suite. Main thread uniquement.
@@ -99,6 +100,8 @@ final class ReplyCenter: ObservableObject {
     @Published private(set) var queued: [String: [String]] = [:]
     /// Dernier retour visible, par session (quelques secondes).
     @Published private(set) var notices: [String: Notice] = [:]
+    /// Sessions sans terminal : on ne peut pas leur écrire.
+    @Published private(set) var headless: Set<String> = []
 
     private struct Waiter {
         let id: UUID
@@ -192,6 +195,7 @@ final class ReplyCenter: ObservableObject {
             release { $0.sessionId == sessionId }
             closeWaiter(sessionId)
             queued[sessionId] = nil
+            headless.remove(sessionId)
         default:
             break
         }
@@ -254,6 +258,12 @@ final class ReplyCenter: ObservableObject {
     /// si Claude est mort ou si le réglage est coupé. Un message en file part tout de suite.
     func wait(sessionId: String, pid: pid_t?, id: UUID = UUID(), reply: @escaping (String?) -> Void) {
         guard isEnabled, pid.map({ ProcessInspector.isAlive($0) }) ?? true else { return reply(nil) }
+        // Sans terminal, Claude attend la fin de ce hook avant de lire le prompt (mesuré, 2.1.304) : le tenir
+        // bloquerait la session.
+        if let pid, Self.isHeadless(ProcessInspector.arguments(pid)) {
+            headless.insert(sessionId)
+            return reply(nil)
+        }
         // Une seule attente par session : la nouvelle remplace l'ancienne.
         waiters.removeValue(forKey: sessionId)?.reply(nil)
         if var queue = queued[sessionId], !queue.isEmpty {
@@ -273,7 +283,7 @@ final class ReplyCenter: ObservableObject {
     @discardableResult
     func send(_ text: String, to sessionId: String) -> SendResult? {
         let message = Self.sanitize(text)
-        guard isEnabled, !message.isEmpty else { return nil }
+        guard isEnabled, !message.isEmpty, !headless.contains(sessionId) else { return nil }
         if let waiter = waiters.removeValue(forKey: sessionId) {
             waiter.reply(message)
             waitersChanged()
@@ -448,13 +458,22 @@ final class ReplyCenter: ObservableObject {
         case "WebFetch":
             return Permission(label: description.label, detail: text("url"), isCode: true, note: nil)
         default:
-            if let detail = description.detail {
-                return Permission(label: description.label, detail: detail, isCode: description.isCode, note: nil)
-            }
-            let json = (try? JSONSerialization.data(withJSONObject: input, options: [.sortedKeys]))
+            // Toute l'entrée (arguments MCP, prompt d'un agent, args d'un skill), comme le dialogue du terminal ;
+            // au-delà de 6 lignes, la carte prévient qu'elle est coupée.
+            let json = input.isEmpty ? nil : (try? JSONSerialization.data(
+                withJSONObject: input, options: [.sortedKeys, .withoutEscapingSlashes]))
                 .map { String(decoding: $0, as: UTF8.self) }
-            return Permission(label: description.label, detail: json.map { ToolDescriber.truncate($0, max: 300) },
-                              isCode: true, note: nil)
+            return Permission(label: description.label, detail: json.map { ToolDescriber.truncate($0, max: 2000) },
+                              isCode: true, note: description.detail)
+        }
+    }
+
+    /// Claude lancé sans terminal : `-p`/`--print`, ou entrée/sortie en flux (SDK, IDE, onglet Code de Claude
+    /// Desktop, qui passe `--input-format stream-json` sans `-p`).
+    static func isHeadless(_ arguments: [String]) -> Bool {
+        arguments.dropFirst().prefix { $0 != "--" }.contains { argument in
+            argument == "-p" || argument == "--print"
+                || ["--input-format", "--output-format"].contains { argument == $0 || argument.hasPrefix($0 + "=") }
         }
     }
 

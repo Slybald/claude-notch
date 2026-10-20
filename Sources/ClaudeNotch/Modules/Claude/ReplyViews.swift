@@ -8,8 +8,9 @@ import SwiftUI
 final class ReplyDrafts: ObservableObject {
     /// Session dont le champ de message est ouvert.
     @Published var composing: String?
-    /// Message (clé : session), motif de refus ou changements demandés (clé : demande), réponse libre
-    /// (clé : demande#question).
+    /// Message libre, par session : gardé jusqu'à l'envoi, jamais touché par `prune`.
+    @Published var messages: [String: String] = [:]
+    /// Motif de refus ou changements demandés (clé : demande), réponse libre (clé : demande#question).
     @Published var texts: [String: String] = [:]
     /// Libellés cochés d'une question (clé : demande#question).
     @Published var choices: [String: Set<String>] = [:]
@@ -18,19 +19,19 @@ final class ReplyDrafts: ObservableObject {
         Binding(get: { self.texts[key] ?? "" }, set: { self.texts[key] = $0.isEmpty ? nil : $0 })
     }
 
+    func message(_ session: String) -> Binding<String> {
+        Binding(get: { self.messages[session] ?? "" }, set: { self.messages[session] = $0.isEmpty ? nil : $0 })
+    }
+
     static func key(_ request: UUID, _ question: Int? = nil) -> String {
         question.map { "\(request.uuidString)#\($0)" } ?? request.uuidString
     }
 
-    /// Oublie les saisies des demandes qui ne sont plus tenues.
+    /// Oublie les saisies des demandes qui ne sont plus tenues (les messages ont leur propre table).
     func prune(keeping requests: [UUID]) {
         let live = Set(requests.map(\.uuidString))
-        func isLive(_ key: String) -> Bool {
-            guard key.count >= 36, UUID(uuidString: String(key.prefix(36))) != nil else { return true }
-            return live.contains(String(key.prefix(36)))
-        }
-        texts = texts.filter { isLive($0.key) }
-        choices = choices.filter { isLive($0.key) }
+        texts = texts.filter { live.contains(String($0.key.prefix(36))) }
+        choices = choices.filter { live.contains(String($0.key.prefix(36))) }
     }
 }
 
@@ -71,7 +72,7 @@ struct ReplyableSessionCard: View {
 
     private var canWrite: Bool {
         prefs.replyFromNotch && session.phase != .ended && replies.request(for: session.id) == nil
-            && drafts.composing != session.id
+            && drafts.composing != session.id && !replies.headless.contains(session.id)
     }
 
     var body: some View {
@@ -250,20 +251,7 @@ struct RequestCard: View {
                 }
             }
             if let detail = permission.detail {
-                Text(detail)
-                    .font(.system(size: 11, design: permission.isCode ? .monospaced : .default))
-                    .foregroundColor(.white.opacity(0.88))
-                    .lineLimit(6)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.black.opacity(0.35)))
-                    .help(detail)
-                if Self.isLong(detail) {
-                    ReplyStatusLine(icon: "eye", color: Palette.amber,
-                                    text: L("Texte coupé : lis-le en entier dans la session", table: "Claude"))
-                }
+                PermissionDetail(text: detail, isCode: permission.isCode)
             }
             actionRow(
                 field: ReplyField(placeholder: L("Pourquoi refuser ? (facultatif)", table: "Claude"), text: reason,
@@ -332,9 +320,63 @@ struct RequestCard: View {
         }
     }
 
+    /// Coupé à coup sûr, sans mesure : plus de 420 caractères ou de 6 lignes.
     static func isLong(_ text: String) -> Bool {
         text.count > 420 || text.reduce(0) { $1.isNewline ? $0 + 1 : $0 } >= 6
     }
+}
+
+/// Ce qui sera autorisé, sur 6 lignes au plus. Dès que le texte affiché est coupé (lignes longues repliées
+/// comprises), la carte le dit : la fin cachée peut changer ce que fait la commande.
+private struct PermissionDetail: View {
+    let text: String
+    let isCode: Bool
+
+    @State private var clipped = false
+
+    private static let maxLines = 6
+    private var font: Font { .system(size: 11, design: isCode ? .monospaced : .default) }
+
+    var body: some View {
+        let long = RequestCard.isLong(text)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(text)
+                .font(font)
+                .foregroundColor(.white.opacity(0.88))
+                .lineLimit(Self.maxLines)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay { if !long { probe } }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.black.opacity(0.35)))
+                .help(text)
+            if long || clipped {
+                ReplyStatusLine(icon: "eye", color: Palette.amber,
+                                text: L("Texte coupé : lis-le en entier dans la session", table: "Claude"))
+            }
+        }
+        .onPreferenceChange(ClippedKey.self) { clipped = $0 }
+    }
+
+    /// Le même texte sans limite de lignes, invisible, à la même largeur : plus haut que l'affiché, il est coupé.
+    private var probe: some View {
+        GeometryReader { shown in
+            Text(text)
+                .font(font)
+                .fixedSize(horizontal: false, vertical: true)
+                .hidden()
+                .frame(width: shown.size.width, alignment: .leading)
+                .background(GeometryReader { full in
+                    Color.clear.preference(key: ClippedKey.self, value: full.size.height > shown.size.height + 1)
+                })
+        }
+    }
+}
+
+private struct ClippedKey: PreferenceKey {
+    static var defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }
 
 /// Questions d'AskUserQuestion : un choix (ou plusieurs), ou une réponse libre ; « Répondre » une fois chaque
@@ -472,14 +514,14 @@ struct MessageComposer: View {
 
     @FocusState private var focused: Bool
 
-    private var text: String { drafts.texts[session.id] ?? "" }
+    private var text: String { drafts.messages[session.id] ?? "" }
     private var canSend: Bool { !ReplyCenter.sanitize(text).isEmpty }
 
     var body: some View {
         let connected = replies.waiting.contains(session.id)
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 6) {
-                ReplyField(placeholder: L("Message à Claude…", table: "Claude"), text: drafts.binding(session.id),
+                ReplyField(placeholder: L("Message à Claude…", table: "Claude"), text: drafts.message(session.id),
                            onSubmit: send, onCancel: close)
                     .focused($focused)
                 Button(action: send) {
@@ -529,7 +571,7 @@ struct MessageComposer: View {
 
     private func send() {
         guard canSend, replies.send(text, to: session.id) != nil else { return }
-        drafts.texts[session.id] = nil
+        drafts.messages[session.id] = nil
         close()
     }
 
