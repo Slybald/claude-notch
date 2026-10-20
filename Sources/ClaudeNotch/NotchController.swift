@@ -74,6 +74,12 @@ final class NotchController {
     private var isShown = false
     private var cancellables = Set<AnyCancellable>()
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+    /// Compteur du presse-papiers de glisser relevé au dernier clic dans une autre app (Étagère).
+    private var fileDragBaseline: Int?
+    /// Notch montrée seulement pour un dépôt (rien d'autre à afficher) : recachée au repli.
+    private var shownForDrag = false
+    /// Onglet d'avant qu'un glisser de fichiers montre l'Étagère ; nil dès qu'un dépôt a lieu.
+    private var tabBeforeDrag: String?
 
     init(store: SessionStore, monitor: ClaudeMonitor, prefs: Preferences, tools: ToolsFeed) {
         self.store = store
@@ -117,7 +123,22 @@ final class NotchController {
         hosting.sizingOptions = []
         hosting.frame = NSRect(origin: .zero, size: Self.panelSize)
         hosting.autoresizingMask = [.width, .height]
-        panel.contentView = hosting
+        // Étagère : une vue AppKit sous le contenu SwiftUI reçoit les fichiers glissés sur le panneau déplié.
+        let drop = ShelfDropView(frame: hosting.frame)
+        drop.autoresizingMask = [.width, .height]
+        drop.addSubview(hosting)
+        drop.shelf = shelf
+        drop.accepts = { [weak self] point in
+            guard let self else { return false }
+            return self.model.isExpanded && self.registry.isEnabled(ShelfModule.moduleId) && self.isInsideZone(point)
+        }
+        drop.showShelf = { [weak self] in
+            guard let self, self.model.selectedTab != ShelfModule.moduleId else { return }
+            self.tabBeforeDrag = self.model.selectedTab
+            self.model.selectedTab = ShelfModule.moduleId
+        }
+        drop.dropped = { [weak self] in self?.tabBeforeDrag = nil }
+        panel.contentView = drop
 
         updateGeometry()
         installMouseMonitors()
@@ -205,8 +226,13 @@ final class NotchController {
 
     private func installMouseMonitors() {
         let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-            self?.mouseMoved()
+        // Clic dans une autre app : arme la détection d'un glisser de fichiers vers l'Étagère (`openForFileDrag`).
+        let globalMask = mask.union(.leftMouseDown)
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: globalMask, handler: { [weak self] event in
+            guard let self else { return }
+            if event.type == .leftMouseDown { return self.armFileDrag() }
+            if event.type == .leftMouseDragged, self.openForFileDrag() { return }
+            self.mouseMoved()
         }) {
             eventMonitors.append(global)
         }
@@ -274,10 +300,10 @@ final class NotchController {
 
     private var isCompact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
 
-    private func expand() {
+    private func expand(tab: String? = nil) {
         guard !model.isExpanded else { return }
         panel.ignoresMouseEvents = false
-        model.selectedTab = registry.initialTab(claudeNeedsAttention: store.indicator == .attention)
+        model.selectedTab = tab ?? registry.initialTab(claudeNeedsAttention: store.indicator == .attention)
         model.isExpanded = true
         if prefs.hapticFeedback {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
@@ -295,9 +321,15 @@ final class NotchController {
         panel.ignoresMouseEvents = true
         if model.isExpanded {
             model.isExpanded = false
-            if prefs.lastTab != model.selectedTab { prefs.lastTab = model.selectedTab }
+            let tab = Self.tabToRemember(selected: model.selectedTab, beforeDrag: tabBeforeDrag)
+            if prefs.lastTab != tab { prefs.lastTab = tab }
         }
+        tabBeforeDrag = nil
         registry.setPanelOpen(false)
+        if shownForDrag {
+            shownForDrag = false
+            updateVisibility()
+        }
     }
 
     /// 15 Hz, seulement déplié : rattrape les mouvements que les moniteurs ne voient pas.
@@ -311,6 +343,55 @@ final class NotchController {
     private func stopPolling() {
         pollTimer?.invalidate()
         pollTimer = nil
+    }
+
+    // MARK: - Glisser-déposer (Étagère)
+
+    private var shelf: ShelfModule? { registry.module(ShelfModule.moduleId) as? ShelfModule }
+
+    /// Pendant un glisser, plus de `mouseMoved` : seuls des `leftMouseDragged` arrivent, et la fenêtre repliée
+    /// laisse passer la souris. Un nouveau contenu du presse-papiers de glisser depuis le clic = un glisser commencé.
+    private func armFileDrag() {
+        fileDragBaseline = registry.isEnabled(ShelfModule.moduleId) ? NSPasteboard(name: .drag).changeCount : nil
+    }
+
+    /// Glisser de fichiers au-dessus de la notch repliée : déplie tout de suite sur l'Étagère, puis `ShelfDropView`
+    /// prend le relais (fenêtre qui accepte la souris). Une fois par glisser ; jamais en plein écran « masquée ».
+    private func openForFileDrag() -> Bool {
+        guard let baseline = fileDragBaseline, !model.isExpanded, !hiddenForFullScreen,
+              Self.dropZone(notch: notchRect, screen: screenFrame, contentWidth: model.contentSize.width)
+                .contains(NSEvent.mouseLocation) else { return false }
+        let pasteboard = NSPasteboard(name: .drag)
+        guard pasteboard.changeCount != baseline else { return false }
+        fileDragBaseline = nil
+        guard ShelfDrop.hasFiles(pasteboard) else { return false }
+        if !shouldShow {
+            shownForDrag = true
+            hideWork?.cancel()
+            hideWork = nil
+        }
+        if !isShown {
+            isShown = true
+            updateGeometry()
+            panel.orderFrontRegardless()
+        }
+        tabBeforeDrag = prefs.lastTab
+        expand(tab: ShelfModule.moduleId)
+        shelf?.isDropTargeted = true
+        return true
+    }
+
+    /// Notch repliée : la forme et la place des oreilles, élargies (le glisser arrive vite et de biais).
+    static func dropZone(notch: CGRect, screen: CGRect, contentWidth: CGFloat) -> CGRect {
+        let width = max(contentWidth, notch.width + 2 * earWidth) + 40
+        let height = notch.height + 16
+        // +1 : la souris peut être pile sur le bord haut de l'écran.
+        return CGRect(x: notch.midX - width / 2, y: screen.maxY - height, width: width, height: height + 1)
+    }
+
+    /// Onglet mémorisé au repli : l'Étagère montrée par un glisser de fichiers resté sans dépôt ne compte pas.
+    static func tabToRemember(selected: String, beforeDrag: String?) -> String {
+        selected == ShelfModule.moduleId ? beforeDrag ?? selected : selected
     }
 
     // MARK: - Actions
@@ -451,7 +532,7 @@ final class NotchController {
     private var shouldShow: Bool {
         guard !hiddenForFullScreen else { return false }
         return prefs.alwaysVisible || monitor.desktopRunning || !monitor.cliPids.isEmpty || store.hasLiveSessions
-            || registry.moduleEars != nil
+            || registry.moduleEars != nil || shownForDrag
     }
 
     private func updateVisibility() {

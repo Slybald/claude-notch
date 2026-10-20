@@ -1,3 +1,35 @@
 /* Claude Notch: English texts of the Shelf module. The key is the French text used in the code. */
 "Étagère" = "Shelf";
-"Dépose des fichiers ici pour les garder sous la main." = "Drop files here to keep them at hand.";
+
+/* Onglet */
+"Glisse des fichiers sur la notch" = "Drag files onto the notch";
+"Ils restent ici, sous la main. Rien n'est copié : l'étagère garde un lien vers chaque fichier." = "They stay here, at hand. Nothing is copied: the shelf keeps a link to each file.";
+"Déposer ici" = "Drop here";
+"Introuvable" = "Missing";
+"Étagère vidée" = "Shelf cleared";
+"Annuler" = "Undo";
+"%d élément" = "%d item";
+"%d éléments" = "%d items";
+"%1$d sur %2$d sélectionné" = "%1$d of %2$d selected";
+"%1$d sur %2$d sélectionnés" = "%1$d of %2$d selected";
+"AirDrop : la sélection, ou toute l'étagère" = "AirDrop: the selection, or the whole shelf";
+
+/* Actions */
+"Ouvrir" = "Open";
+"Afficher dans le Finder" = "Show in Finder";
+"Coup d'œil" = "Quick Look";
+"Retirer de l'étagère" = "Remove from Shelf";
+"Retirer %d éléments" = "Remove %d Items";
+"Tout vider" = "Clear All";
+
+/* Messages */
+"Étagère pleine : %d éléments au maximum." = "Shelf full: %d items at most.";
+"Certains éléments n'ont pas pu être ajoutés." = "Some items could not be added.";
+"Impossible d'enregistrer l'étagère." = "Could not save the shelf.";
+"AirDrop n'est pas disponible." = "AirDrop is not available.";
+
+/* Réglages */
+"Retirer un élément glissé vers une autre app" = "Remove items dragged to another app";
+"Vider l'étagère en quittant" = "Clear the shelf on quit";
+"Nombre maximal d'éléments" = "Maximum number of items";
+"Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider l'étagère en quittant », la liste est gardée d'un lancement à l'autre." = "Drag files or folders onto the notch, even when it is collapsed. The shelf keeps a link to each file (nothing is copied) and finds it again if it moves. Without “Clear the shelf on quit”, the list is kept from one launch to the next.";
