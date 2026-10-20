@@ -329,24 +329,24 @@ struct ClaudeSettingsView: View {
         SettingsPane {
             Section {
                 Toggle("Répondre depuis la notch", isOn: $prefs.replyFromNotch)
-                SettingsNote(L("Autoriser ou refuser une permission, répondre à une question, valider un plan ou "
-                    + "écrire à Claude (survole une carte : « Écrire ») sans quitter la notch. Le dialogue du terminal "
-                    + "reste utilisable : la première réponse gagne.", table: "Claude"))
-                SettingsNote(L("La notch garde une demande 4 s, ou jusqu'à ta réponse si tu ouvres sa carte ; sinon "
-                    + "le terminal garde la main. Jamais de « toujours autoriser » depuis la notch. Désactivé, les "
-                    + "hooks rendent la main tout de suite.", table: "Claude"))
                 if prefs.replyFromNotch, setup.status != .installed {
                     Label(L("Hooks à mettre à jour pour répondre depuis la notch", table: "Claude"),
                           systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 11))
                         .foregroundColor(Palette.amber)
                 }
-                if prefs.replyFromNotch {
-                    SettingsNote(L("Une session ouverte avant la mise à jour des hooks reçoit les réponses après "
-                        + "son redémarrage.", table: "Claude"))
+            } header: {
+                Text("Réponses", tableName: "Claude")
+            } footer: {
+                VStack(alignment: .leading, spacing: 2) {
+                    SettingsNote(L("Permissions, questions et plans depuis la notch ; la première réponse gagne.",
+                                   table: "Claude"))
+                    if prefs.replyFromNotch {
+                        SettingsNote(L("Redémarre les sessions ouvertes avant la mise à jour des hooks.", table: "Claude"))
+                    }
                 }
             }
-            Section("Hooks Claude Code") {
+            Section {
                 LabeledContent("État") {
                     Text(statusText)
                         .foregroundColor(setup.status == .installed ? Palette.green : Palette.amber)
@@ -363,6 +363,9 @@ struct ClaudeSettingsView: View {
                     Spacer()
                     Button("Désinstaller Claude Notch…", action: setup.confirmAndUninstall)
                 }
+            } header: {
+                Text("Hooks Claude Code")
+            } footer: {
                 SettingsNote(L("Les hooks relaient chaque événement de Claude Code à l'app, en local (127.0.0.1)."))
             }
         }

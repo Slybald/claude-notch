@@ -16,6 +16,8 @@
 "OK" = "OK";
 "Lancer %d min" = "Lancer %d min";
 "Durée libre : flèches, molette ou saisie" = "Durée libre : flèches, molette ou saisie";
+"Diminuer la durée" = "Diminuer la durée";
+"Augmenter la durée" = "Augmenter la durée";
 "Concentration" = "Concentration";
 "Pause courte" = "Pause courte";
 "Pause longue" = "Pause longue";
@@ -46,4 +48,4 @@
 "Ouvrir Réglages Système" = "Ouvrir Réglages Système";
 "Notifications refusées" = "Notifications refusées";
 "Fin du minuteur" = "Fin du minuteur";
-"L'autorisation des notifications est demandée au premier minuteur lancé. Sans elle, le son et l'oreille « Terminé » suffisent." = "L'autorisation des notifications est demandée au premier minuteur lancé. Sans elle, le son et l'oreille « Terminé » suffisent.";
+"Notifications : l'autorisation est demandée au premier minuteur lancé." = "Notifications : l'autorisation est demandée au premier minuteur lancé.";

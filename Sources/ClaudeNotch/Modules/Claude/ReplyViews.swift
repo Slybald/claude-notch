@@ -532,6 +532,7 @@ struct MessageComposer: View {
                 .buttonStyle(.plain)
                 .disabled(!canSend)
                 .help(L("Envoyer (Entrée)", table: "Claude"))
+                .accessibilityLabel(L("Envoyer (Entrée)", table: "Claude"))
                 Button(action: close) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 15))
@@ -539,6 +540,7 @@ struct MessageComposer: View {
                 }
                 .buttonStyle(.plain)
                 .help(L("Fermer (Échap)", table: "Claude"))
+                .accessibilityLabel(L("Fermer (Échap)", table: "Claude"))
             }
             HStack(spacing: 5) {
                 Circle()

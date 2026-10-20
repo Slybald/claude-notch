@@ -6,6 +6,7 @@
 "Annuler" = "Annuler";
 "Annuler la suppression" = "Annuler la suppression";
 "Rechercher" = "Rechercher";
+"Effacer la recherche" = "Effacer la recherche";
 "Désépingler" = "Désépingler";
 "Épingler" = "Épingler";
 "Supprimer" = "Supprimer";
@@ -17,7 +18,7 @@
 "%@ caractères" = "%@ caractères";
 "Afficher dans le Finder" = "Afficher dans le Finder";
 "Fichier des notes" = "Fichier des notes";
-"Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie." = "Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie.";
+"Texte brut : %d notes au plus, %@ caractères chacune. Enregistrement automatique." = "Texte brut : %d notes au plus, %@ caractères chacune. Enregistrement automatique.";
 "Limite de %d notes atteinte" = "Limite de %d notes atteinte";
 "Note limitée à %d caractères" = "Note limitée à %d caractères";
 "Notes illisibles : copie gardée dans %@" = "Notes illisibles : copie gardée dans %@";

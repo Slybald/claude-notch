@@ -65,7 +65,7 @@
 "Caféine : impossible d'empêcher la veille." = "Caffeine: couldn't prevent sleep.";
 "Raccourci « activer »" = "\"Turn on\" shortcut";
 "Raccourci « désactiver »" = "\"Turn off\" shortcut";
-"macOS ne permet ni de lire ni de régler la Concentration. Un raccourci de l'app Raccourcis l'active ou la désactive ; l'état affiché est celui de ton dernier clic." = "macOS lets apps neither read nor set Focus. A shortcut from the Shortcuts app turns it on or off; the state shown is that of your last click.";
+"Un raccourci l'active ou la coupe ; l'état affiché est celui de ton dernier clic." = "A shortcut turns it on or off; the state shown is that of your last click.";
 "Créer un raccourci…" = "Create a Shortcut…";
 "Aide sur Raccourcis" = "Help with Shortcuts";
 "Comment créer le raccourci « Définir la concentration »" = "How to create the \"Set Focus\" shortcut";
@@ -75,10 +75,10 @@
 "La caféine est visible dans les oreilles de la notch tant qu'elle est active." = "Caffeine shows in the notch ears while it is active.";
 "Autonomie : couper aussi le Bluetooth" = "Battery Saver: also turn Bluetooth off";
 "Présentation : activer la Concentration" = "Presentation: turn Focus on";
-"Autonomie : économie d'énergie, caféine coupée. Présentation : écran allumé, économie d'énergie coupée. Normal rétablit l'état d'avant les scènes. Changer l'économie d'énergie demande Touch ID ou ton mot de passe à chaque fois : macOS l'exige, rien n'est installé en arrière-plan." = "Battery Saver: Low Power Mode on, caffeine off. Presentation: screen kept on, Low Power Mode off. Normal restores the state from before the scenes. Changing Low Power Mode asks for Touch ID or your password each time: macOS requires it, nothing is installed in the background.";
+"Normal rétablit l'état d'avant les scènes ; l'économie d'énergie demande Touch ID." = "Normal restores the state from before the scenes; Low Power Mode asks for Touch ID.";
 "Passage automatique" = "Automatic switch";
 "Passer en Autonomie quand la batterie baisse" = "Switch to Battery Saver when the battery runs low";
 "Seuil : %d %%" = "Threshold: %d%%";
-"Une seule fois par descente, sur batterie. La demande d'autorisation du système s'affiche à ce moment-là. Désactivé par défaut." = "Once per drop, on battery. The system authorization prompt appears at that moment. Off by default.";
+"Une seule fois par descente, sur batterie. Désactivé par défaut." = "Once per drop, on battery. Off by default.";
 "+%d autre" = "+%d more";
 "+%d autres" = "+%d more";

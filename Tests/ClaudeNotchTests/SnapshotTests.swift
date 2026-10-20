@@ -11,7 +11,7 @@ final class SnapshotTests: XCTestCase {
     }
 
     /// Trois sessions : une au travail (tâches, agents), une qui attend une permission, une terminée.
-    private static func sampleStore() -> SessionStore {
+    static func sampleStore() -> SessionStore {
         let store = SessionStore()
         let context = ProcessContext(source: .cli, hostName: "iTerm2", hostBundleId: "com.googlecode.iterm2")
         func send(_ name: String, _ sid: String, _ extra: [String: Any] = [:]) {

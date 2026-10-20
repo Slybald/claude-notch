@@ -6,6 +6,7 @@
 "Annuler" = "Undo";
 "Annuler la suppression" = "Undo delete";
 "Rechercher" = "Search";
+"Effacer la recherche" = "Clear search";
 "Désépingler" = "Unpin";
 "Épingler" = "Pin";
 "Supprimer" = "Delete";
@@ -17,7 +18,7 @@
 "%@ caractères" = "%@ characters";
 "Afficher dans le Finder" = "Show in Finder";
 "Fichier des notes" = "Notes file";
-"Texte brut, %d notes au plus et %@ caractères par note. Enregistré environ une seconde après la dernière frappe, au changement de note et quand le panneau se replie." = "Plain text, up to %d notes and %@ characters per note. Saved about a second after your last keystroke, when you switch notes and when the panel collapses.";
+"Texte brut : %d notes au plus, %@ caractères chacune. Enregistrement automatique." = "Plain text: up to %d notes of %@ characters each. Saved automatically.";
 "Limite de %d notes atteinte" = "Limit of %d notes reached";
 "Note limitée à %d caractères" = "Note limited to %d characters";
 "Notes illisibles : copie gardée dans %@" = "Unreadable notes: copy kept in %@";

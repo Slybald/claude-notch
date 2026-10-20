@@ -32,4 +32,4 @@
 "Retirer un élément glissé vers une autre app" = "Retirer un élément glissé vers une autre app";
 "Vider l'étagère en quittant" = "Vider l'étagère en quittant";
 "Nombre maximal d'éléments" = "Nombre maximal d'éléments";
-"Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider l'étagère en quittant », la liste est gardée d'un lancement à l'autre." = "Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider l'étagère en quittant », la liste est gardée d'un lancement à l'autre.";
+"Rien n'est copié : l'étagère garde un lien vers chaque fichier, même déplacé." = "Rien n'est copié : l'étagère garde un lien vers chaque fichier, même déplacé.";

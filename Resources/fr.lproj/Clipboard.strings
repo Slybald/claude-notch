@@ -1,5 +1,6 @@
 /* Claude Notch : textes français du module Clipboard (la clé est le texte). */
 "Presse-papiers" = "Presse-papiers";
+"Aucune copie pour l'instant" = "Aucune copie pour l'instant";
 "Copie du texte, un lien ou une image : ils apparaîtront ici." = "Copie du texte, un lien ou une image : ils apparaîtront ici.";
 "Rechercher" = "Rechercher";
 "Effacer la recherche" = "Effacer la recherche";
@@ -19,10 +20,11 @@
 "et %d autre fichier" = "et %d autre fichier";
 "et %d autres fichiers" = "et %d autres fichiers";
 "Historique" = "Historique";
+"Capture" = "Capture";
 "Éléments gardés" = "Éléments gardés";
-"Les éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés. Les images de plus de 5 Mo ne sont pas gardées." = "Les éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés. Les images de plus de 5 Mo ne sont pas gardées.";
+"Les épinglés s'ajoutent à ce nombre. Images de plus de 5 Mo ignorées." = "Les épinglés s'ajoutent à ce nombre. Images de plus de 5 Mo ignorées.";
 "Garder l'historique après redémarrage" = "Garder l'historique après redémarrage";
-"Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans mise en forme ; les images et les fichiers n'y sont jamais." = "Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans mise en forme ; les images et les fichiers n'y sont jamais.";
+"Activé : seuls les textes et les liens vont dans un fichier privé." = "Activé : seuls les textes et les liens vont dans un fichier privé.";
 "Effacer l'historique" = "Effacer l'historique";
 "Effacer l'historique ?" = "Effacer l'historique ?";
 "Effacer" = "Effacer";
@@ -31,11 +33,11 @@
 "Ne plus ignorer cette app" = "Ne plus ignorer cette app";
 "Ajouter une app…" = "Ajouter une app…";
 "Rétablir la liste par défaut" = "Rétablir la liste par défaut";
-"Jamais enregistrés : ce que les gestionnaires de mots de passe marquent comme confidentiel ou temporaire, et tout ce qui est copié depuis une app de cette liste." = "Jamais enregistrés : ce que les gestionnaires de mots de passe marquent comme confidentiel ou temporaire, et tout ce qui est copié depuis une app de cette liste.";
+"Jamais enregistrés : copies confidentielles et copies faites depuis ces apps." = "Jamais enregistrés : copies confidentielles et copies faites depuis ces apps.";
 "Choisis l'app dont les copies ne doivent pas être enregistrées." = "Choisis l'app dont les copies ne doivent pas être enregistrées.";
 "Trousseaux d'accès" = "Trousseaux d'accès";
 "Mots de passe" = "Mots de passe";
-"La capture est suspendue : tes copies ne sont pas enregistrées." = "La capture est suspendue : tes copies ne sont pas enregistrées.";
+"Tes copies ne sont pas enregistrées." = "Tes copies ne sont pas enregistrées.";
 "Image de plus de 5 Mo : non gardée." = "Image de plus de 5 Mo : non gardée.";
 "Fermer" = "Fermer";
 "macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps.";

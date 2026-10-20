@@ -43,7 +43,7 @@
 "Délai dépassé : réponds dans la session" = "Délai dépassé : réponds dans la session";
 
 /* Réglages */
-"Autoriser ou refuser une permission, répondre à une question, valider un plan ou écrire à Claude (survole une carte : « Écrire ») sans quitter la notch. Le dialogue du terminal reste utilisable : la première réponse gagne." = "Autoriser ou refuser une permission, répondre à une question, valider un plan ou écrire à Claude (survole une carte : « Écrire ») sans quitter la notch. Le dialogue du terminal reste utilisable : la première réponse gagne.";
-"La notch garde une demande 4 s, ou jusqu'à ta réponse si tu ouvres sa carte ; sinon le terminal garde la main. Jamais de « toujours autoriser » depuis la notch. Désactivé, les hooks rendent la main tout de suite." = "La notch garde une demande 4 s, ou jusqu'à ta réponse si tu ouvres sa carte ; sinon le terminal garde la main. Jamais de « toujours autoriser » depuis la notch. Désactivé, les hooks rendent la main tout de suite.";
+"Permissions, questions et plans depuis la notch ; la première réponse gagne." = "Permissions, questions et plans depuis la notch ; la première réponse gagne.";
 "Hooks à mettre à jour pour répondre depuis la notch" = "Hooks à mettre à jour pour répondre depuis la notch";
-"Une session ouverte avant la mise à jour des hooks reçoit les réponses après son redémarrage." = "Une session ouverte avant la mise à jour des hooks reçoit les réponses après son redémarrage.";
+"Réponses" = "Réponses";
+"Redémarre les sessions ouvertes avant la mise à jour des hooks." = "Redémarre les sessions ouvertes avant la mise à jour des hooks.";

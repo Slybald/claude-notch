@@ -29,11 +29,11 @@
 "Aucun événement à venir" = "No upcoming events";
 "Afficher le lecteur" = "Show the player";
 "Oreilles pendant la lecture" = "Ears while playing";
-"Notch repliée : la pochette et un égaliseur de part et d'autre de la notch tant qu'un morceau joue et que Claude n'a rien à montrer." = "Collapsed notch: the artwork and an equalizer on either side of the notch while a track plays and Claude has nothing to show.";
+"Notch repliée : pochette et égaliseur tant qu'un morceau joue." = "Collapsed notch: artwork and equalizer while a track plays.";
 "État" = "Status";
 "Vérification…" = "Checking…";
 "Disponible" = "Available";
 "Indisponible" = "Unavailable";
 "Afficher le calendrier" = "Show the calendar";
 "Calendrier" = "Calendar";
-"Lu seulement quand l'onglet est à l'écran. Un clic sur un événement l'ouvre dans Calendrier." = "Read only while the tab is on screen. Click an event to open it in Calendar.";
+"Lu seulement quand l'onglet est affiché. Un clic ouvre l'événement." = "Read only while the tab is shown. A click opens the event.";

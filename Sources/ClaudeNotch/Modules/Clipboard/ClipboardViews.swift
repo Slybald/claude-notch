@@ -24,7 +24,7 @@ struct ClipboardPanel: View {
 
     private static let spacing: CGFloat = 8
     private static let searchHeight: CGFloat = 26
-    private static let stripHeight: CGFloat = 30
+    private static let stripHeight = ModuleBanner.minHeight
     /// Trois lignes de 10,5 pt au plus, dans les trois tailles de panneau.
     private static let accessNoticeHeight: CGFloat = 54
 
@@ -120,6 +120,7 @@ struct ClipboardPanel: View {
                 }
             }
             .frame(height: min(listHeight > 0 ? listHeight : estimate, listMaxHeight))
+            .bottomFade(listHeight > listMaxHeight + 1)
             .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
             .onChange(of: selection) { id in
                 if let id { withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(id) } }
@@ -198,11 +199,11 @@ struct ClipboardRow: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .frame(minHeight: 32)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .background(ModuleStyle.shape(ModuleStyle.rowRadius)
             .fill(selected ? Palette.accent.opacity(0.2) : Color.white.opacity(active ? 0.1 : 0.05)))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .overlay(ModuleStyle.shape(ModuleStyle.rowRadius)
             .stroke(Palette.accent.opacity(selected ? 0.7 : 0), lineWidth: 1))
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .contentShape(ModuleStyle.shape(ModuleStyle.rowRadius))
         .onTapGesture(perform: actions.copy)
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: active)
@@ -232,18 +233,18 @@ struct ClipboardRow: View {
                     Text("Copié", tableName: "Clipboard")
                 }
                 .font(.system(size: 10.5, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Palette.accent.onFill)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Capsule().fill(Palette.accent))
                 .transition(.opacity)
             } else if active {
                 HStack(spacing: 2) {
-                    ClipboardIconButton(symbol: item.pinned ? "pin.slash" : "pin",
-                                        label: item.pinned ? L("Désépingler", table: "Clipboard")
-                                            : L("Épingler", table: "Clipboard"), action: actions.pin)
-                    ClipboardIconButton(symbol: "trash", label: L("Supprimer", table: "Clipboard"),
-                                        action: actions.remove)
+                    ModuleIconButton(symbol: item.pinned ? "pin.slash" : "pin",
+                                     label: item.pinned ? L("Désépingler", table: "Clipboard")
+                                         : L("Épingler", table: "Clipboard"), action: actions.pin)
+                    ModuleIconButton(symbol: "trash", label: L("Supprimer", table: "Clipboard"),
+                                     action: actions.remove)
                 }
             } else {
                 HStack(spacing: 4) {
@@ -262,29 +263,6 @@ struct ClipboardRow: View {
             }
         }
         .frame(minWidth: 62, alignment: .trailing)
-    }
-}
-
-/// Bouton d'action de ligne : symbole seul, halo au survol.
-struct ClipboardIconButton: View {
-    let symbol: String
-    let label: String
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white.opacity(hovering ? 1 : 0.75))
-                .frame(width: 26, height: 22)
-                .background(Circle().fill(Color.white.opacity(hovering ? 0.14 : 0)))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(label)
-        .accessibilityLabel(label)
     }
 }
 
@@ -444,30 +422,20 @@ struct ClipboardEmptyState: View {
     var resume: () -> Void = {}
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: suspended ? "pause.circle.fill" : "doc.on.clipboard")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundColor(suspended ? Palette.amber : Palette.accent)
-            Text(verbatim: suspended
-                 ? L("La capture est suspendue : tes copies ne sont pas enregistrées.", table: "Clipboard")
-                 : L("Copie du texte, un lien ou une image : ils apparaîtront ici.", table: "Clipboard"))
-                .font(.system(size: 11.5))
-                .foregroundColor(Palette.secondary)
-                .multilineTextAlignment(.center)
+        Group {
             if suspended {
-                Button(action: resume) {
-                    Text("Reprendre", tableName: "Clipboard")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Palette.amber)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Palette.amber.opacity(0.16)))
-                }
-                .buttonStyle(.plain)
+                ModuleEmptyState(symbol: "pause.circle.fill", tint: Palette.amber,
+                                 title: L("Capture suspendue", table: "Clipboard"),
+                                 detail: L("Tes copies ne sont pas enregistrées.", table: "Clipboard"),
+                                 action: ModuleAction(title: L("Reprendre", table: "Clipboard"), style: .warning,
+                                                      run: resume))
+            } else {
+                ModuleEmptyState(symbol: "doc.on.clipboard", title: L("Aucune copie pour l'instant", table: "Clipboard"),
+                                 detail: L("Copie du texte, un lien ou une image : ils apparaîtront ici.",
+                                           table: "Clipboard"))
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+        .padding(.vertical, 16)
     }
 }
 
@@ -489,23 +457,8 @@ struct SuspendedStrip: View {
     let resume: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "pause.circle.fill")
-                .foregroundColor(Palette.amber)
-            Text("Capture suspendue", tableName: "Clipboard")
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundColor(Palette.primary)
-            Spacer(minLength: 4)
-            Button(action: resume) {
-                Text("Reprendre", tableName: "Clipboard")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Palette.amber)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.amber.opacity(0.12)))
+        ModuleBanner(symbol: "pause.circle.fill", text: L("Capture suspendue", table: "Clipboard"),
+                     action: ModuleAction(title: L("Reprendre", table: "Clipboard"), style: .warning, run: resume))
     }
 }
 
@@ -521,27 +474,8 @@ struct ClipboardNoticeStrip: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "photo.badge.exclamationmark")
-                .foregroundColor(Palette.amber)
-            Text(verbatim: text)
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundColor(Palette.primary)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            Button(action: dismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(Palette.secondary)
-                    .frame(width: 20, height: 20)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(L("Fermer", table: "Clipboard"))
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.amber.opacity(0.12)))
+        ModuleBanner(symbol: "photo.badge.exclamationmark", text: text,
+                     dismiss: (L("Fermer", table: "Clipboard"), dismiss))
     }
 }
 
@@ -551,19 +485,8 @@ struct ClipboardAccessNotice: View {
     let message: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "lock.trianglebadge.exclamationmark.fill")
-                .foregroundColor(Palette.amber)
-                .padding(.top, 1)
-            Text(verbatim: message)
-                .font(.system(size: 10.5))
-                .foregroundColor(Palette.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.amber.opacity(0.12)))
+        ModuleBanner(symbol: "lock.trianglebadge.exclamationmark.fill", text: message, font: .system(size: 10.5),
+                     lines: nil)
     }
 }
 
@@ -590,27 +513,18 @@ extension ClipboardAccess {
 /// À droite des onglets : suspendre ou reprendre la capture.
 struct ClipboardSuspendButton: View {
     @ObservedObject var module: ClipboardModule
-    @State private var hovering = false
 
     private var label: String {
         module.suspended ? L("Reprendre la capture", table: "Clipboard") : L("Suspendre la capture", table: "Clipboard")
     }
 
     var body: some View {
-        Button {
+        // Le symbole montre l'action : reprendre quand c'est suspendu (le bouton « Reprendre » est dans l'onglet).
+        ModuleIconButton(symbol: module.suspended ? "play.circle.fill" : "pause.circle", label: label, size: 13,
+                         weight: .medium, tint: module.suspended ? Palette.amber : nil) {
             module.suspended.toggle()
-        } label: {
-            // Le symbole montre l'action : reprendre quand c'est suspendu (le bouton « Reprendre » est dans l'onglet).
-            Image(systemName: module.suspended ? "play.circle.fill" : "pause.circle")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(module.suspended ? Palette.amber : .white.opacity(hovering ? 1 : 0.65))
-                .frame(width: 22, height: 18)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(label)
-        .accessibilityLabel(label)
-        .animation(.easeOut(duration: 0.12), value: module.suspended)
+        .animation(ModuleStyle.hover, value: module.suspended)
     }
 }
 
@@ -628,7 +542,7 @@ struct ClipboardSearchBar: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white.opacity(0.45))
+                .foregroundColor(.white.opacity(0.55))
             ClipboardSearchField(text: $query, placeholder: L("Rechercher", table: "Clipboard"),
                                  onFocus: { focused = $0 }, onMove: onMove, onSubmit: onSubmit, onCancel: onCancel)
                 .frame(maxWidth: .infinity)
@@ -637,21 +551,22 @@ struct ClipboardSearchBar: View {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.45))
+                        .foregroundColor(.white.opacity(0.55))
                 }
                 .buttonStyle(.plain)
                 .help(L("Effacer la recherche", table: "Clipboard"))
+                .accessibilityLabel(L("Effacer la recherche", table: "Clipboard"))
             } else if focused {
                 Text(verbatim: "↑↓  ⏎  esc")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(.white.opacity(0.5))
             }
         }
         .padding(.horizontal, 8)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .background(ModuleStyle.shape(ModuleStyle.rowRadius).fill(Color.white.opacity(0.08)))
+        .overlay(ModuleStyle.shape(ModuleStyle.rowRadius)
             .stroke(Palette.accent.opacity(focused ? 0.8 : 0), lineWidth: 1))
-        .animation(.easeOut(duration: 0.12), value: focused)
+        .animation(ModuleStyle.hover, value: focused)
     }
 }
 
@@ -731,7 +646,7 @@ struct ClipboardSearchField: NSViewRepresentable {
         field.cell?.lineBreakMode = .byTruncatingTail
         field.placeholderAttributedString = NSAttributedString(
             string: placeholder,
-            attributes: [.foregroundColor: NSColor.white.withAlphaComponent(0.4), .font: NSFont.systemFont(ofSize: 12)])
+            attributes: [.foregroundColor: NSColor.white.withAlphaComponent(0.5), .font: NSFont.systemFont(ofSize: 12)])
         field.delegate = context.coordinator
         field.gainedFocus = { [weak coordinator = context.coordinator] in coordinator?.focusGained() }
         return field
@@ -764,14 +679,16 @@ struct ClipboardSettingsView: View {
                 } label: {
                     Text("Éléments gardés", tableName: "Clipboard")
                 }
-                SettingsNote(L("Les éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés. Les images de "
-                    + "plus de 5 Mo ne sont pas gardées.", table: "Clipboard"))
+            } header: {
+                Text("Capture", tableName: "Clipboard")
+            } footer: {
+                SettingsNote(L("Les épinglés s'ajoutent à ce nombre. Images de plus de 5 Mo ignorées.",
+                               table: "Clipboard"))
+            }
+            Section {
                 Toggle(isOn: $module.keepsHistory) {
                     Text("Garder l'historique après redémarrage", tableName: "Clipboard")
                 }
-                SettingsNote(L("Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand "
-                    + "l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans "
-                    + "mise en forme ; les images et les fichiers n'y sont jamais.", table: "Clipboard"))
                 if module.keepsHistory, module.persistenceFailed {
                     warning(L("L'historique n'a pas pu être écrit sur le disque. Il sera perdu à la fermeture de l'app.",
                               table: "Clipboard"))
@@ -782,6 +699,8 @@ struct ClipboardSettingsView: View {
                 .disabled(module.history.items.isEmpty)
             } header: {
                 Text("Historique", tableName: "Clipboard")
+            } footer: {
+                SettingsNote(L("Activé : seuls les textes et les liens vont dans un fichier privé.", table: "Clipboard"))
             }
             Section {
                 ForEach(module.excludedApps, id: \.self) { id in
@@ -797,6 +716,7 @@ struct ClipboardSettingsView: View {
                         }
                         .buttonStyle(.borderless)
                         .help(L("Ne plus ignorer cette app", table: "Clipboard"))
+                        .accessibilityLabel(L("Ne plus ignorer cette app", table: "Clipboard"))
                     }
                 }
                 HStack {
@@ -806,8 +726,7 @@ struct ClipboardSettingsView: View {
             } header: {
                 Text("Apps ignorées", tableName: "Clipboard")
             } footer: {
-                SettingsNote(L("Jamais enregistrés : ce que les gestionnaires de mots de passe marquent comme "
-                    + "confidentiel ou temporaire, et tout ce qui est copié depuis une app de cette liste.",
+                SettingsNote(L("Jamais enregistrés : copies confidentielles et copies faites depuis ces apps.",
                                table: "Clipboard"))
             }
         }
@@ -822,7 +741,7 @@ struct ClipboardSettingsView: View {
 
     private func warning(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(Palette.amber)
             SettingsNote(text)
         }
     }

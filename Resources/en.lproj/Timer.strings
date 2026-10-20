@@ -16,6 +16,8 @@
 "OK" = "OK";
 "Lancer %d min" = "Start %d min";
 "Durée libre : flèches, molette ou saisie" = "Custom duration: arrows, scroll wheel or type it";
+"Diminuer la durée" = "Decrease the duration";
+"Augmenter la durée" = "Increase the duration";
 "Concentration" = "Focus";
 "Pause courte" = "Short break";
 "Pause longue" = "Long break";
@@ -46,4 +48,4 @@
 "Ouvrir Réglages Système" = "Open System Settings";
 "Notifications refusées" = "Notifications denied";
 "Fin du minuteur" = "When the timer ends";
-"L'autorisation des notifications est demandée au premier minuteur lancé. Sans elle, le son et l'oreille « Terminé » suffisent." = "Notification permission is asked when you start your first timer. Without it, the sound and the “Done” ear are enough.";
+"Notifications : l'autorisation est demandée au premier minuteur lancé." = "Notifications: permission is asked when the first timer starts.";

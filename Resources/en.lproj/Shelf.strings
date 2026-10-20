@@ -32,4 +32,4 @@
 "Retirer un élément glissé vers une autre app" = "Remove items dragged to another app";
 "Vider l'étagère en quittant" = "Clear the shelf on quit";
 "Nombre maximal d'éléments" = "Maximum number of items";
-"Glisse des fichiers ou des dossiers sur la notch, même repliée. L'étagère garde un lien vers chaque fichier (rien n'est copié) et le retrouve s'il est déplacé. Sans « Vider l'étagère en quittant », la liste est gardée d'un lancement à l'autre." = "Drag files or folders onto the notch, even when it is collapsed. The shelf keeps a link to each file (nothing is copied) and finds it again if it moves. Without “Clear the shelf on quit”, the list is kept from one launch to the next.";
+"Rien n'est copié : l'étagère garde un lien vers chaque fichier, même déplacé." = "Nothing is copied: the shelf keeps a link to each file, even if it moves.";
