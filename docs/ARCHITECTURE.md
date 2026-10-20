@@ -33,7 +33,7 @@ organised and why some choices were made, so they are not undone by accident.
   reading, every field optional.
 - `ProcessInspector`: walks the ancestors of the hook's `$PPID` to find the Claude process, the host app
   (outermost `.app` bundle) and the source (CLI or Desktop). `ClaudeMonitor`: is Claude Desktop running,
-  which `claude` processes are alive (2 s scan).
+  which `claude` processes are alive (2 s scan, only while the Claude tab is on).
 - `SessionStore`: per-session state machine, task lists (`~/.claude/tasks/<session_id>/`), Esc detection.
 - `NotchController` (window, hover, visibility, full screen), `NotchViews` (root, ears, panel, tab bar,
   session cards), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
@@ -64,7 +64,7 @@ organised and why some choices were made, so they are not undone by accident.
   virtual notch geometry (`NotchScreenPicker`). `HotKeys`: global shortcuts (`HotKeyCenter`) through Carbon
   `RegisterEventHotKey`, which needs no Accessibility permission.
 - `HookInstaller` + `OrderedJSON`: add and remove the hooks in `~/.claude/settings.json`. `Onboarding`:
-  first-launch window and menu items. `AppIdentity`: bundle identifier and migration from early builds.
+  welcome window (first launch) and hook menu items. `AppIdentity`: bundle identifier and migration from early builds.
 - `ActivityLog`: `files.jsonl` / `permissions.jsonl`. `JobRunner`: optional companion tool jobs.
 - `Localization`: the `L()` helper, with an optional table. `LaunchAgent`: open at login.
 - `Updater`: automatic updates from GitHub releases (check, signature, install, relaunch) and its menu items.
@@ -93,14 +93,17 @@ Apple Events and Bluetooth are already there) nor another module's files.
   tab switch lives in the module (`@Published`). Content width and maximum height come from the environment
   (`\.notchContentWidth`, `\.notchContentMaxHeight`): the whole panel must stay under 460 pt.
 - **Registry**: order and activation come from `Preferences` (`tabOrder`, `tabEnabled`); unknown ids are ignored,
-  a new module appears at the end, enabled if `isEnabledByDefault`. The Claude module cannot be disabled.
-- **Tab bar**: icons in the header row, below the menu bar band; the active tab shows its title in a capsule
-  that slides (`matchedGeometryEffect`). Click, or hover for 0.2 s (passing over a tab does not switch). The panel
-  opens on the last tab or the default one (settings), except when Claude needs the user: then on Claude.
-- **Ears** (collapsed notch): Claude waiting for you > Claude working > Claude just finished (5 s) > the module
-  ears with the highest priority (timer 5, player 1, caffeine -10; tab order breaks ties) > nothing. Only running
-  modules count. "Show the ears" off: the collapsed notch is exactly the notch. Module ears also keep the notch
-  window on screen.
+  a new module appears at the end, enabled if `isEnabledByDefault`. The Claude tab can be disabled like the others
+  (see "Claude Code is optional" below).
+- **Tab bar**: icons in the header row, below the menu bar band, at a fixed width: the active tab is marked by a
+  capsule that slides (`matchedGeometryEffect`) and its title is shown beside the bar, so no tab shifts under the
+  pointer. Click, or hover for 0.2 s (passing over a tab does not switch). The panel opens on the last tab or the
+  default one (settings), except when Claude needs the user and the Claude tab is on: then on Claude. A tab that
+  is no longer enabled falls back to the first enabled one.
+- **Ears** (collapsed notch; Claude only while its tab is on): Claude waiting for you > Claude working > Claude
+  just finished (5 s) > the module ears with the highest priority (timer 5, player 1, caffeine -10; tab order
+  breaks ties) > nothing. Only running modules count. "Show the ears" off: the collapsed notch is exactly the
+  notch. Module ears also keep the notch window on screen.
 - **Full screen**: detected on events only (Space change, plus 0.4 s later, app activation, screen change): a
   layer-0 window of the front app covers the notch's whole screen, menu bar included (a zoomed window does not).
   Window bounds need no screen-recording permission. Setting: compact (270 pt, no tabs, each module's compact
@@ -117,6 +120,27 @@ Apple Events and Bluetooth are already there) nor another module's files.
 
 ## Decisions worth keeping
 
+- **Claude Code is optional**: the notch is for everyone (player, calendar, quick settings, shelf, clipboard,
+  timer, notes); the Claude Code integration (Claude tab, hooks, replies) is an option, never imposed. 1.2.0 got
+  this wrong (visibility "when Claude is open", Claude tab that could not be disabled, hooks pushed at every
+  launch); 1.2.1 fixed it.
+  - **Detection** (`HookInstaller.claudeCodePresent`): `~/.claude` or `$CLAUDE_CONFIG_DIR` is a folder. Hooks
+    already installed by Claude Notch live in `~/.claude`, so they count. Never real under XCTest
+    (`claudeCodeOnThisMac` checks `NSClassFromString("XCTestCase")`).
+  - **Decided once** (`Preferences.decideClaudeTab`, `AppCore.start`): at the first launch of 1.2.1 or later, the
+    Claude tab is enabled only if Claude Code is detected, and the result is saved in `tabs.enabled`. It never
+    changes on its own afterwards (installing Claude Code later does not turn the tab on: Settings › Tabs does).
+  - **Tab off** (applied live by `AppCore.setClaudeTracking`, from `ModuleRegistry.enabled`): `ClaudeMonitor`
+    stopped (no 2 s process scan, no Claude Desktop observers), `SessionStore` stopped (sessions forgotten, no
+    timer, no transcript read), held replies given back to the terminal. `HookServer.isPaused`: the port stays open
+    (zero cost at rest) but `/hook` answers 204 without walking the processes and `/permission` and `/inbox` answer
+    204 at once (fail-open). No Claude ears, no switch to the Claude tab, default tab = first enabled one, no
+    session or hook items in the **…** menu ("Uninstall" stays, without hook wording when none are installed).
+    Back on: everything restarts; open sessions show up at their next event.
+  - **First launch** (`HookSetup.launchWindow`, `onboarding.welcomeShown`): a welcome window once (how to open the
+    notch, tabs, settings). Claude tab on: a "Claude Code integration" section offers the hooks (opt-in, "Later").
+    Off: one line says where to turn the Claude tab on. Not shown after an update from a version that had
+    installed the hooks.
 - **Facts measured on Claude Code 2.1.29x**: `PermissionRequest` carries no `tool_use_id` (it is matched to the
   last active tool with the same name); internal agents send `SubagentStop` with an empty `agent_type`
   (ignored); a background agent's result comes back as a `UserPromptSubmit` starting with
@@ -171,9 +195,13 @@ Apple Events and Bluetooth are already there) nor another module's files.
   session timer only runs while there are sessions; the root view does not observe `ClaudeMonitor` (it changes
   on every app switch), only the Claude tab does.
 - **Notch settings** (Settings › General and Appearance, `NotchShell`):
-  - Visibility `visibility.mode`: always (fresh install; `alwaysVisible = false`, or no key but hooks already
-    installed by an earlier version, becomes "when Claude is open"; decided once and saved at first launch), when Claude is open, during activity. Module ears show it in every mode. "Hide the notch" for 1 h,
-    until 8 am tomorrow or until turned back on (`visibility.hiddenUntil`, `distantFuture`): one `Timer` at the
+  - Visibility `visibility.mode`: always (the default for everyone, no key needed; the old `alwaysVisible = false`
+    becomes "when Claude is open"), when Claude is open, during activity. With the Claude tab off, "when Claude is
+    open" is not offered (Settings › General, **…** menu) and acts as always; "during activity" only counts module
+    ears. One-time repair (`visibility.defaultFixed121`, set at the first launch of 1.2.1): 1.2.0 saved "when Claude
+    is open" on its own for people who had the hooks, so that value without the old `alwaysVisible` key goes back
+    to always, once. Trade-off: someone who picked it on purpose during 1.2.0 gets always once. Module ears show it
+    in every mode. "Hide the notch" for 1 h, until 8 am tomorrow or until turned back on (`visibility.hiddenUntil`, `distantFuture`): one `Timer` at the
     end date, only while hidden, re-read on wake. "Until turned back on" ends when the app is opened again
     (reopen event) or relaunched; reopening the app also opens the settings (no Dock or menu bar icon).
   - Screen `display.screen`: built-in (with the notch), main, under the mouse (follows it while collapsed, on
@@ -264,8 +292,10 @@ Apple Events and Bluetooth are already there) nor another module's files.
 - **Hooks after an update**: when the entries in `settings.json` are current and only the bundled hook script
   changed (`HookInstaller.Status.scriptOutdated`), the script is rewritten silently at launch and
   `settings.json` is not touched. When our entries come from a previous version (`.outdated`), entries and
-  script are reinstalled silently too (timestamped backup); the onboarding window only opens if that fails or
-  if the hooks were never installed.
+  script are reinstalled silently too (timestamped backup). Only with the Claude tab on, and so only for people who
+  already had the hooks; with the tab off, `~/.claude` is not even read at launch. A window opens only if that
+  update fails. Hooks that were never installed are offered once, in the welcome window (first launch, Claude Code
+  detected), then from Settings › Claude; never at every launch.
 - **Reply flow** (`/permission`, `/inbox`): the hook script posts with the token (curl reads it from the 0600 file
   `hook-token`, never from argv) and waits. `HookServer` checks `Host`, `Origin` and the token, then hands the
   request to `ReplyCenter`. A click gives the answer: the app returns it with the `X-Claude-Notch-Proof` header,

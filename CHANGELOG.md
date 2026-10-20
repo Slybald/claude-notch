@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-10-20
+
+### Added
+
+- A welcome window on first launch: how to open the notch, its tabs, where the settings are. The Claude Code hooks
+  are offered there only when Claude Code is found on the Mac (`~/.claude` or `$CLAUDE_CONFIG_DIR`), and can wait
+  ("Later"); otherwise the window says where to turn on the Claude tab.
+
+### Changed
+
+- The Claude Code integration is optional. The Claude tab can be turned off in **Settings › Tabs** like any other
+  tab. On first launch it is on only if Claude Code is found on the Mac; that choice is saved and does not change
+  afterwards. With the tab off, nothing Claude-related runs: no process scan, no session tracking, hook events are
+  ignored and permission and message requests go straight back to the terminal, no Claude ears, the panel never
+  switches to Claude, and the **…** menu shows no session or hook items. Turning the tab back on restarts
+  everything; open sessions show up at their next message.
+- The notch is shown **Always** by default, for everyone. With the Claude tab off, **When Claude Is Open** is no
+  longer offered and acts as **Always**, and **During Activity** only counts the tabs' ears.
+- Hooks are still updated silently after an update, but only for people who already had them, with the Claude
+  tab on. The window no longer asks for the hooks at every launch.
+
+### Fixed
+
+- 1.2.0 saved **When Claude Is Open** on its own for people who already had the hooks. It is set back to
+  **Always**, once (someone who picked it on purpose during 1.2.0 gets **Always** once too).
+- Tabs no longer shift under the pointer when hovering opens one (fixed-width tab bar, title shown beside it).
+
 ## [1.2.0] - 2026-10-20
 
 ### Added
