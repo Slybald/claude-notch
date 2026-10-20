@@ -506,6 +506,17 @@ struct ExpandedPanel: View {
                 Spacer(minLength: 8)
             } else {
                 NotchTabBar(modules: registry.enabled, selection: $selection, animation: tabAnimation)
+                // Titre après la rangée d'onglets, pas dedans : sa largeur ne déplace aucun onglet.
+                if let selected {
+                    Text(selected.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Palette.primary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .id(selected.id)
+                        .transition(.opacity)
+                        .accessibilityHidden(true)
+                }
                 Spacer(minLength: 8)
                 selected?.makeHeaderAccessory()
             }
@@ -523,8 +534,10 @@ struct ExpandedPanel: View {
     }
 }
 
-/// Barre d'onglets en icônes. L'onglet actif porte aussi son titre, dans une capsule qui glisse d'un onglet à
-/// l'autre. Clic, ou survol de 0,2 s, pour changer d'onglet (en passant dessus, rien ne change).
+/// Barre d'onglets en icônes, de largeur fixe : l'onglet actif est marqué par une capsule qui glisse d'un onglet à
+/// l'autre, son titre est affiché à côté de la barre. Clic, ou survol de 0,2 s, pour changer d'onglet (en passant
+/// dessus, rien ne change). Un onglet ne change jamais de taille : sinon les autres glisseraient sous la souris et
+/// le survol en ouvrirait un autre.
 struct NotchTabBar: View {
     let modules: [any NotchModule]
     @Binding var selection: String
@@ -561,16 +574,9 @@ struct NotchTabBar: View {
                     }
                 }
                 .frame(width: 17, height: 17)
-                if active {
-                    Text(module.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .transition(.opacity)
-                }
             }
             .foregroundColor(active ? Palette.primary : .white.opacity(hovered == module.id ? 0.85 : 0.5))
-            .padding(.horizontal, active ? 8 : 5)
+            .padding(.horizontal, 5)
             .frame(height: 22)
             .background {
                 if active {

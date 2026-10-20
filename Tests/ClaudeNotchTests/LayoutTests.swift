@@ -42,6 +42,16 @@ final class LayoutTests: XCTestCase {
         window.close()
     }
 
+    /// Survoler un onglet l'ouvre : les onglets ne doivent pas bouger, sinon un autre glisse sous la souris et
+    /// s'ouvre à son tour sans que l'utilisateur ait bougé.
+    func testTabPositionsDoNotDependOnSelection() {
+        let modules: [any NotchModule] = [FakeModule(id: "a"), FakeModule(id: "un titre assez long"), FakeModule(id: "c")]
+        let widths = modules.map { module in
+            NSHostingView(rootView: NotchTabBar(modules: modules, selection: .constant(module.id))).fittingSize.width
+        }
+        XCTAssertEqual(Set(widths).count, 1, "largeur de la barre selon l'onglet actif : \(widths)")
+    }
+
     /// Taille du panneau choisie dans les réglages, et plein écran « normal » qui la garde.
     func testPanelSizeFollowsPreferences() {
         for size in PanelSize.allCases {
