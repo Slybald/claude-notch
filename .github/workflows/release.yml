@@ -21,15 +21,30 @@ jobs:
       - name: Test
         run: swift test
 
+      # RELEASE_CHANNEL=1 : seule cette app se met à jour seule depuis les releases (Updater.swift).
       - name: Build universal app
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          VERSION="$VERSION" scripts/build.sh
+          RELEASE_CHANNEL=1 VERSION="$VERSION" scripts/build.sh
           lipo -archs build/ClaudeNotch.app/Contents/MacOS/ClaudeNotch
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ClaudeNotchUpdateChannel' build/ClaudeNotch.app/Contents/Info.plist)" = release
 
       - name: Build DMG
         run: scripts/make-dmg.sh
+
+      # Signature Ed25519 du DMG, vérifiée avec la clé publique intégrée à l'app : un secret absent ou qui ne
+      # correspond pas à cette clé fait échouer le job (les installations existantes refuseraient la mise à jour).
+      - name: Sign DMG
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          DMG="build/ClaudeNotch-$VERSION.dmg"
+          swift scripts/update-signing.swift sign "$DMG" > "$DMG.sig"
+          test -s "$DMG.sig"
+          PUBLIC_KEY=$(sed -n 's/.*static let publicKey = "\([^"]*\)".*/\1/p' Sources/ClaudeNotch/Updater.swift)
+          test -n "$PUBLIC_KEY"
+          swift scripts/update-signing.swift verify "$DMG" "$(cat "$DMG.sig")" "$PUBLIC_KEY"
 
       - name: Create GitHub release
         env:
@@ -38,5 +53,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "build/ClaudeNotch-$VERSION.dmg" \
             "build/ClaudeNotch-$VERSION.dmg.sha256" \
+            "build/ClaudeNotch-$VERSION.dmg.sig" \
             --title "Claude Notch $VERSION" \
             --generate-notes
