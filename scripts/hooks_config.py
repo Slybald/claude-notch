@@ -7,6 +7,10 @@
 Respecte CLAUDE_CONFIG_DIR. Sauvegarde horodatée avant toute écriture.
 Idempotent : nos entrées (repérées par « claude-notch-hook.sh ») sont retirées puis rajoutées.
 Les hooks existants et l'ordre des clés sont conservés. JSON invalide : abandon sans rien toucher.
+
+Un groupe par événement : le relais async ; plus, pour « Répondre depuis la notch », le hook PermissionRequest
+synchrone (mode permission, sans onFailure : un échec rend la main au terminal) et l'attente asyncRewake de
+SessionStart et Stop (mode inbox). Même résultat, octet pour octet, que HookInstaller.swift.
 """
 
 import json
@@ -35,6 +39,25 @@ EVENTS = [
     "PreCompact",
     "PostCompact",
 ]
+REWAKE_MESSAGE = "Message from the user, sent from Claude Notch:"
+REWAKE_SUMMARY = "Message from Claude Notch"
+
+
+def entries(hook_path):
+    """Nos hooks, par événement, dans l'ordre où ils sont écrits."""
+    command = f'"{hook_path}"'
+    relay = {"type": "command", "command": command, "async": True, "timeout": 10}
+    permission = {"type": "command", "command": f"{command} permission", "timeout": 600}
+    inbox = {
+        "type": "command",
+        "command": f"{command} inbox",
+        "asyncRewake": True,
+        "timeout": 86400,
+        "rewakeMessage": REWAKE_MESSAGE,
+        "rewakeSummary": REWAKE_SUMMARY,
+    }
+    extra = {"SessionStart": [inbox], "PermissionRequest": [permission], "Stop": [inbox]}
+    return {event: [dict(relay)] + [dict(hook) for hook in extra.get(event, [])] for event in EVENTS}
 
 
 def config_dir():
@@ -97,12 +120,11 @@ def install(settings, hook_path):
     hooks = settings.setdefault("hooks", {})
     if not isinstance(hooks, dict):
         sys.exit("La clé « hooks » de settings.json n'est pas un objet : rien n'a été modifié.")
-    entry = {"type": "command", "command": f'"{hook_path}"', "async": True, "timeout": 10}
-    for event in EVENTS:
+    for event, ours in entries(hook_path).items():
         groups = hooks.setdefault(event, [])
         if not isinstance(groups, list):
             sys.exit(f"hooks.{event} n'est pas une liste : rien n'a été modifié.")
-        groups.append({"hooks": [dict(entry)]})
+        groups.append({"hooks": ours})
 
 
 def write(path, settings):

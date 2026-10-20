@@ -130,15 +130,34 @@ final class HookInstallerTests: XCTestCase {
 
         let settings = try OrderedJSON.parse(settingsData())
         XCTAssertEqual(settings["hooks"]?.members?.map(\.key), HookInstaller.events)
+        let entries = HookInstaller.entries(command: installer.hookCommand)
         for event in HookInstaller.events {
             XCTAssertEqual(settings["hooks"]?[event], .array([.object([
-                OrderedJSON.Member(key: "hooks", value: .array([HookInstaller.entry(command: installer.hookCommand)])),
+                OrderedJSON.Member(key: "hooks", value: .array(entries[event] ?? [])),
             ])]))
+            // Le relais async d'abord, partout.
+            XCTAssertEqual(entries[event]?.first, HookInstaller.entry(command: installer.hookCommand), event)
         }
+        // Répondre depuis la notch : PermissionRequest synchrone, attente asyncRewake sur SessionStart et Stop.
+        XCTAssertEqual(HookInstaller.events.filter { (entries[$0]?.count ?? 0) > 1 },
+                       ["SessionStart", "PermissionRequest", "Stop"])
+        let permission = try XCTUnwrap(entries["PermissionRequest"]?.last)
+        XCTAssertEqual(permission["command"], .string(installer.hookCommand + " permission"))
+        XCTAssertEqual(permission["timeout"], .number("600"))
+        XCTAssertNil(permission["async"], "synchrone")
+        XCTAssertNil(permission["onFailure"], "un échec rend la main au terminal")
+        XCTAssertEqual(entries["SessionStart"]?.last, entries["Stop"]?.last)
+        let inbox = try XCTUnwrap(entries["Stop"]?.last)
+        XCTAssertEqual(inbox["command"], .string(installer.hookCommand + " inbox"))
+        XCTAssertEqual(inbox["asyncRewake"], .bool(true))
+        XCTAssertEqual(inbox["timeout"], .number("86400"))
+
         let text = String(decoding: try settingsData(), as: UTF8.self)
         XCTAssertTrue(text.hasPrefix("{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"hooks\": [\n"))
         XCTAssertTrue(text.contains("\"command\": \"\\\"\(installer.hookURL.path)\\\"\",\n"))
+        XCTAssertTrue(text.contains("\"command\": \"\\\"\(installer.hookURL.path)\\\" permission\",\n"))
         XCTAssertTrue(text.contains("\"async\": true,\n            \"timeout\": 10\n"))
+        XCTAssertTrue(text.contains("\"rewakeSummary\": \"Message from Claude Notch\"\n"))
         XCTAssertTrue(text.hasSuffix("}\n"))
 
         // Script copié, exécutable, identique à celui de l'app.
@@ -450,6 +469,28 @@ final class HookInstallerTests: XCTestCase {
         try write(String(decoding: settings.serialized(), as: UTF8.self))
         XCTAssertEqual(installer.status(), .outdated)
 
+        // Installation d'une version précédente : le relais seul sur chaque événement (sans les hooks de réponse).
+        settings = try OrderedJSON.parse(installed)
+        HookInstaller.strip(&settings, dropEmptyRoot: true)
+        var hooks = settings["hooks"] ?? .object([])
+        for event in HookInstaller.events {
+            hooks[event] = .array([.object([OrderedJSON.Member(key: "hooks", value: .array([
+                HookInstaller.entry(command: installer.hookCommand),
+            ]))])])
+        }
+        settings["hooks"] = hooks
+        try write(String(decoding: settings.serialized(), as: UTF8.self))
+        XCTAssertEqual(installer.status(), .outdated)
+
+        // Ordre des clés différent : toujours à jour.
+        settings = try OrderedJSON.parse(installed)
+        let reversed = HookInstaller.entries(command: installer.hookCommand)["Stop"]!.map { hook in
+            OrderedJSON.object(Array(hook.members!.reversed()))
+        }
+        settings["hooks"]?["Stop"] = .array([.object([OrderedJSON.Member(key: "hooks", value: .array(reversed))])])
+        try write(String(decoding: settings.serialized(), as: UTF8.self))
+        XCTAssertEqual(installer.status(), .installed)
+
         // Script ancien, puis absent : entrées à jour, seul le script est à refaire.
         try write(String(decoding: installed, as: UTF8.self))
         XCTAssertEqual(installer.status(), .installed)
@@ -490,6 +531,43 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertThrowsError(try self.installer(bundled: nil).updateScript()) { error in
             XCTAssertEqual(error as? HookInstaller.Failure, .missingBundledHook)
         }
+    }
+
+    /// Après une mise à jour de l'app : des hooks d'une version précédente sont mis à jour sans fenêtre, avec
+    /// sauvegarde ; des hooks absents ne sont jamais installés en silence.
+    func testSilentUpdateOfPreviousInstallation() throws {
+        let installer = installer()
+        let setup = HookSetup(installer: installer)
+        setup.refresh()
+        setup.silentUpdate()
+        XCTAssertEqual(setup.status, .notInstalled, "jamais installé : rien en silence")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: config.appendingPathComponent("settings.json").path))
+
+        // Version précédente : le relais seul, et un ancien script.
+        var settings = try OrderedJSON.parse(Self.realistic)
+        var hooks = settings["hooks"] ?? .object([])
+        for event in HookInstaller.events {
+            var groups = hooks[event]?.items ?? []
+            groups.append(.object([OrderedJSON.Member(key: "hooks", value: .array([
+                HookInstaller.entry(command: installer.hookCommand),
+            ]))]))
+            hooks[event] = .array(groups)
+        }
+        settings["hooks"] = hooks
+        try write(String(decoding: settings.serialized(), as: UTF8.self) + "\n")
+        try FileManager.default.createDirectory(at: installer.hookURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Data("#!/bin/sh\n# ancienne version\n".utf8).write(to: installer.hookURL)
+        setup.refresh()
+        XCTAssertEqual(setup.status, .outdated)
+
+        setup.silentUpdate()
+        XCTAssertEqual(setup.status, .installed)
+        XCTAssertEqual(backups().count, 1, "sauvegarde horodatée avant l'écriture")
+        XCTAssertEqual(try Data(contentsOf: installer.hookURL), try Data(contentsOf: Self.bundledHook))
+        let updated = try OrderedJSON.parse(settingsData())
+        XCTAssertEqual(updated["hooks"]?["PreToolUse"]?.items?.first,
+                       try OrderedJSON.parse(Self.realistic)["hooks"]?["PreToolUse"]?.items?.first, "tes hooks restent")
     }
 
     func testOursRequiresAnObjectWithMarker() {

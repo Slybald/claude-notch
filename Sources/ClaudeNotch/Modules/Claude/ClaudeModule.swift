@@ -14,6 +14,10 @@ final class ClaudeModule: NotchModule {
     let prefs: Preferences
     /// État des hooks (menu « … », réglages) ; injectable pour les tests.
     let hooks: HookSetup
+    /// Demandes tenues et messages (« Répondre depuis la notch »), alimentés par le serveur de hooks.
+    let replies: ReplyCenter
+    /// Saisies en cours dans les cartes de réponse.
+    let drafts = ReplyDrafts()
     /// Posées par `NotchController.start()` (elles referment le panneau).
     var actions = NotchActions()
 
@@ -23,12 +27,13 @@ final class ClaudeModule: NotchModule {
     @Published var openChecklists: Set<String> = []
 
     init(store: SessionStore, monitor: ClaudeMonitor, tools: ToolsFeed, prefs: Preferences,
-         hooks: HookSetup = .shared) {
+         hooks: HookSetup = .shared, replies: ReplyCenter = .shared) {
         self.store = store
         self.monitor = monitor
         self.tools = tools
         self.prefs = prefs
         self.hooks = hooks
+        self.replies = replies
     }
 
     func start() {
@@ -41,14 +46,29 @@ final class ClaudeModule: NotchModule {
         tools.setActive(false)
         if toolsPane != nil { toolsPane = nil }
         if !openChecklists.isEmpty { openChecklists = [] }
+        // Panneau replié : le clavier revient à l'app de devant, le texte saisi reste pour la prochaine fois.
+        NotchKeyboard.release(force: true)
+        if drafts.composing != nil { drafts.composing = nil }
+        drafts.prune(keeping: replies.requests.map(\.id))
+    }
+
+    /// Clic dans une carte de réponse : la décision part au hook, la session quitte « attend ta permission ».
+    func decide(_ request: ReplyCenter.Request, _ decision: ReplyCenter.Decision) {
+        guard replies.decide(request, decision) else { return }
+        switch decision {
+        case .allow, .answer, .approvePlan: store.resolveAttention(request.sessionId, allowed: true)
+        case .deny, .revisePlan: store.resolveAttention(request.sessionId, allowed: false)
+        }
+        drafts.prune(keeping: replies.requests.map(\.id))
     }
 
     func makeView() -> AnyView {
-        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools))
+        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools, replies: replies))
     }
 
     func makeCompactView() -> AnyView? {
-        AnyView(ClaudeCompactView(store: store, activate: { [weak self] in self?.actions.activate($0) }))
+        AnyView(ClaudeCompactView(module: self, store: store, replies: replies, prefs: prefs,
+                                  activate: { [weak self] in self?.actions.activate($0) }))
     }
 
     func makeSettingsView() -> AnyView? {
@@ -93,6 +113,7 @@ struct ClaudePanel: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var monitor: ClaudeMonitor
     @ObservedObject var tools: ToolsFeed
+    @ObservedObject var replies: ReplyCenter
 
     @Environment(\.notchContentMaxHeight) private var contentMaxHeight
     @State private var listHeight: CGFloat = 0
@@ -102,9 +123,11 @@ struct ClaudePanel: View {
     static let maxListHeight: CGFloat = 296
     private static let minListHeight: CGFloat = 120
 
-    /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge).
+    /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge). Une carte
+    /// de réponse à l'écran : toute la hauteur disponible, pour que ses boutons restent visibles.
     private var listMaxHeight: CGFloat {
-        min(Self.maxListHeight, max(Self.minListHeight, contentMaxHeight - rowsBelowList))
+        let cap = module.prefs.replyFromNotch && !replies.requests.isEmpty ? contentMaxHeight : Self.maxListHeight
+        return min(cap, max(Self.minListHeight, contentMaxHeight - rowsBelowList))
     }
 
     private var untrackedCount: Int { monitor.cliPids.subtracting(store.trackedPids).count }
@@ -149,9 +172,11 @@ struct ClaudePanel: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 8) {
                     ForEach(sessions) { session in
-                        SessionCard(session: session, now: context.date,
-                                    showTasks: checklistBinding(session.id),
-                                    onTap: { module.actions.activate(session) })
+                        ReplyableSessionCard(replies: module.replies, drafts: module.drafts, prefs: module.prefs,
+                                             session: session, now: context.date,
+                                             showTasks: checklistBinding(session.id),
+                                             onTap: { module.actions.activate(session) },
+                                             decide: { module.decide($0, $1) })
                     }
                 }
                 .background(GeometryReader { proxy in
@@ -222,8 +247,12 @@ struct ClaudeHeaderPills: View {
 // MARK: - Plein écran compact
 
 /// Sessions en cours : état et une ligne chacune. Un clic ramène l'app hôte devant, comme une carte.
+/// Avec « Répondre depuis la notch », une demande en cours s'affiche dessous (sans champ de message).
 struct ClaudeCompactView: View {
+    let module: ClaudeModule
     @ObservedObject var store: SessionStore
+    @ObservedObject var replies: ReplyCenter
+    @ObservedObject var prefs: Preferences
     let activate: (Session) -> Void
 
     static let maxSessions = 4
@@ -240,6 +269,11 @@ struct ClaudeCompactView: View {
             }
             ForEach(live.prefix(Self.maxSessions)) { session in
                 row(session)
+                if prefs.replyFromNotch,
+                   SessionReplyArea.hasContent(session, replies: replies, drafts: module.drafts, compact: true) {
+                    SessionReplyArea(replies: replies, drafts: module.drafts, session: session, compact: true,
+                                     decide: { module.decide($0, $1) })
+                }
             }
             if live.count > Self.maxSessions {
                 let more = live.count - Self.maxSessions
@@ -286,7 +320,7 @@ struct ClaudeCompactView: View {
 
 // MARK: - Réglages
 
-/// Réglages › Claude : réponses depuis la notch (à venir), état des hooks.
+/// Réglages › Claude : réponses depuis la notch, état des hooks.
 struct ClaudeSettingsView: View {
     @ObservedObject var prefs: Preferences
     @ObservedObject var setup: HookSetup
@@ -295,8 +329,22 @@ struct ClaudeSettingsView: View {
         SettingsPane {
             Section {
                 Toggle("Répondre depuis la notch", isOn: $prefs.replyFromNotch)
-                SettingsNote(L("Accorder une permission ou répondre à une question sans quitter la notch. "
-                    + "Le réglage est gardé ; la fonction arrive dans une prochaine version."))
+                SettingsNote(L("Autoriser ou refuser une permission, répondre à une question, valider un plan ou "
+                    + "écrire à Claude (survole une carte : « Écrire ») sans quitter la notch. Le dialogue du terminal "
+                    + "reste utilisable : la première réponse gagne.", table: "Claude"))
+                SettingsNote(L("La notch garde une demande 4 s, ou jusqu'à ta réponse si tu ouvres sa carte ; sinon "
+                    + "le terminal garde la main. Jamais de « toujours autoriser » depuis la notch. Désactivé, les "
+                    + "hooks rendent la main tout de suite.", table: "Claude"))
+                if prefs.replyFromNotch, setup.status != .installed {
+                    Label(L("Hooks à mettre à jour pour répondre depuis la notch", table: "Claude"),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Palette.amber)
+                }
+                if prefs.replyFromNotch {
+                    SettingsNote(L("Une session ouverte avant la mise à jour des hooks reçoit les réponses après "
+                        + "son redémarrage.", table: "Claude"))
+                }
             }
             Section("Hooks Claude Code") {
                 LabeledContent("État") {

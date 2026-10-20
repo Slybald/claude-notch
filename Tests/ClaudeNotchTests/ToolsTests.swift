@@ -349,7 +349,9 @@ final class ToolsTests: XCTestCase {
         let log = ActivityLog(directory: fixtures.directory.appendingPathComponent("ClaudeNotch"))
         let core = AppCore(tools: ToolsFeed(paths: fixtures.paths), activityLog: log)
         let port = UInt16.random(in: 49_200...60_000)
-        let server = HookServer(port: port, handler: AppCore.hookHandler(store: core.store, log: log))
+        // Jeton en mémoire seulement : jamais le fichier de l'app installée.
+        let access = HookAccess(file: nil)
+        let server = HookServer(port: port, access: access, handler: AppCore.hookHandler(store: core.store, log: log))
         server.stateProvider = { core.debugState() }
         try server.start()
         defer { server.stop() }
@@ -358,6 +360,7 @@ final class ToolsTests: XCTestCase {
         func request(_ method: String, _ path: String, _ body: [String: Any]? = nil) -> (Int, Data) {
             var url = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
             url.httpMethod = method
+            url.setValue(access.token, forHTTPHeaderField: HookAccess.headerName)
             url.httpBody = body.flatMap { try? JSONSerialization.data(withJSONObject: $0) }
             var result: (Int, Data)?
             let deadline = Date().addingTimeInterval(5)
