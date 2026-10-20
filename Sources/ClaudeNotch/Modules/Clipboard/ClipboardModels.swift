@@ -49,6 +49,43 @@ struct ClipboardImage {
     }
 }
 
+/// Mise en forme d'un texte copié (RTF, HTML), gardée en mémoire seulement pour que « Copier » la restitue ;
+/// « Copier en texte brut » l'écarte. Jamais écrite sur disque. Au plus 100 Ko par élément : au-delà, le texte
+/// est gardé sans sa mise en forme.
+struct ClipboardRichText: Equatable {
+    static let maxBytes = 100 * 1024
+
+    var rtf: Data?
+    var html: Data?
+
+    /// nil : ni RTF ni HTML dans la limite.
+    static func make(rtf: Data?, html: Data?) -> ClipboardRichText? {
+        var rich = ClipboardRichText()
+        if let rtf, !rtf.isEmpty, rtf.count <= maxBytes { rich.rtf = rtf }
+        if let html, !html.isEmpty, html.count + (rich.rtf?.count ?? 0) <= maxBytes { rich.html = html }
+        return rich.rtf == nil && rich.html == nil ? nil : rich
+    }
+}
+
+/// Ce que le presse-papiers contient à un tic.
+struct ClipboardRead {
+    var content: ClipboardContent?
+    /// Mise en forme d'un contenu `.text`.
+    var rich: ClipboardRichText?
+    /// Une image était là mais dépasse 5 Mo : elle est ignorée, l'utilisateur doit le savoir.
+    var imageTooLarge = false
+}
+
+/// Accès programmatique au presse-papiers général (macOS 15.4 et après : Réglages Système › Confidentialité et
+/// sécurité › Coller depuis d'autres apps).
+enum ClipboardAccess: Equatable {
+    case allowed
+    /// macOS demande l'accord à la lecture (réglage par défaut).
+    case ask
+    /// Refusé : tout ce qui est lu est vide.
+    case denied
+}
+
 enum ClipboardContent {
     case text(String)
     case url(URL)
@@ -117,17 +154,25 @@ struct ClipboardItem: Identifiable {
     var date: Date
     var pinned: Bool
     var source: ClipboardSource?
+    /// Mise en forme du texte (en mémoire seulement).
+    var rich: ClipboardRichText?
     /// Le texte a été coupé à `maxTextCharacters` : le recopier redonne la version coupée.
     let truncated: Bool
     let key: String
     /// Contenu et app source, en minuscules sans accents : la recherche est une simple inclusion.
     let searchText: String
 
-    /// nil : rien à garder (texte vide, image trop lourde).
+    /// nil : rien à garder (texte vide, image trop lourde). `truncated` : le texte avait déjà été coupé
+    /// (élément relu depuis le disque).
     init?(_ content: ClipboardContent, date: Date, source: ClipboardSource? = nil, pinned: Bool = false,
-          id: UUID = UUID()) {
+          id: UUID = UUID(), rich: ClipboardRichText? = nil, truncated wasTruncated: Bool = false) {
         var content = content
-        var truncated = false
+        var truncated = wasTruncated
+        var rich = rich
+        // Un lien démesuré est un texte comme un autre : il est coupé.
+        if case .url(let url) = content, url.absoluteString.count > Self.maxTextCharacters {
+            content = .text(url.absoluteString)
+        }
         switch content {
         case .text(let text):
             guard text.contains(where: { !$0.isWhitespace }) else { return nil }
@@ -136,21 +181,33 @@ struct ClipboardItem: Identifiable {
                 content = .text(String(text[..<end]))
                 truncated = true
             }
+            // La mise en forme d'un texte coupé ne correspondrait plus au texte.
+            if truncated { rich = nil }
         case .image(let image):
             guard image.data.count <= ClipboardImage.maxBytes else { return nil }
+            rich = nil
         case .files(let urls):
             guard !urls.isEmpty else { return nil }
+            rich = nil
         default:
-            break
+            rich = nil
         }
         self.id = id
         self.content = content
         self.date = date
         self.pinned = pinned
         self.source = source
+        self.rich = rich
         self.truncated = truncated
         key = content.key
         searchText = Self.fold(content.searchable + " " + (source?.name ?? ""))
+    }
+
+    /// « Copier en texte brut » n'a de sens que s'il change quelque chose : pour un texte, seulement quand il a
+    /// une mise en forme à écarter.
+    var offersPlainCopy: Bool {
+        if case .text = content { return rich != nil }
+        return content.plainText != nil
     }
 
     static func fold(_ text: String) -> String {
@@ -175,6 +232,7 @@ struct ClipboardHistory {
         if let index = items.firstIndex(where: { $0.key == item.key }) {
             var existing = items.remove(at: index)
             existing.date = item.date
+            existing.rich = item.rich
             if item.source != nil { existing.source = item.source }
             items.insert(existing, at: 0)
         } else {
@@ -198,10 +256,12 @@ struct ClipboardHistory {
         items.insert(item, at: 0)
     }
 
-    /// Désépingler peut faire dépasser le plafond : l'élément le plus ancien part alors.
-    mutating func togglePin(_ id: UUID, limit: Int) {
+    /// Désépingler peut faire dépasser le plafond. L'élément qu'on vient de choisir de garder ne doit pas être le
+    /// premier à partir : désépinglé, il remonte en tête (à `date`) et c'est le plus ancien des autres qui est évincé.
+    mutating func togglePin(_ id: UUID, limit: Int, at date: Date) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].pinned.toggle()
+        if !items[index].pinned { touch(id, at: date) }
         trim(limit: limit)
     }
 

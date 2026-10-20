@@ -117,6 +117,50 @@ final class ClipboardStorageTests: XCTestCase {
         XCTAssertEqual(second.texts.first, "t39")
     }
 
+    // MARK: Erreurs d'écriture, texte coupé
+
+    func testAWriteFailureIsReportedAndClearsOnTheNextSuccess() throws {
+        // Un fichier à la place du dossier : impossible d'y écrire.
+        let blocker = try makeTemporaryDirectory(self).appendingPathComponent("bloque")
+        try Data().write(to: blocker)
+        let rig = try makeClipboardRig(keepsHistory: true, directory: blocker.appendingPathComponent("dossier"))
+        XCTAssertFalse(rig.module.persistenceFailed)
+        rig.copy("a")
+        rig.module.flushPersistence()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertTrue(rig.module.persistenceFailed)
+
+        // Désactiver le réglage efface l'alerte (plus rien n'est écrit).
+        rig.module.keepsHistory = false
+        XCTAssertFalse(rig.module.persistenceFailed)
+
+        let good = try makeClipboardRig(keepsHistory: true)
+        good.copy("a")
+        good.module.flushPersistence()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertFalse(good.module.persistenceFailed)
+    }
+
+    func testTheCutFlagSurvivesARestart() throws {
+        let first = try makeClipboardRig(keepsHistory: true)
+        first.copy(String(repeating: "é", count: 25_000))
+        first.copy("court")
+        first.module.stop()
+        let second = try makeClipboardRig(directory: first.directory, defaults: first.defaults)
+        XCTAssertEqual(second.items.map(\.truncated), [false, true])
+        XCTAssertEqual(second.items[1].content.plainText?.count, 20_000)
+    }
+
+    func testRecordsWrittenBeforeTheCutFlagExistedStillLoad() throws {
+        let directory = try makeTemporaryDirectory(self)
+        let legacy = #"{"version":1,"items":[{"id":"\#(UUID().uuidString)","kind":"text","value":"ancien","date":1800000000,"pinned":true}]}"#
+        try Data(legacy.utf8).write(to: directory.appendingPathComponent(ClipboardStorage.fileName))
+        let items = ClipboardStorage(directory: directory).load().compactMap(ClipboardItem.init(record:))
+        XCTAssertEqual(items.map { $0.content.plainText }, ["ancien"])
+        XCTAssertEqual(items.map(\.truncated), [false])
+        XCTAssertTrue(items[0].pinned)
+    }
+
     // MARK: Désactiver, effacer
 
     func testTurningPersistenceOffDeletesTheFileAndOnWritesItAgain() throws {
@@ -151,6 +195,34 @@ final class ClipboardStorageTests: XCTestCase {
         rig.copy("après")
         rig.module.flushPersistence()
         XCTAssertEqual(rig.storage.load().map(\.value), ["après"])
+    }
+
+    /// Le fichier mis de côté contient peut-être l'ancien historique en clair : « Effacer » le retire aussi.
+    func testClearingTheHistoryAlsoDeletesQuarantinedFiles() throws {
+        let directory = try makeTemporaryDirectory(self)
+        let file = directory.appendingPathComponent(ClipboardStorage.fileName)
+        try Data("un".utf8).write(to: file)
+        _ = ClipboardStorage(directory: directory).load()
+        try Data("deux".utf8).write(to: file)
+        _ = ClipboardStorage(directory: directory).load()
+        try Data("sans rapport".utf8).write(to: directory.appendingPathComponent("autre.json"))
+        XCTAssertEqual(names(directory).count, 3)
+
+        let rig = try makeClipboardRig(keepsHistory: true, directory: directory)
+        rig.copy("a")
+        rig.module.clearHistory()
+        rig.module.flushPersistence()
+        XCTAssertEqual(names(directory), ["autre.json"], "ni l'historique ni les .corrupt, rien d'autre")
+    }
+
+    func testTurningPersistenceOffAlsoDeletesQuarantinedFiles() throws {
+        let directory = try makeTemporaryDirectory(self)
+        try Data("illisible".utf8).write(to: directory.appendingPathComponent(ClipboardStorage.fileName))
+        let rig = try makeClipboardRig(keepsHistory: true, directory: directory)
+        XCTAssertEqual(names(directory), [ClipboardStorage.fileName + ".corrupt"])
+        rig.module.keepsHistory = false
+        rig.storage.flush()
+        XCTAssertEqual(names(directory), [])
     }
 
     func testRemovingAnItemUpdatesTheFile() throws {

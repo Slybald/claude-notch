@@ -7,12 +7,18 @@ import SwiftUI
 /// - Capture : un `Timer` d'une seconde (tolérance 0,5 s) ne lit que `changeCount`. Le contenu n'est lu que si
 ///   le compteur a changé, et seulement après les contrôles de confidentialité (types déclarés, app au premier
 ///   plan). Le module tourne panneau replié tant que la capture n'est pas suspendue, sinon l'historique aurait
-///   des trous ; suspendue, il n'a plus de timer ni d'observateur.
+///   des trous ; suspendue, il n'a plus de timer ni d'observateur. La copie est attribuée à l'app de devant au
+///   début de l'intervalle (copier puis changer d'app est le geste courant), pas à celle du tic.
 /// - Confidentialité : jamais d'élément portant un type « confidentiel », « temporaire » ou « généré » (voir
 ///   `ClipboardPrivacy`), jamais de copie faite depuis une app exclue (gestionnaires de mots de passe par défaut,
 ///   modifiable). L'exclusion vaut pour toutes les apps passées au premier plan depuis le dernier tic.
-/// - Mémoire : historique en mémoire seulement par défaut. « Garder l'historique après redémarrage » écrit
-///   textes et liens (jamais images ni fichiers) dans un fichier 0600 (`ClipboardStorage`).
+/// - Mémoire : historique en mémoire seulement par défaut, vidé quand l'onglet est désactivé. « Garder
+///   l'historique après redémarrage » écrit textes et liens (jamais images, fichiers ni mise en forme) dans un
+///   fichier 0600 (`ClipboardStorage`) qui est relu à la réactivation.
+/// - Mise en forme (RTF, HTML) des textes : gardée en mémoire (100 Ko au plus par élément) pour que « Copier »
+///   la restitue ; « Copier en texte brut » l'écarte.
+/// - Accès : depuis macOS 15.4 le presse-papiers général peut être refusé ou soumis à une alerte ; `access` le
+///   dit à l'onglet et aux réglages, qui renvoient vers Réglages Système.
 /// - Images : vignette de 96 pt ; données d'origine gardées jusqu'à 5 Mo, au-delà l'image est ignorée ; 40 Mo
 ///   d'images au plus au total (les plus anciennes non épinglées partent d'abord).
 /// - Copier depuis la liste réécrit le presse-papiers (jamais de collage automatique : il exigerait
@@ -33,6 +39,12 @@ final class ClipboardModule: NotchModule {
     @Published private(set) var history = ClipboardHistory()
     /// Élément qui vient d'être recopié (retour « Copié »).
     @Published private(set) var copiedID: UUID?
+    /// Accès que macOS accorde au presse-papiers (relu au démarrage, à chaque copie vue et à l'ouverture de l'onglet).
+    @Published private(set) var access = ClipboardAccess.allowed
+    /// Dernière copie ignorée dont l'utilisateur doit savoir pourquoi ; effacée à la copie suivante gardée.
+    @Published private(set) var notice: ClipboardNotice?
+    /// La dernière écriture du fichier d'historique a échoué.
+    @Published private(set) var persistenceFailed = false
 
     // MARK: Réglages
 
@@ -62,6 +74,7 @@ final class ClipboardModule: NotchModule {
             } else {
                 saveWork?.cancel()
                 saveWork = nil
+                persistenceFailed = false
                 storage.delete()
             }
         }
@@ -124,6 +137,7 @@ final class ClipboardModule: NotchModule {
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        refreshAccess()
         if keepsHistory { loadPersisted() }
         // Fin de l'app dans la seconde qui suit un changement : l'écriture débouncée aurait été perdue.
         terminationObserver = NotificationCenter.default.addObserver(
@@ -143,6 +157,17 @@ final class ClipboardModule: NotchModule {
         copiedWork?.cancel()
         copiedWork = nil
         copiedID = nil
+        // Désactivé (et non simple repli d'une capture suspendue, que le module ne distingue pas de l'extérieur
+        // quand il est aussi désactivé) : textes, liens et images ne restent pas en mémoire. Ce qui est sur disque
+        // revient à la réactivation.
+        if !suspended { releaseHistory() }
+    }
+
+    private func releaseHistory() {
+        guard !history.items.isEmpty || notice != nil else { return }
+        history = ClipboardHistory()
+        notice = nil
+        loaded = false
     }
 
     /// Le timer existe quand le module tourne et que la capture n'est pas suspendue. Il part toujours d'un
@@ -176,14 +201,32 @@ final class ClipboardModule: NotchModule {
         lastChangeCount = count
         // Notre propre écriture (recopie d'un élément) : déjà dans l'historique.
         guard count != ownChangeCount else { return }
+        refreshAccess()
         capture(apps: apps)
+    }
+
+    /// Relit l'accès accordé par macOS (une simple propriété, jamais le contenu).
+    func refreshAccess() {
+        let current = pasteboard.access
+        if current != access { access = current }
+    }
+
+    func dismissNotice() {
+        if notice != nil { notice = nil }
     }
 
     private func capture(apps: [ClipboardSource]) {
         if ClipboardPrivacy.hasIgnoredType(pasteboard.types) { return }
         if apps.contains(where: { ClipboardPrivacy.isExcluded($0, in: excludedApps) }) { return }
-        guard let content = pasteboard.readContent(),
-              let item = ClipboardItem(content, date: clock(), source: apps.last) else { return }
+        let read = pasteboard.read()
+        // `apps.first` : l'app de devant au début de l'intervalle. Une copie suivie d'un Cmd-Tab dans la même
+        // seconde vient d'elle ; l'inverse (changer d'app, sélectionner, copier en moins d'une seconde) est rare.
+        guard let content = read.content,
+              let item = ClipboardItem(content, date: clock(), source: apps.first, rich: read.rich) else {
+            if read.imageTooLarge { notice = .imageTooLarge }
+            return
+        }
+        dismissNotice()
         history.add(item, limit: limit)
         historyChanged()
     }
@@ -193,7 +236,7 @@ final class ClipboardModule: NotchModule {
     /// Recopie l'élément dans le presse-papiers (ou son texte brut) et le remonte en tête.
     func copy(_ id: UUID, plainText: Bool = false) {
         guard let item = history.items.first(where: { $0.id == id }) else { return }
-        ownChangeCount = pasteboard.write(item.content, plainText: plainText)
+        ownChangeCount = pasteboard.write(item.content, rich: item.rich, plainText: plainText)
         lastChangeCount = ownChangeCount
         history.touch(id, at: clock())
         historyChanged()
@@ -205,7 +248,7 @@ final class ClipboardModule: NotchModule {
     }
 
     func togglePin(_ id: UUID) {
-        history.togglePin(id, limit: limit)
+        history.togglePin(id, limit: limit, at: clock())
         historyChanged()
     }
 
@@ -214,13 +257,16 @@ final class ClipboardModule: NotchModule {
         historyChanged()
     }
 
-    /// « Effacer l'historique » : tout part, épinglés compris, et le fichier avec.
+    /// « Effacer l'historique » : tout part, épinglés compris, avec le fichier et les fichiers mis de côté (`.corrupt`),
+    /// même si l'écriture sur disque est désactivée aujourd'hui.
     func clearHistory() {
         history.clear()
         copiedID = nil
+        notice = nil
+        persistenceFailed = false
         saveWork?.cancel()
         saveWork = nil
-        if keepsHistory { storage.delete() }
+        storage.delete()
     }
 
     // MARK: Réglages des apps exclues
@@ -260,7 +306,10 @@ final class ClipboardModule: NotchModule {
     private func saveNow() {
         saveWork = nil
         guard keepsHistory else { return }
-        storage.save(history.items.compactMap(\.record))
+        storage.save(history.items.compactMap(\.record)) { [weak self] succeeded in
+            guard let self, keepsHistory, persistenceFailed == succeeded else { return }
+            persistenceFailed = !succeeded
+        }
     }
 
     /// Écrit tout de suite ce qui attend et attend la fin (arrêt du module, fin de l'app, tests).
@@ -271,4 +320,10 @@ final class ClipboardModule: NotchModule {
         }
         storage.flush()
     }
+}
+
+/// Pourquoi une copie n'a pas été gardée.
+enum ClipboardNotice: Equatable {
+    /// Une image de plus de 5 Mo.
+    case imageTooLarge
 }

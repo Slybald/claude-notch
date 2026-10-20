@@ -99,6 +99,29 @@ final class ClipboardSnapshotTests: XCTestCase {
         try render(panel(rig, query: "zzz", focused: true), "clipboard-no-results", outputDir, size: size,
                    background: nil)
 
+        // macOS refuse ou soumet à une alerte la lecture du presse-papiers : la ligne d'explication, sans et avec
+        // historique (l'alerte seule disparaît dès qu'une copie a été gardée).
+        let denied = try makeClipboardRig()
+        denied.pasteboard.access = .denied
+        denied.module.refreshAccess()
+        try render(notch(denied).root, "clipboard-access-denied-empty", outputDir)
+        let asking = try makeClipboardRig()
+        asking.pasteboard.access = .ask
+        asking.module.refreshAccess()
+        try render(notch(asking).root, "clipboard-access-ask-empty", outputDir)
+        let deniedFilled = try filledRig()
+        deniedFilled.pasteboard.access = .denied
+        deniedFilled.module.refreshAccess()
+        try render(notch(deniedFilled).root, "clipboard-access-denied-filled", outputDir)
+
+        // Une image de plus de 5 Mo n'est pas gardée : la ligne le dit jusqu'à la copie suivante.
+        rig.apps.current = .safari
+        rig.pasteboard.copyTooLargeImage()
+        rig.module.poll()
+        XCTAssertEqual(rig.module.notice, .imageTooLarge)
+        try render(notch(rig).root, "clipboard-image-too-large", outputDir)
+        rig.module.dismissNotice()
+
         // Capture suspendue : bandeau et bouton « Reprendre » dans l'en-tête, avec et sans historique.
         rig.module.suspended = true
         try render(notch(rig).root, "clipboard-suspended", outputDir)
@@ -120,6 +143,11 @@ final class ClipboardSnapshotTests: XCTestCase {
         rig.module.keepsHistory = true
         try render(window, "settings-clipboard-persist-on", outputDir, size: SettingsWindow.size, background: nil)
         rig.module.keepsHistory = false
+        let warned = notch(denied)
+        let warnedWindow = SettingsView(prefs: warned.harness.prefs, registry: warned.registry, updater: Updater(),
+                                        selection: .module("clipboard"))
+        try render(warnedWindow, "settings-clipboard-access-denied", outputDir, size: SettingsWindow.size,
+                   background: nil)
     }
 
     /// Fenêtre hors écran + rendu de l'arbre de calques (même méthode que MediaSnapshotTests).

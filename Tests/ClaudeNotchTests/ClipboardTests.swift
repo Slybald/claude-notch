@@ -7,37 +7,53 @@ import XCTest
 /// Presse-papiers factice : compte les lectures, garde les écritures. `copy` simule la copie d'une app.
 final class FakePasteboard: ClipboardPasteboard {
     var changeCount = 0
+    var access = ClipboardAccess.allowed
     private(set) var typesReads = 0
     private(set) var contentReads = 0
-    private(set) var written: [(content: ClipboardContent, plainText: Bool)] = []
+    private(set) var written: [(content: ClipboardContent, rich: ClipboardRichText?, plainText: Bool)] = []
     private var declared: [String] = []
     private var content: ClipboardContent?
+    private var rich: ClipboardRichText?
+    private var tooLarge = false
 
     var types: [String] {
         typesReads += 1
         return declared
     }
 
-    func readContent() -> ClipboardContent? {
+    func read() -> ClipboardRead {
         contentReads += 1
-        return content
+        return ClipboardRead(content: content, rich: rich, imageTooLarge: tooLarge)
     }
 
-    func write(_ content: ClipboardContent, plainText: Bool) -> Int {
-        written.append((content, plainText))
+    func write(_ content: ClipboardContent, rich: ClipboardRichText?, plainText: Bool) -> Int {
+        written.append((content, rich, plainText))
         self.content = content
+        self.rich = rich
+        tooLarge = false
         changeCount += 1
         return changeCount
     }
 
-    func copy(_ content: ClipboardContent, types: [String] = ["public.utf8-plain-text"]) {
+    func copy(_ content: ClipboardContent, rich: ClipboardRichText? = nil, types: [String] = ["public.utf8-plain-text"]) {
         self.content = content
+        self.rich = rich
+        tooLarge = false
         declared = types
         changeCount += 1
     }
 
-    func copy(_ text: String, types: [String] = ["public.utf8-plain-text"]) {
-        copy(ClipboardContent.classify(text: text), types: types)
+    func copy(_ text: String, rich: ClipboardRichText? = nil, types: [String] = ["public.utf8-plain-text"]) {
+        copy(ClipboardContent.classify(text: text), rich: rich, types: types)
+    }
+
+    /// Une image de plus de 5 Mo : le presse-papiers la signale sans la livrer.
+    func copyTooLargeImage() {
+        content = nil
+        rich = nil
+        tooLarge = true
+        declared = ["public.png"]
+        changeCount += 1
     }
 }
 
@@ -82,9 +98,10 @@ struct ClipboardRig {
     let clock: ClipboardClock
 
     /// Une copie par une app, puis un tic ; l'horloge avance d'une seconde.
-    func copy(_ text: String, from source: ClipboardSource? = .textEdit, types: [String] = ["public.utf8-plain-text"]) {
+    func copy(_ text: String, from source: ClipboardSource? = .textEdit, rich: ClipboardRichText? = nil,
+              types: [String] = ["public.utf8-plain-text"]) {
         apps.current = source
-        pasteboard.copy(text, types: types)
+        pasteboard.copy(text, rich: rich, types: types)
         clock.advance()
         module.poll()
     }
@@ -264,6 +281,17 @@ final class ClipboardTests: XCTestCase {
         XCTAssertEqual(rig.texts, ["suite"], "l'intervalle suivant n'est plus concerné")
     }
 
+    /// Copie dans Safari puis Cmd-Tab vers TextEdit avant le tic : la copie vient de Safari, l'app de devant au
+    /// début de l'intervalle (copier puis changer d'app est le geste courant ; l'inverse prend plus d'une seconde).
+    func testASwitchRightAfterACopyKeepsTheAppThatCopied() throws {
+        let rig = try makeClipboardRig()
+        rig.apps.visited = [.safari]
+        rig.copy("depuis safari", from: .textEdit)
+        XCTAssertEqual(rig.items[0].source, .safari)
+        rig.copy("sans changement", from: .textEdit)
+        XCTAssertEqual(rig.items[0].source, .textEdit)
+    }
+
     func testExcludedAppsAreEditableAndRemembered() throws {
         let rig = try makeClipboardRig()
         rig.module.exclude("com.example.coffre")
@@ -372,9 +400,12 @@ final class ClipboardTests: XCTestCase {
         rig.module.togglePin(rig.items[0].id)
         for index in 0..<30 { rig.copy("u\(index)") }
         XCTAssertEqual(rig.items.count, 26)
+        rig.clock.advance()
         rig.module.togglePin(rig.module.history.ordered[0].id)
         XCTAssertEqual(rig.items.count, 25, "désépingler ne dépasse pas le plafond")
-        XCTAssertFalse(rig.texts.contains("à garder"), "le plus ancien part")
+        XCTAssertEqual(rig.texts.first, "à garder", "l'élément désépinglé remonte en tête : il n'est pas évincé")
+        XCTAssertFalse(rig.texts.contains("u5"), "c'est le plus ancien des autres qui part")
+        XCTAssertGreaterThan(rig.items[0].date, rig.items[1].date)
 
         rig.module.limit = 7
         XCTAssertEqual(rig.module.limit, 50, "valeur inconnue : retour au défaut")
@@ -390,6 +421,22 @@ final class ClipboardTests: XCTestCase {
         XCTAssertEqual(rig.texts, ["b", "a"])
         rig.module.clearHistory()
         XCTAssertTrue(rig.items.isEmpty, "épinglés compris")
+    }
+
+    func testUnpinningAVeryOldItemDoesNotDeleteIt() throws {
+        let rig = try makeClipboardRig()
+        rig.copy("à garder")
+        rig.module.togglePin(rig.items[0].id)
+        for index in 0..<50 { rig.copy("t\(index)") }
+        XCTAssertEqual(rig.items.count, 51, "50 non épinglés + l'épinglé")
+        let kept = try XCTUnwrap(rig.items.first { $0.content.plainText == "à garder" })
+        rig.clock.advance()
+        rig.module.togglePin(kept.id)
+        XCTAssertEqual(rig.items.count, 50)
+        XCTAssertEqual(rig.texts.first, "à garder", "désépinglé, il redevient le plus récent")
+        XCTAssertFalse(rig.texts.contains("t0"), "le plus ancien des autres part, pas l'élément choisi")
+        XCTAssertFalse(rig.items[0].pinned)
+        XCTAssertGreaterThan(rig.items[0].date, rig.items[1].date)
     }
 
     // MARK: Types de contenu
@@ -408,6 +455,18 @@ final class ClipboardTests: XCTestCase {
         XCTAssertTrue(rig.items[0].truncated)
         guard case .text(let emoji) = rig.items[0].content else { return XCTFail("texte attendu") }
         XCTAssertEqual(emoji.count, 20_000)
+    }
+
+    func testAHugeLinkIsCutLikeAnyText() throws {
+        let rig = try makeClipboardRig()
+        let link = "https://example.com/" + String(repeating: "a", count: 100_000)
+        rig.copy(link)
+        guard case .text(let text) = rig.items[0].content else { return XCTFail("trop long pour un lien : du texte") }
+        XCTAssertEqual(text.count, ClipboardItem.maxTextCharacters)
+        XCTAssertTrue(rig.items[0].truncated)
+        rig.copy("https://example.com/" + String(repeating: "b", count: 100))
+        guard case .url = rig.items[0].content else { return XCTFail("un lien court reste un lien") }
+        XCTAssertFalse(rig.items[0].truncated)
     }
 
     func testImagesAreKeptUpToFiveMegabytesAndLargerOnesAreIgnored() throws {
@@ -443,7 +502,7 @@ final class ClipboardTests: XCTestCase {
         for index in 0..<11 {
             let item = try XCTUnwrap(ClipboardItem(fake(index), date: start.addingTimeInterval(Double(index))))
             history.add(item, limit: 50)
-            if index == 0 { history.togglePin(item.id, limit: 50) }
+            if index == 0 { history.togglePin(item.id, limit: 50, at: start.addingTimeInterval(Double(index))) }
         }
         let bytes = history.items.reduce(0) { $0 + $1.content.imageBytes }
         XCTAssertLessThanOrEqual(bytes, ClipboardHistory.imageBudget)
@@ -460,6 +519,160 @@ final class ClipboardTests: XCTestCase {
         rig.copy(.files([URL(fileURLWithPath: "/tmp/a.txt")]))
         rig.copy(.color("112233"))
         XCTAssertEqual(rig.items.count, 2)
+    }
+
+    // MARK: Mise en forme (RTF, HTML)
+
+    private let rtf = Data(#"{\rtf1\ansi {\b gras} et normal}"#.utf8)
+    private let html = Data("<b>gras</b> et normal".utf8)
+
+    func testFormattedTextIsRestoredByCopyAndDroppedByPlainCopy() throws {
+        let rig = try makeClipboardRig()
+        let rich = ClipboardRichText(rtf: rtf, html: html)
+        rig.copy("gras et normal", rich: rich)
+        XCTAssertEqual(rig.items[0].rich, rich)
+        XCTAssertTrue(rig.items[0].offersPlainCopy)
+
+        rig.module.copy(rig.items[0].id)
+        XCTAssertEqual(rig.pasteboard.written.last?.rich, rich, "Copier restitue la mise en forme")
+        XCTAssertEqual(rig.pasteboard.written.last?.plainText, false)
+        rig.module.copy(rig.items[0].id, plainText: true)
+        XCTAssertEqual(rig.pasteboard.written.last?.plainText, true, "Copier en texte brut est une écriture à part")
+    }
+
+    func testPlainCopyIsOfferedOnlyWhenItChangesSomething() throws {
+        let rig = try makeClipboardRig()
+        rig.copy("texte nu")
+        XCTAssertFalse(rig.items[0].offersPlainCopy, "un texte sans mise en forme : identique à Copier")
+        rig.copy("https://example.com/a")
+        XCTAssertTrue(rig.items[0].offersPlainCopy, "un lien : l'adresse seule, sans objet lien")
+        rig.copy(.color("112233"))
+        XCTAssertTrue(rig.items[0].offersPlainCopy)
+        rig.copy(.image(makeTestImage()))
+        XCTAssertFalse(rig.items[0].offersPlainCopy)
+    }
+
+    func testRichTextIsBoundedAndNeverKeptForCutTextOrOtherKinds() throws {
+        XCTAssertNil(ClipboardRichText.make(rtf: nil, html: nil))
+        XCTAssertNil(ClipboardRichText.make(rtf: Data(), html: Data()))
+        let heavy = Data(count: ClipboardRichText.maxBytes + 1)
+        XCTAssertNil(ClipboardRichText.make(rtf: heavy, html: heavy), "au-delà de 100 Ko : texte seul")
+        let light = ClipboardRichText.make(rtf: rtf, html: heavy)
+        XCTAssertEqual(light?.rtf, rtf)
+        XCTAssertNil(light?.html, "le budget de 100 Ko vaut pour les deux ensemble")
+
+        let rig = try makeClipboardRig()
+        let rich = ClipboardRichText(rtf: rtf, html: nil)
+        rig.copy(String(repeating: "x", count: 20_500), rich: rich)
+        XCTAssertTrue(rig.items[0].truncated)
+        XCTAssertNil(rig.items[0].rich, "la mise en forme d'un texte coupé ne correspondrait plus")
+        let item = try XCTUnwrap(ClipboardItem(.color("112233"), date: Date(), rich: rich))
+        XCTAssertNil(item.rich)
+    }
+
+    func testCopyingTheSameTextAgainReplacesItsFormatting() throws {
+        let rig = try makeClipboardRig()
+        rig.copy("gras et normal", rich: ClipboardRichText(rtf: rtf, html: nil))
+        rig.copy("gras et normal")
+        XCTAssertEqual(rig.items.count, 1)
+        XCTAssertNil(rig.items[0].rich, "la dernière copie fait foi")
+    }
+
+    func testFormattingIsNeverWrittenToDisk() throws {
+        let rig = try makeClipboardRig(keepsHistory: true)
+        rig.copy("gras et normal", rich: ClipboardRichText(rtf: rtf, html: html))
+        rig.module.flushPersistence()
+        let raw = try String(contentsOf: rig.file, encoding: .utf8)
+        XCTAssertTrue(raw.contains("gras et normal"))
+        XCTAssertFalse(raw.contains("rtf") || raw.contains("html") || raw.contains("<b>"))
+    }
+
+    // MARK: Accès au presse-papiers (macOS 15.4 et après)
+
+    func testTheAccessMacOSGrantsIsReadAtStartAndAtEachCopy() throws {
+        let rig = try makeClipboardRig(start: false)
+        rig.pasteboard.access = .denied
+        rig.module.start()
+        XCTAssertEqual(rig.module.access, .denied)
+        rig.pasteboard.access = .ask
+        rig.module.poll()
+        XCTAssertEqual(rig.module.access, .denied, "rien n'est relu tant qu'aucune copie n'a lieu")
+        rig.copy("a")
+        XCTAssertEqual(rig.module.access, .ask)
+        rig.pasteboard.access = .allowed
+        rig.module.refreshAccess()
+        XCTAssertEqual(rig.module.access, .allowed)
+        XCTAssertNil(rig.module.access.message)
+        XCTAssertNotNil(ClipboardAccess.ask.message)
+        XCTAssertNotNil(ClipboardAccess.denied.message)
+    }
+
+    func testTheAccessNoticeShowsTheRefusalAlwaysAndTheAlertUntilSomethingWasKept() {
+        let show = ClipboardPanel.showsAccessNotice
+        XCTAssertFalse(show(.allowed, false))
+        XCTAssertTrue(show(.denied, false))
+        XCTAssertTrue(show(.denied, true))
+        XCTAssertTrue(show(.ask, false))
+        XCTAssertFalse(show(.ask, true), "des copies ont été gardées : l'alerte est réglée")
+    }
+
+    func testTheRealPasteboardReportsAccessAllowedOnAPrivatePasteboard() {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("claudenotch-access-\(UUID().uuidString)"))
+        addTeardownBlock { pasteboard.releaseGlobally() }
+        XCTAssertEqual(SystemPasteboard(pasteboard: pasteboard).access, .allowed)
+    }
+
+    // MARK: Retours à l'utilisateur
+
+    func testAnImageOverFiveMegabytesLeavesANoticeUntilTheNextKeptCopy() throws {
+        let rig = try makeClipboardRig()
+        rig.copy("avant")
+        rig.apps.current = .textEdit
+        rig.pasteboard.copyTooLargeImage()
+        rig.clock.advance()
+        rig.module.poll()
+        XCTAssertEqual(rig.module.notice, .imageTooLarge)
+        XCTAssertEqual(rig.texts, ["avant"], "rien n'est gardé")
+
+        rig.module.dismissNotice()
+        XCTAssertNil(rig.module.notice)
+        rig.pasteboard.copyTooLargeImage()
+        rig.module.poll()
+        XCTAssertEqual(rig.module.notice, .imageTooLarge)
+        rig.copy("  ")
+        XCTAssertEqual(rig.module.notice, .imageTooLarge, "un texte vide n'efface pas l'explication")
+        rig.copy("après")
+        XCTAssertNil(rig.module.notice, "une copie gardée l'efface")
+    }
+
+    func testStoppingTheModuleDropsTheHistoryFromMemoryButNotWhenOnlyCapturePaused() throws {
+        let rig = try makeClipboardRig()
+        rig.copy("a")
+        rig.copy(.image(makeTestImage()))
+        rig.module.stop()
+        XCTAssertTrue(rig.items.isEmpty, "désactivé : plus rien en mémoire")
+        rig.module.start()
+        XCTAssertTrue(rig.items.isEmpty)
+        rig.copy("b")
+        XCTAssertEqual(rig.texts, ["b"])
+
+        // Capture suspendue : le repli panneau fermé n'efface rien.
+        rig.module.suspended = true
+        rig.module.stop()
+        XCTAssertEqual(rig.texts, ["b"])
+    }
+
+    func testStoppingAndRestartingBringsTheSavedHistoryBack() throws {
+        let rig = try makeClipboardRig(keepsHistory: true)
+        rig.copy("sur disque")
+        rig.copy(.image(makeTestImage()))
+        rig.module.stop()
+        XCTAssertTrue(rig.items.isEmpty)
+        rig.module.start()
+        XCTAssertEqual(rig.texts, ["sur disque"], "le fichier est relu à la réactivation ; l'image, jamais écrite, est perdue")
+        rig.copy("neuf")
+        rig.module.flushPersistence()
+        XCTAssertEqual(rig.storage.load().map(\.value), ["neuf", "sur disque"], "le fichier n'a pas été vidé par l'arrêt")
     }
 
     // MARK: Recherche
@@ -577,29 +790,56 @@ final class ClipboardTests: XCTestCase {
         addTeardownBlock { pasteboard.releaseGlobally() }
         let system = SystemPasteboard(pasteboard: pasteboard)
 
-        _ = system.write(.text("bonjour"), plainText: false)
-        guard case .text("bonjour")? = system.readContent() else { return XCTFail("texte") }
+        _ = system.write(.text("bonjour"), rich: nil, plainText: false)
+        guard case .text("bonjour")? = system.read().content else { return XCTFail("texte") }
 
         let url = URL(string: "https://example.com/a")!
-        _ = system.write(.url(url), plainText: false)
-        guard case .url(let read)? = system.readContent() else { return XCTFail("lien") }
+        _ = system.write(.url(url), rich: nil, plainText: false)
+        guard case .url(let read)? = system.read().content else { return XCTFail("lien") }
         XCTAssertEqual(read, url)
-        _ = system.write(.url(url), plainText: true)
+        _ = system.write(.url(url), rich: nil, plainText: true)
         XCTAssertEqual(pasteboard.types?.map(\.rawValue).contains("public.url"), false, "texte brut : pas d'objet lien")
 
         let files = [URL(fileURLWithPath: "/tmp/a.txt"), URL(fileURLWithPath: "/tmp/b.txt")]
-        _ = system.write(.files(files), plainText: false)
-        guard case .files(let readFiles)? = system.readContent() else { return XCTFail("fichiers") }
+        _ = system.write(.files(files), rich: nil, plainText: false)
+        guard case .files(let readFiles)? = system.read().content else { return XCTFail("fichiers") }
         XCTAssertEqual(readFiles.map(\.path), files.map(\.path))
 
-        _ = system.write(.color("D97757"), plainText: false)
-        guard case .color("D97757")? = system.readContent() else { return XCTFail("couleur") }
+        _ = system.write(.color("D97757"), rich: nil, plainText: false)
+        guard case .color("D97757")? = system.read().content else { return XCTFail("couleur") }
 
         let image = makeTestImage(width: 120, height: 80)
-        let count = system.write(.image(image), plainText: false)
+        let count = system.write(.image(image), rich: nil, plainText: false)
         XCTAssertEqual(count, system.changeCount)
-        guard case .image(let readImage)? = system.readContent() else { return XCTFail("image") }
+        guard case .image(let readImage)? = system.read().content else { return XCTFail("image") }
         XCTAssertEqual(readImage.digest, image.digest)
+
+        // Un texte mis en forme : RTF et HTML sont lus, restitués par « Copier », écartés par le texte brut.
+        pasteboard.clearContents()
+        pasteboard.setString("gras et normal", forType: .string)
+        pasteboard.setData(rtf, forType: .rtf)
+        pasteboard.setData(html, forType: .html)
+        let formatted = system.read()
+        guard case .text("gras et normal")? = formatted.content else { return XCTFail("texte mis en forme") }
+        XCTAssertEqual(formatted.rich, ClipboardRichText(rtf: rtf, html: html))
+        _ = system.write(.text("gras et normal"), rich: formatted.rich, plainText: false)
+        XCTAssertEqual(pasteboard.data(forType: .rtf), rtf)
+        XCTAssertEqual(pasteboard.data(forType: .html), html)
+        _ = system.write(.text("gras et normal"), rich: formatted.rich, plainText: true)
+        XCTAssertNil(pasteboard.data(forType: .rtf), "texte brut : la mise en forme est écartée")
+        XCTAssertEqual(pasteboard.string(forType: .string), "gras et normal")
+        // Un lien n'emporte pas de mise en forme.
+        pasteboard.clearContents()
+        pasteboard.setString("https://example.com/a", forType: .string)
+        pasteboard.setData(rtf, forType: .rtf)
+        XCTAssertNil(system.read().rich)
+
+        // Une image de plus de 5 Mo est signalée, sans lire les formats suivants.
+        pasteboard.clearContents()
+        pasteboard.setData(Data(count: ClipboardImage.maxBytes + 1), forType: .png)
+        let heavy = system.read()
+        XCTAssertNil(heavy.content)
+        XCTAssertTrue(heavy.imageTooLarge)
 
         // Un type confidentiel déclaré par une autre app est vu avant toute lecture du contenu.
         pasteboard.clearContents()

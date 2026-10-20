@@ -22,7 +22,7 @@
 "Éléments gardés" = "Items kept";
 "Les éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés. Les images de plus de 5 Mo ne sont pas gardées." = "Pinned items come on top of this number and are never removed. Images over 5 MB are not kept.";
 "Garder l'historique après redémarrage" = "Keep the history after a restart";
-"Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app. Activé, les textes et les liens sont écrits dans un fichier privé ; les images et les fichiers n'y sont jamais." = "Off, the history stays in memory and is gone when the app quits. On, texts and links are written to a private file; images and files never are.";
+"Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans mise en forme ; les images et les fichiers n'y sont jamais." = "Off, the history stays in memory and is gone when the app quits or the tab is turned off. On, texts and links are written to a private file, without their formatting; images and files never are.";
 "Effacer l'historique" = "Clear history";
 "Effacer l'historique ?" = "Clear the history?";
 "Effacer" = "Clear";
@@ -35,3 +35,9 @@
 "Choisis l'app dont les copies ne doivent pas être enregistrées." = "Choose the app whose copies must not be recorded.";
 "Trousseaux d'accès" = "Keychain Access";
 "Mots de passe" = "Passwords";
+"La capture est suspendue : tes copies ne sont pas enregistrées." = "Capture is paused: your copies are not being recorded.";
+"Image de plus de 5 Mo : non gardée." = "Image over 5 MB: not kept.";
+"Fermer" = "Dismiss";
+"macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS asks before letting an app read the clipboard. To stop the interruptions, allow Claude Notch in System Settings › Privacy & Security › Paste from Other Apps.";
+"macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS blocks clipboard access, so nothing can be recorded. Allow Claude Notch in System Settings › Privacy & Security › Paste from Other Apps.";
+"L'historique n'a pas pu être écrit sur le disque. Il sera perdu à la fermeture de l'app." = "The history could not be written to disk. It will be lost when the app quits.";

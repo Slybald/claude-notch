@@ -25,6 +25,8 @@ struct ClipboardPanel: View {
     private static let spacing: CGFloat = 8
     private static let searchHeight: CGFloat = 26
     private static let stripHeight: CGFloat = 30
+    /// Trois lignes de 10,5 pt au plus, dans les trois tailles de panneau.
+    private static let accessNoticeHeight: CGFloat = 54
 
     init(module: ClipboardModule, query: String = "", selection: UUID? = nil, searchFocused: Bool = false,
          hovered: UUID? = nil) {
@@ -35,8 +37,20 @@ struct ClipboardPanel: View {
         previewHover = hovered
     }
 
+    /// Le refus de macOS se dit toujours ; son alerte, tant qu'aucune copie n'a été gardée (ensuite, c'est réglé).
+    static func showsAccessNotice(_ access: ClipboardAccess, hasHistory: Bool) -> Bool {
+        access == .denied || (access == .ask && !hasHistory)
+    }
+
+    private var accessNotice: Bool {
+        Self.showsAccessNotice(module.access, hasHistory: !module.history.items.isEmpty)
+    }
+
     private var listMaxHeight: CGFloat {
-        let fixed = Self.searchHeight + Self.spacing + (module.suspended ? Self.stripHeight + Self.spacing : 0)
+        var fixed = Self.searchHeight + Self.spacing
+        if module.suspended { fixed += Self.stripHeight + Self.spacing }
+        if module.notice != nil { fixed += Self.stripHeight + Self.spacing }
+        if accessNotice { fixed += Self.accessNoticeHeight + Self.spacing }
         return max(120, contentMaxHeight - fixed)
     }
 
@@ -44,12 +58,21 @@ struct ClipboardPanel: View {
         let all = module.history.ordered
         let results = ClipboardHistory.filter(all, query: query)
         VStack(alignment: .leading, spacing: Self.spacing) {
-            if module.suspended {
+            if accessNotice, let message = module.access.message {
+                ClipboardAccessNotice(message: message)
+                    .transition(.opacity)
+            }
+            // Sans historique, l'état vide dit déjà que la capture est suspendue (un seul bouton « Reprendre »).
+            if module.suspended, !all.isEmpty {
                 SuspendedStrip { module.suspended = false }
                     .transition(.opacity)
             }
+            if let notice = module.notice {
+                ClipboardNoticeStrip(notice: notice, dismiss: module.dismissNotice)
+                    .transition(.opacity)
+            }
             if all.isEmpty {
-                ClipboardEmptyState()
+                ClipboardEmptyState(suspended: module.suspended) { module.suspended = false }
             } else {
                 ClipboardSearchBar(query: $query, focused: $searchFocused, onMove: { move($0, in: results) },
                                    onSubmit: { submit(results) }, onCancel: leaveSearch)
@@ -62,6 +85,9 @@ struct ClipboardPanel: View {
             }
         }
         .animation(notchSpring, value: module.suspended)
+        .animation(notchSpring, value: module.notice)
+        .animation(notchSpring, value: accessNotice)
+        .onAppear { module.refreshAccess() }
         .onChange(of: query) { newValue in
             selection = newValue.isEmpty ? nil : ClipboardHistory.filter(module.history.ordered, query: newValue).first?.id
         }
@@ -183,7 +209,7 @@ struct ClipboardRow: View {
         .animation(.easeOut(duration: 0.12), value: copied)
         .contextMenu {
             Button(action: actions.copy) { Text("Copier", tableName: "Clipboard") }
-            if item.content.plainText != nil {
+            if item.offersPlainCopy {
                 Button(action: actions.copyPlain) { Text("Copier en texte brut", tableName: "Clipboard") }
             }
             Divider()
@@ -414,15 +440,31 @@ enum ClipboardFileIcons {
 // MARK: - États
 
 struct ClipboardEmptyState: View {
+    var suspended = false
+    var resume: () -> Void = {}
+
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "doc.on.clipboard")
+            Image(systemName: suspended ? "pause.circle.fill" : "doc.on.clipboard")
                 .font(.system(size: 22, weight: .medium))
-                .foregroundColor(Palette.accent)
-            Text("Copie du texte, un lien ou une image : ils apparaîtront ici.", tableName: "Clipboard")
+                .foregroundColor(suspended ? Palette.amber : Palette.accent)
+            Text(verbatim: suspended
+                 ? L("La capture est suspendue : tes copies ne sont pas enregistrées.", table: "Clipboard")
+                 : L("Copie du texte, un lien ou une image : ils apparaîtront ici.", table: "Clipboard"))
                 .font(.system(size: 11.5))
                 .foregroundColor(Palette.secondary)
                 .multilineTextAlignment(.center)
+            if suspended {
+                Button(action: resume) {
+                    Text("Reprendre", tableName: "Clipboard")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Palette.amber)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Palette.amber.opacity(0.16)))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
@@ -467,6 +509,82 @@ struct SuspendedStrip: View {
     }
 }
 
+/// Ligne qui dit pourquoi une copie n'a pas été gardée ; un clic sur la croix la retire.
+struct ClipboardNoticeStrip: View {
+    let notice: ClipboardNotice
+    let dismiss: () -> Void
+
+    private var text: String {
+        switch notice {
+        case .imageTooLarge: return L("Image de plus de 5 Mo : non gardée.", table: "Clipboard")
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "photo.badge.exclamationmark")
+                .foregroundColor(Palette.amber)
+            Text(verbatim: text)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundColor(Palette.primary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(Palette.secondary)
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L("Fermer", table: "Clipboard"))
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.amber.opacity(0.12)))
+    }
+}
+
+/// macOS (15.4 et après) refuse ou soumet à une alerte la lecture du presse-papiers : sans cette ligne,
+/// l'historique resterait vide sans explication.
+struct ClipboardAccessNotice: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lock.trianglebadge.exclamationmark.fill")
+                .foregroundColor(Palette.amber)
+                .padding(.top, 1)
+            Text(verbatim: message)
+                .font(.system(size: 10.5))
+                .foregroundColor(Palette.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.amber.opacity(0.12)))
+    }
+}
+
+extension ClipboardAccess {
+    /// Ce que l'utilisateur doit faire ; nil quand tout va bien.
+    var message: String? {
+        switch self {
+        case .allowed:
+            return nil
+        case .ask:
+            return L("macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, "
+                + "autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis "
+                + "d'autres apps.", table: "Clipboard")
+        case .denied:
+            return L("macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Claude "
+                + "Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps.",
+                     table: "Clipboard")
+        }
+    }
+}
+
 // MARK: - En-tête
 
 /// À droite des onglets : suspendre ou reprendre la capture.
@@ -482,22 +600,11 @@ struct ClipboardSuspendButton: View {
         Button {
             module.suspended.toggle()
         } label: {
-            if module.suspended {
-                HStack(spacing: 4) {
-                    Image(systemName: "play.fill").font(.system(size: 8, weight: .bold))
-                    Text("Reprendre", tableName: "Clipboard")
-                }
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundColor(Palette.amber)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(Palette.amber.opacity(0.16)))
-            } else {
-                Image(systemName: "pause.circle")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(hovering ? 1 : 0.65))
-                    .frame(width: 22, height: 18)
-            }
+            // Le symbole montre l'action : reprendre quand c'est suspendu (le bouton « Reprendre » est dans l'onglet).
+            Image(systemName: module.suspended ? "play.circle.fill" : "pause.circle")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(module.suspended ? Palette.amber : .white.opacity(hovering ? 1 : 0.65))
+                .frame(width: 22, height: 18)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -650,6 +757,7 @@ struct ClipboardSettingsView: View {
     var body: some View {
         SettingsPane {
             Section {
+                if let message = module.access.message { warning(message) }
                 Toggle(isOn: $module.suspended) { Text("Suspendre la capture", tableName: "Clipboard") }
                 Picker(selection: $module.limit) {
                     ForEach(ClipboardModule.limits, id: \.self) { Text(verbatim: "\($0)").tag($0) }
@@ -661,9 +769,13 @@ struct ClipboardSettingsView: View {
                 Toggle(isOn: $module.keepsHistory) {
                     Text("Garder l'historique après redémarrage", tableName: "Clipboard")
                 }
-                SettingsNote(L("Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app. Activé, "
-                    + "les textes et les liens sont écrits dans un fichier privé ; les images et les fichiers n'y "
-                    + "sont jamais.", table: "Clipboard"))
+                SettingsNote(L("Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand "
+                    + "l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans "
+                    + "mise en forme ; les images et les fichiers n'y sont jamais.", table: "Clipboard"))
+                if module.keepsHistory, module.persistenceFailed {
+                    warning(L("L'historique n'a pas pu être écrit sur le disque. Il sera perdu à la fermeture de l'app.",
+                              table: "Clipboard"))
+                }
                 Button(role: .destructive) { confirmingClear = true } label: {
                     Text("Effacer l'historique", tableName: "Clipboard")
                 }
@@ -699,11 +811,19 @@ struct ClipboardSettingsView: View {
                                table: "Clipboard"))
             }
         }
+        .onAppear { module.refreshAccess() }
         .confirmationDialog(Text("Effacer l'historique ?", tableName: "Clipboard"), isPresented: $confirmingClear,
                             titleVisibility: .visible) {
             Button(role: .destructive) { module.clearHistory() } label: { Text("Effacer", tableName: "Clipboard") }
         } message: {
             Text("Tout est supprimé, y compris les éléments épinglés.", tableName: "Clipboard")
+        }
+    }
+
+    private func warning(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+            SettingsNote(text)
         }
     }
 

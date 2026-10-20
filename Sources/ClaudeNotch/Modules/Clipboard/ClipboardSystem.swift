@@ -8,10 +8,13 @@ protocol ClipboardPasteboard: AnyObject {
     var changeCount: Int { get }
     /// Types déclarés, sans lire aucun contenu : la confidentialité se décide dessus.
     var types: [String] { get }
-    /// Contenu utilisable (fichiers, couleur, texte ou lien, image) ; nil si rien.
-    func readContent() -> ClipboardContent?
-    /// Remplace le presse-papiers (par le texte brut du contenu si `plainText`) ; rend le nouveau `changeCount`.
-    func write(_ content: ClipboardContent, plainText: Bool) -> Int
+    /// L'accès que macOS accorde à l'app (toujours `.allowed` avant macOS 15.4 et hors presse-papiers général).
+    var access: ClipboardAccess { get }
+    /// Contenu utilisable (fichiers, couleur, texte ou lien, image) et, pour un texte, sa mise en forme.
+    func read() -> ClipboardRead
+    /// Remplace le presse-papiers (par le texte brut du contenu si `plainText`, sinon avec la mise en forme `rich`
+    /// d'un texte) ; rend le nouveau `changeCount`.
+    func write(_ content: ClipboardContent, rich: ClipboardRichText?, plainText: Bool) -> Int
 }
 
 protocol ClipboardFrontApps: AnyObject {
@@ -38,34 +41,50 @@ final class SystemPasteboard: ClipboardPasteboard {
 
     var types: [String] { pasteboard.types?.map(\.rawValue) ?? [] }
 
-    func readContent() -> ClipboardContent? {
+    var access: ClipboardAccess {
+        guard #available(macOS 15.4, *) else { return .allowed }
+        switch pasteboard.accessBehavior {
+        case .alwaysAllow: return .allowed
+        case .alwaysDeny: return .denied
+        default: return .ask
+        }
+    }
+
+    func read() -> ClipboardRead {
         let declared = Set(pasteboard.types ?? [])
         let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self],
                                               options: [.urlReadingFileURLsOnly: true]) as? [URL]
-        if let fileURLs, !fileURLs.isEmpty { return .files(fileURLs) }
+        if let fileURLs, !fileURLs.isEmpty { return ClipboardRead(content: .files(fileURLs)) }
 
         // Les sélecteurs de couleur déclarent ce type ; un texte copié n'en a jamais.
         if declared.contains(.color), let color = (pasteboard.readObjects(forClasses: [NSColor.self]) as? [NSColor])?.first,
            let hex = Self.hex(of: color) {
-            return .color(hex)
+            return ClipboardRead(content: .color(hex))
         }
 
         let text = pasteboard.string(forType: .string)
         if text == nil || text?.contains(where: { !$0.isWhitespace }) != true {
             for type in [NSPasteboard.PasteboardType.png, .tiff, Self.jpeg] where declared.contains(type) {
-                if let data = pasteboard.data(forType: type), let image = ClipboardImage.make(data: data, type: type.rawValue) {
-                    return .image(image)
+                guard let data = pasteboard.data(forType: type) else { continue }
+                // Les formats suivants (TIFF non compressé) seraient encore plus lourds : on s'arrête là.
+                if data.count > ClipboardImage.maxBytes { return ClipboardRead(imageTooLarge: true) }
+                if let image = ClipboardImage.make(data: data, type: type.rawValue) {
+                    return ClipboardRead(content: .image(image))
                 }
             }
             if let url = (pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])?.first,
                ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-                return .url(url)
+                return ClipboardRead(content: .url(url))
             }
         }
-        return text.map(ClipboardContent.classify(text:))
+        guard let text else { return ClipboardRead() }
+        let content = ClipboardContent.classify(text: text)
+        guard case .text = content else { return ClipboardRead(content: content) }
+        let rich = ClipboardRichText.make(rtf: pasteboard.data(forType: .rtf), html: pasteboard.data(forType: .html))
+        return ClipboardRead(content: content, rich: rich)
     }
 
-    func write(_ content: ClipboardContent, plainText: Bool) -> Int {
+    func write(_ content: ClipboardContent, rich: ClipboardRichText?, plainText: Bool) -> Int {
         pasteboard.clearContents()
         if plainText, let text = content.plainText {
             pasteboard.setString(text, forType: .string)
@@ -74,6 +93,8 @@ final class SystemPasteboard: ClipboardPasteboard {
         switch content {
         case .text(let text):
             pasteboard.setString(text, forType: .string)
+            if let rtf = rich?.rtf { pasteboard.setData(rtf, forType: .rtf) }
+            if let html = rich?.html { pasteboard.setData(html, forType: .html) }
         case .url(let url):
             pasteboard.writeObjects([url as NSURL])
             pasteboard.setString(url.absoluteString, forType: .string)

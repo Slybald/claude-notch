@@ -7,6 +7,8 @@ import Foundation
 /// - Un seul fichier JSON en 0600, dans le dossier de l'app (injectable pour les tests).
 /// - Écriture atomique (fichier temporaire 0600 créé en `O_EXCL`, puis `rename`) sur une file en arrière-plan.
 /// - JSON illisible : le fichier est renommé en `.corrupt` (jamais écrasé) et l'historique repart de zéro.
+///   « Effacer l'historique » et la désactivation du réglage suppriment aussi ces fichiers mis de côté : ils
+///   peuvent contenir l'ancien historique en clair.
 final class ClipboardStorage {
     struct Record: Codable, Equatable {
         var id: UUID
@@ -17,6 +19,8 @@ final class ClipboardStorage {
         var pinned: Bool
         var app: String?
         var appName: String?
+        /// Le texte avait été coupé à 20 000 caractères (absent des anciens fichiers).
+        var truncated: Bool?
     }
 
     private struct Document: Codable {
@@ -47,19 +51,29 @@ final class ClipboardStorage {
         }
     }
 
-    /// Écriture asynchrone et atomique.
-    func save(_ records: [Record]) {
+    /// Écriture asynchrone et atomique. `completion` (sur le main thread) dit si le fichier a bien été écrit.
+    func save(_ records: [Record], completion: @escaping (Bool) -> Void = { _ in }) {
         queue.async { [url] in
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .secondsSince1970
-            guard let data = try? encoder.encode(Document(items: records)) else { return }
-            try? Self.write(data, to: url)
+            var succeeded = false
+            if let data = try? encoder.encode(Document(items: records)), (try? Self.write(data, to: url)) != nil {
+                succeeded = true
+            }
+            DispatchQueue.main.async { completion(succeeded) }
         }
     }
 
-    /// Supprime le fichier, dans l'ordre des écritures déjà demandées.
+    /// Supprime le fichier et ceux mis de côté (`.corrupt`), dans l'ordre des écritures déjà demandées.
     func delete() {
-        queue.async { [url] in try? FileManager.default.removeItem(at: url) }
+        queue.async { [url] in
+            let manager = FileManager.default
+            try? manager.removeItem(at: url)
+            let names = (try? manager.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)) ?? []
+            for name in names where name.hasPrefix(url.lastPathComponent + ".corrupt") {
+                try? manager.removeItem(at: url.deletingLastPathComponent().appendingPathComponent(name))
+            }
+        }
     }
 
     /// Attend la fin des écritures en cours (arrêt du module, fin de l'app, tests).
@@ -106,7 +120,7 @@ extension ClipboardItem {
         default: return nil
         }
         return ClipboardStorage.Record(id: id, kind: kind, value: value, date: date, pinned: pinned,
-                                       app: source?.bundleID, appName: source?.name)
+                                       app: source?.bundleID, appName: source?.name, truncated: truncated ? true : nil)
     }
 
     init?(record: ClipboardStorage.Record) {
@@ -117,6 +131,7 @@ extension ClipboardItem {
         default: return nil
         }
         let source = record.app.map { ClipboardSource(bundleID: $0, name: record.appName ?? $0) }
-        self.init(content, date: record.date, source: source, pinned: record.pinned, id: record.id)
+        self.init(content, date: record.date, source: source, pinned: record.pinned, id: record.id,
+                  truncated: record.truncated ?? false)
     }
 }

@@ -22,7 +22,7 @@
 "Éléments gardés" = "Éléments gardés";
 "Les éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés. Les images de plus de 5 Mo ne sont pas gardées." = "Les éléments épinglés s'ajoutent à ce nombre et ne sont jamais retirés. Les images de plus de 5 Mo ne sont pas gardées.";
 "Garder l'historique après redémarrage" = "Garder l'historique après redémarrage";
-"Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app. Activé, les textes et les liens sont écrits dans un fichier privé ; les images et les fichiers n'y sont jamais." = "Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app. Activé, les textes et les liens sont écrits dans un fichier privé ; les images et les fichiers n'y sont jamais.";
+"Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans mise en forme ; les images et les fichiers n'y sont jamais." = "Désactivé, l'historique reste en mémoire et disparaît à la fermeture de l'app ou quand l'onglet est désactivé. Activé, les textes et les liens sont écrits dans un fichier privé, sans mise en forme ; les images et les fichiers n'y sont jamais.";
 "Effacer l'historique" = "Effacer l'historique";
 "Effacer l'historique ?" = "Effacer l'historique ?";
 "Effacer" = "Effacer";
@@ -35,3 +35,9 @@
 "Choisis l'app dont les copies ne doivent pas être enregistrées." = "Choisis l'app dont les copies ne doivent pas être enregistrées.";
 "Trousseaux d'accès" = "Trousseaux d'accès";
 "Mots de passe" = "Mots de passe";
+"La capture est suspendue : tes copies ne sont pas enregistrées." = "La capture est suspendue : tes copies ne sont pas enregistrées.";
+"Image de plus de 5 Mo : non gardée." = "Image de plus de 5 Mo : non gardée.";
+"Fermer" = "Fermer";
+"macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps.";
+"macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps.";
+"L'historique n'a pas pu être écrit sur le disque. Il sera perdu à la fermeture de l'app." = "L'historique n'a pas pu être écrit sur le disque. Il sera perdu à la fermeture de l'app.";
