@@ -206,8 +206,8 @@ struct ClipboardRow: View {
         .contentShape(ModuleStyle.shape(ModuleStyle.rowRadius))
         .onTapGesture(perform: actions.copy)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: active)
-        .animation(.easeOut(duration: 0.12), value: copied)
+        .animation(ModuleStyle.hover, value: active)
+        .animation(ModuleStyle.hover, value: copied)
         .contextMenu {
             Button(action: actions.copy) { Text("Copier", tableName: "Clipboard") }
             if item.offersPlainCopy {

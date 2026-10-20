@@ -90,7 +90,7 @@ struct ShelfTile: View {
             if hovered { removeButton.transition(.opacity) }
         }
         .frame(width: width, height: ShelfPanel.tileHeight)
-        .animation(.easeOut(duration: 0.12), value: hovered)
+        .animation(ModuleStyle.hover, value: hovered)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: missing ? item.name + ", " + L("Introuvable", table: "Shelf") : item.name))
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -118,7 +118,7 @@ struct ShelfTile: View {
                     }
                 }
             // Deux lignes, coupé au milieu comme dans le Finder : l'extension reste visible.
-            Text(verbatim: item.name)
+            Text(verbatim: Self.breakable(item.name))
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundColor(missing ? Palette.secondary : Palette.primary)
                 .multilineTextAlignment(.center)
@@ -137,6 +137,11 @@ struct ShelfTile: View {
             ModuleStyle.shape(ModuleStyle.rowRadius)
                 .strokeBorder(Palette.accent.opacity(selected ? 0.7 : 0), lineWidth: 1)
         )
+    }
+
+    /// Un nom sans espace se coupe après un point ou un tiret bas (« Budget. / numbers »), pas au milieu d'un mot.
+    static func breakable(_ name: String) -> String {
+        name.replacingOccurrences(of: ".", with: ".\u{200B}").replacingOccurrences(of: "_", with: "_\u{200B}")
     }
 
     private var removeButton: some View {

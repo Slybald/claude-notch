@@ -159,13 +159,12 @@ final class ShelfModule: NotchModule {
 
     private var order: [UUID] { items.map { $0.id } }
 
-    /// « 5 éléments », ou « 2 sur 5 sélectionnés ».
+    /// « 5 éléments », ou « 2 sélectionnés » (assez court pour tenir dans l'en-tête à 480 pt).
     var summary: String {
         let count = items.count
         let selected = selection.ids.count
         if selected > 0 {
-            return String(format: L(selected, one: "%1$d sur %2$d sélectionné", other: "%1$d sur %2$d sélectionnés",
-                                    table: "Shelf"), selected, count)
+            return String(format: L(selected, one: "%d sélectionné", other: "%d sélectionnés", table: "Shelf"), selected)
         }
         return String(format: L(count, one: "%d élément", other: "%d éléments", table: "Shelf"), count)
     }

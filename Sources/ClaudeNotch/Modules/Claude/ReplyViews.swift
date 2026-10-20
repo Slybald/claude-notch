@@ -220,9 +220,9 @@ struct RequestCard: View {
             }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
+        .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Color.white.opacity(0.07)))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.cardRadius)
                 .strokeBorder(Palette.amber.opacity(0.35), lineWidth: 1)
         )
         // La carte est à l'écran : la notch garde la demande le temps qu'il faut (sinon 4 s).
@@ -286,7 +286,7 @@ struct RequestCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.black.opacity(0.35)))
+                    .background(ModuleStyle.shape(ModuleStyle.itemRadius).fill(Color.black.opacity(0.35)))
                     .help(plan)
             }
             actionRow(
@@ -349,7 +349,7 @@ private struct PermissionDetail: View {
                 .overlay { if !long { probe } }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.black.opacity(0.35)))
+                .background(ModuleStyle.shape(ModuleStyle.itemRadius).fill(Color.black.opacity(0.35)))
                 .help(text)
             if long || clipped {
                 ReplyStatusLine(icon: "eye", color: Palette.amber,
@@ -494,9 +494,9 @@ struct QuestionForm: View {
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .background(ModuleStyle.shape(ModuleStyle.itemRadius)
                 .fill(selected ? Palette.accent.opacity(0.16) : Color.white.opacity(0.04)))
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .contentShape(ModuleStyle.shape(ModuleStyle.itemRadius))
         }
         .buttonStyle(.plain)
         .help(option.detail ?? option.label)
@@ -563,7 +563,7 @@ struct MessageComposer: View {
             .padding(.leading, 2)
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
+        .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Color.white.opacity(0.07)))
         .onAppear {
             NotchKeyboard.take()
             DispatchQueue.main.async { focused = true }
@@ -603,7 +603,7 @@ struct ReplyField: View {
             .onExitCommand(perform: onCancel)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.08)))
+            .background(ModuleStyle.shape(ModuleStyle.itemRadius).fill(Color.white.opacity(0.08)))
     }
 }
 
@@ -633,6 +633,7 @@ struct ReplyButton: View {
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.45)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
     }
 
     private var foreground: Color {

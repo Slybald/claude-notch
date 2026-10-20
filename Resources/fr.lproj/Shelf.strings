@@ -10,8 +10,8 @@
 "Annuler" = "Annuler";
 "%d élément" = "%d élément";
 "%d éléments" = "%d éléments";
-"%1$d sur %2$d sélectionné" = "%1$d sur %2$d sélectionné";
-"%1$d sur %2$d sélectionnés" = "%1$d sur %2$d sélectionnés";
+"%d sélectionné" = "%d sélectionné";
+"%d sélectionnés" = "%d sélectionnés";
 "AirDrop : la sélection, ou toute l'étagère" = "AirDrop : la sélection, ou toute l'étagère";
 
 /* Actions */

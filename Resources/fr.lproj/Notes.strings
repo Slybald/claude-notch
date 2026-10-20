@@ -12,13 +12,13 @@
 "Supprimer" = "Supprimer";
 "Copié" = "Copié";
 "Copier tout le texte" = "Copier tout le texte";
-"Une idée, un numéro, une commande : écris-la ici." = "Une idée, un numéro, une commande : écris-la ici.";
+"Écris une idée, un numéro, une commande…" = "Écris une idée, un numéro, une commande…";
 "À l'instant" = "À l'instant";
 "%@ caractère" = "%@ caractère";
 "%@ caractères" = "%@ caractères";
 "Afficher dans le Finder" = "Afficher dans le Finder";
 "Fichier des notes" = "Fichier des notes";
-"Texte brut : %d notes au plus, %@ caractères chacune. Enregistrement automatique." = "Texte brut : %d notes au plus, %@ caractères chacune. Enregistrement automatique.";
+"Texte brut : %d notes au plus, %@ caractères chacune." = "Texte brut : %d notes au plus, %@ caractères chacune.";
 "Limite de %d notes atteinte" = "Limite de %d notes atteinte";
 "Note limitée à %d caractères" = "Note limitée à %d caractères";
 "Notes illisibles : copie gardée dans %@" = "Notes illisibles : copie gardée dans %@";

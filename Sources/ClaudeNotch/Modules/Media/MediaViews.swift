@@ -192,7 +192,7 @@ struct PlaybackProgress: View {
         }
         .font(.system(size: 10, weight: .medium).monospacedDigit())
         .foregroundColor(Palette.secondary)
-        .animation(.easeOut(duration: 0.12), value: dragFraction == nil)
+        .animation(ModuleStyle.hover, value: dragFraction == nil)
     }
 }
 
@@ -215,6 +215,7 @@ struct MediaControlButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(label)
         .accessibilityLabel(label)
     }
@@ -366,12 +367,13 @@ struct EventRow: View {
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+            .background(ModuleStyle.shape(ModuleStyle.itemRadius)
                 .fill(Color.white.opacity(hovering ? 0.08 : 0)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(L("Ouvrir dans Calendrier", table: "Media"))
     }
 }

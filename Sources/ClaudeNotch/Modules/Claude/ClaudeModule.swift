@@ -306,14 +306,14 @@ struct ClaudeCompactView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.rowRadius)
                 .fill(Color.white.opacity(0.05))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            ModuleStyle.shape(ModuleStyle.rowRadius)
                 .strokeBorder(Palette.amber.opacity(session.phase.needsAttention ? 0.9 : 0), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(ModuleStyle.shape(ModuleStyle.rowRadius))
         .onTapGesture { activate(session) }
     }
 }

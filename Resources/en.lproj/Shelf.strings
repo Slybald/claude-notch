@@ -10,8 +10,8 @@
 "Annuler" = "Undo";
 "%d élément" = "%d item";
 "%d éléments" = "%d items";
-"%1$d sur %2$d sélectionné" = "%1$d of %2$d selected";
-"%1$d sur %2$d sélectionnés" = "%1$d of %2$d selected";
+"%d sélectionné" = "%d selected";
+"%d sélectionnés" = "%d selected";
 "AirDrop : la sélection, ou toute l'étagère" = "AirDrop: the selection, or the whole shelf";
 
 /* Actions */

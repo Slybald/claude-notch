@@ -221,7 +221,7 @@ struct NoteRow: View {
             }
         }
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.1), value: hovering)
+        .animation(ModuleStyle.hover, value: hovering)
     }
 }
 
@@ -250,7 +250,7 @@ struct NotesEditorCard: View {
         VStack(spacing: 0) {
             if let note = module.selectedNote {
                 NotesTextView(noteID: note.id, text: note.text,
-                              placeholder: L("Une idée, un numéro, une commande : écris-la ici.", table: "Notes"),
+                              placeholder: L("Écris une idée, un numéro, une commande…", table: "Notes"),
                               focusToken: focusToken,
                               onChange: { module.setText($0, for: note.id) },
                               onEscape: Self.leaveEditor)
@@ -299,7 +299,7 @@ struct NotesEditorCard: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 24)
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(ModuleStyle.hover, value: hovering)
     }
 
     /// Échap : le clavier retourne à l'app de devant.
@@ -483,9 +483,8 @@ struct NotesSettingsView: View {
             } header: {
                 Text("Notes rapides", tableName: "Notes")
             } footer: {
-                SettingsNote(String(format: L("Texte brut : %d notes au plus, %@ caractères chacune. Enregistrement "
-                    + "automatique.", table: "Notes"), NotesModule.maxNotes,
-                    (NotesModule.maxLength).formatted(.number.grouping(.automatic))))
+                SettingsNote(String(format: L("Texte brut : %d notes au plus, %@ caractères chacune.", table: "Notes"),
+                                    NotesModule.maxNotes, NotesModule.maxLength.formatted(.number.grouping(.automatic))))
             }
         }
     }

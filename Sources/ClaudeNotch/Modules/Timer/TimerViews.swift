@@ -281,6 +281,7 @@ struct TimerChip: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(String(format: L("Lancer %d min", table: "Timer"), minutes))
         .accessibilityLabel(String(format: L("Lancer %d min", table: "Timer"), minutes))
     }
@@ -307,6 +308,7 @@ struct TimerRoundButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .help(label)
         .accessibilityLabel(label)
     }
@@ -337,6 +339,7 @@ struct TimerPill: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
     }
 }
 
@@ -379,6 +382,7 @@ struct DurationControl: View {
         .background(Capsule().fill(Color.white.opacity(hovering || focused ? 0.12 : 0.07)))
         .overlay(ScrollWheelCatcher { change in adjust(change) })
         .onHover { hovering = $0 }
+        .animation(ModuleStyle.hover, value: hovering)
         .onAppear { draft = String(minutes) }
         .onChange(of: minutes) { value in if !focused { draft = String(value) } }
         .onChange(of: draft) { value in

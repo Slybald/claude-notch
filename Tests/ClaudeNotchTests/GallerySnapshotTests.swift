@@ -7,8 +7,9 @@ import XCTest
 /// du panneau (480, 540, 620 pt), puis le résumé compact du plein écran et le volet de réglages de chaque module.
 /// Données factices, doubles partout : ni le vrai presse-papiers, ni le vrai calendrier, ni la vraie lecture.
 ///
-/// Le panneau doit rester sous 460 pt dans chaque état et à chaque largeur (toujours vérifié) ; les PNG ne sont
-/// écrits que si `CLAUDE_NOTCH_SNAPSHOT_DIR` est défini : `gallery-<onglet>-<état>-<largeur>.png`.
+/// Le panneau doit rester sous 460 pt dans chaque état : à 480 pt (la largeur la plus étroite, donc la plus haute)
+/// toujours, aux trois largeurs quand `CLAUDE_NOTCH_SNAPSHOT_DIR` est défini, car les PNG sont alors écrits :
+/// `gallery-<onglet>-<état>-<largeur>.png`.
 final class GallerySnapshotTests: XCTestCase {
     private var outputDir: URL? {
         ProcessInfo.processInfo.environment["CLAUDE_NOTCH_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
@@ -41,10 +42,10 @@ final class GallerySnapshotTests: XCTestCase {
         return (harness, registry)
     }
 
-    /// Un état d'un onglet aux trois largeurs : mesure (toujours) puis rendu (avec `CLAUDE_NOTCH_SNAPSHOT_DIR`).
+    /// Un état d'un onglet : mesure à 480 pt, et aux deux autres largeurs avec rendu si `CLAUDE_NOTCH_SNAPSHOT_DIR`.
     private func shoot(_ tab: String, _ state: String, _ module: (any NotchModule)? = nil,
                        store: SessionStore = SessionStore()) throws {
-        for size in PanelSize.allCases {
+        for size in outputDir == nil ? [PanelSize.compact] : PanelSize.allCases {
             try shoot(tab, state, size: size, replacing: module.map { [$0] } ?? [], store: store)
         }
     }
@@ -405,6 +406,7 @@ final class GallerySnapshotTests: XCTestCase {
 
     private func notes() throws {
         let rig = try NotesRig(self)
+        rig.clock.now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded())
         let empty = rig.startedModule()
         addTeardownBlock { empty.stop() }
         try shoot("notes", "empty", empty)
