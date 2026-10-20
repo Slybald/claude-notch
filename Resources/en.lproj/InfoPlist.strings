@@ -2,3 +2,7 @@
 "NSDesktopFolderUsageDescription" = "Claude Notch runs optional companion tools that read files on your Desktop.";
 "NSDocumentsFolderUsageDescription" = "Claude Notch runs optional companion tools that read files in your Documents folder.";
 "NSDownloadsFolderUsageDescription" = "Claude Notch runs optional companion tools that sort files from your Downloads folder.";
+"NSAppleEventsUsageDescription" = "Claude Notch sends commands to other apps, for example to control music playback, only when you use a feature that needs it.";
+"NSBluetoothAlwaysUsageDescription" = "Claude Notch uses Bluetooth to show the status of your connected devices, only if you turn this feature on.";
+"NSCalendarsFullAccessUsageDescription" = "Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.";
+"NSCalendarsUsageDescription" = "Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.";

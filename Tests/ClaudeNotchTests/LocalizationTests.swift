@@ -2,44 +2,74 @@ import Foundation
 import XCTest
 @testable import ClaudeNotch
 
-/// Traductions : chaque clé utilisée dans le code a sa traduction anglaise, les fichiers .strings sont valides
-/// et un bundle assemblé comme par scripts/build.sh rend l'anglais ou le français selon la langue demandée.
+/// Traductions : chaque clé utilisée dans le code a sa traduction anglaise dans la bonne table (Localizable ou
+/// celle d'un module), les fichiers .strings sont valides et un bundle assemblé comme par scripts/build.sh rend
+/// l'anglais ou le français selon la langue demandée.
 /// (Les autres tests tournent avec Bundle.main = xctest, sans traduction : ils voient le français.)
 final class LocalizationTests: XCTestCase {
     private static let resources = repositoryRoot.appendingPathComponent("Resources")
     private static let sources = repositoryRoot.appendingPathComponent("Sources/ClaudeNotch")
     private static let usageKeys = ["NSDesktopFolderUsageDescription", "NSDocumentsFolderUsageDescription",
-                                    "NSDownloadsFolderUsageDescription"]
+                                    "NSDownloadsFolderUsageDescription", "NSCalendarsFullAccessUsageDescription",
+                                    "NSCalendarsUsageDescription", "NSAppleEventsUsageDescription",
+                                    "NSBluetoothAlwaysUsageDescription"]
+
+    /// Tables des textes de l'interface : Localizable et une par module (tout .strings sauf InfoPlist).
+    private static func tables(_ language: String = "en") throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: resources.appendingPathComponent("\(language).lproj").path)
+            .filter { $0.hasSuffix(".strings") && $0 != "InfoPlist.strings" }
+            .map { String($0.dropLast(".strings".count)) }
+            .sorted()
+    }
 
     // MARK: - Clés du code
 
     func testEveryKeyUsedInCodeHasAnEnglishTranslation() throws {
         let used = try Self.keysUsedInSources()
-        XCTAssertGreaterThan(used.count, 100, "extraction des clés cassée ?")
-        let english = try Self.strings("en", "Localizable")
-        for (key, file) in used.sorted(by: { $0.key < $1.key }) {
-            XCTAssertNotNil(english[key], "traduction anglaise manquante (\(file)) : « \(key) »")
+        XCTAssertGreaterThan(used["Localizable"]?.count ?? 0, 100, "extraction des clés cassée ?")
+        let tables = try Self.tables()
+        XCTAssertEqual(Set(used.keys).subtracting(tables).sorted(), [], "table de traduction absente")
+        for table in tables {
+            let english = try Self.strings("en", table)
+            let keys = used[table] ?? [:]
+            for (key, file) in keys.sorted(by: { $0.key < $1.key }) {
+                XCTAssertNotNil(english[key], "traduction anglaise manquante (\(file), \(table)) : « \(key) »")
+            }
+            XCTAssertEqual(Set(english.keys).subtracting(keys.keys).sorted(), [], "clés inutilisées dans \(table)")
         }
-        XCTAssertEqual(Set(english.keys).subtracting(used.keys).sorted(), [], "clés anglaises inutilisées")
+    }
+
+    /// Une table par module, les mêmes en anglais et en français.
+    func testModuleTablesExist() throws {
+        let tables = try Self.tables()
+        for table in ["Localizable", "Media", "QuickSettings", "Shelf", "Clipboard", "Timer", "Notes"] {
+            XCTAssertTrue(tables.contains(table), table)
+        }
+        XCTAssertEqual(try Self.tables("fr"), tables)
     }
 
     func testTranslationsKeepFormatSpecifiers() throws {
-        for (key, value) in try Self.strings("en", "Localizable") {
-            XCTAssertEqual(Self.specifiers(value), Self.specifiers(key), "« \(key) » → « \(value) »")
+        for table in try Self.tables() {
+            for (key, value) in try Self.strings("en", table) {
+                XCTAssertEqual(Self.specifiers(value), Self.specifiers(key), "\(table) : « \(key) » → « \(value) »")
+            }
         }
     }
 
     func testFrenchTableIsIdentity() throws {
-        let english = try Self.strings("en", "Localizable")
-        let french = try Self.strings("fr", "Localizable")
-        XCTAssertEqual(Set(french.keys).symmetricDifference(english.keys).sorted(), [], "clés différentes en/fr")
-        for (key, value) in french { XCTAssertEqual(value, key) }
+        for table in try Self.tables() {
+            let english = try Self.strings("en", table)
+            let french = try Self.strings("fr", table)
+            XCTAssertEqual(Set(french.keys).symmetricDifference(english.keys).sorted(), [],
+                           "clés différentes en/fr dans \(table)")
+            for (key, value) in french { XCTAssertEqual(value, key, table) }
+        }
     }
 
     func testStringsFilesHaveNoDuplicateKeys() throws {
         let entry = try NSRegularExpression(pattern: #"^"((?:[^"\\]|\\.)*)"\s*="#, options: .anchorsMatchLines)
         for language in ["en", "fr"] {
-            for table in ["Localizable", "InfoPlist"] {
+            for table in try Self.tables(language) + ["InfoPlist"] {
                 let text = try String(contentsOf: Self.stringsURL(language, table), encoding: .utf8)
                 let keys = entry.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap {
                     Range($0.range(at: 1), in: text).map { String(text[$0]) }
@@ -96,6 +126,10 @@ final class LocalizationTests: XCTestCase {
             XCTAssertEqual(english.localizedString(forKey: key, value: nil, table: nil), value)
             XCTAssertEqual(french.localizedString(forKey: key, value: nil, table: nil), key)
         }
+        XCTAssertEqual(english.localizedString(forKey: "Lecteur", value: nil, table: "Media"), "Player")
+        XCTAssertEqual(french.localizedString(forKey: "Lecteur", value: nil, table: "Media"), "Lecteur")
+        XCTAssertEqual(english.localizedString(forKey: "Lecteur", value: nil, table: nil), "Lecteur",
+                       "une clé de module n'est pas dans Localizable")
         let desktop = english.localizedString(forKey: "NSDesktopFolderUsageDescription", value: nil, table: "InfoPlist")
         XCTAssertTrue(desktop.contains("optional companion tools"), desktop)
         let bureau = french.localizedString(forKey: "NSDesktopFolderUsageDescription", value: nil, table: "InfoPlist")
@@ -131,21 +165,26 @@ final class LocalizationTests: XCTestCase {
         return try XCTUnwrap(Bundle(path: path), language)
     }
 
-    /// Clés littérales du code : Text("…"), Button("…"), Toggle("…"), .help("…"), L("…" + "…")
-    /// et les deux formes du pluriel L(n, one: "…", other: "…"). Commentaires ignorés.
-    private static func keysUsedInSources() throws -> [String: String] {
+    /// Clés littérales du code, par table : Text("…"), Button("…"), Toggle("…"), Picker("…"), .help("…"),
+    /// L("…" + "…") et les deux formes du pluriel L(n, one: "…", other: "…"). `table: "X"` ou `tableName: "X"`
+    /// désigne la table d'un module, sinon Localizable. Sous-dossiers compris, commentaires ignorés.
+    private static func keysUsedInSources() throws -> [String: [String: String]] {
         let literal = #""(?:[^"\\\n]|\\.)*""#
         let joined = "(\(literal)(?:\\s*\\+\\s*\(literal))*)"
+        let table = #"(?:\s*,\s*(?:table|tableName):\s*"(\w+)")?"#
+        // Groupes : 1 = clé (ou forme « one »), 2 = forme « other » ou vide, 3 = table.
         let patterns = [
-            #"\b(?:Text|Button|Toggle|Menu|Label|Section|help)\(\s*"# + "(\(literal))",
-            #"\bL\(\s*"# + joined,
-            #"\b(?:one|other):\s*"# + joined,
+            #"\b(?:Text|Button|Toggle|Menu|Label|Section|Picker|LabeledContent|help)\(\s*"# + "(\(literal))()" + table,
+            #"\bL\(\s*"# + joined + "()" + table,
+            #"\bone:\s*"# + joined + #"\s*,\s*other:\s*"# + joined + table,
         ].map { try! NSRegularExpression(pattern: $0) }
         let part = try NSRegularExpression(pattern: literal)
 
-        var keys: [String: String] = [:]
-        let files = try FileManager.default.contentsOfDirectory(at: sources, includingPropertiesForKeys: nil)
+        var keys: [String: [String: String]] = [:]
+        let files = (FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)?.allObjects ?? [])
+            .compactMap { $0 as? URL }
             .filter { $0.pathExtension == "swift" }
+        XCTAssertTrue(files.contains { $0.path.contains("/Modules/") }, "dossiers des modules parcourus")
         for file in files {
             let text = try String(contentsOf: file, encoding: .utf8)
                 .components(separatedBy: "\n")
@@ -153,15 +192,19 @@ final class LocalizationTests: XCTestCase {
                 .joined(separator: "\n")
             for pattern in patterns {
                 for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-                    guard let range = Range(match.range(at: 1), in: text) else { continue }
-                    let expression = String(text[range])
-                    XCTAssertFalse(expression.contains("\\("),
-                                   "interpolation dans une clé (\(file.lastPathComponent)) : \(expression)")
-                    let parts = part.matches(in: expression, range: NSRange(expression.startIndex..., in: expression))
-                    let key = parts.compactMap { Range($0.range, in: expression) }
-                        .map { unescape(expression[$0].dropFirst().dropLast()) }
-                        .joined()
-                    keys[key] = file.lastPathComponent
+                    let tableName = Range(match.range(at: 3), in: text).map { String(text[$0]) } ?? "Localizable"
+                    for group in [1, 2] {
+                        guard let range = Range(match.range(at: group), in: text), !range.isEmpty else { continue }
+                        let expression = String(text[range])
+                        XCTAssertFalse(expression.contains("\\("),
+                                       "interpolation dans une clé (\(file.lastPathComponent)) : \(expression)")
+                        let parts = part.matches(in: expression,
+                                                 range: NSRange(expression.startIndex..., in: expression))
+                        let key = parts.compactMap { Range($0.range, in: expression) }
+                            .map { unescape(expression[$0].dropFirst().dropLast()) }
+                            .joined()
+                        keys[tableName, default: [:]][key] = file.lastPathComponent
+                    }
                 }
             }
         }

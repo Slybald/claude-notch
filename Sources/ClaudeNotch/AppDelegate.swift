@@ -92,6 +92,7 @@ final class AppCore {
         let notch = NotchController(store: store, monitor: monitor, prefs: prefs, tools: tools)
         notch.start()
         self.notch = notch
+        MainMenu.install(openSettings: { [weak notch] in notch?.openSettings() })
     }
 
     /// Instantané lisible de l'état, servi par `GET /state` (diagnostic local).

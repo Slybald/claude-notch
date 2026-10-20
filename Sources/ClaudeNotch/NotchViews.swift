@@ -2,7 +2,9 @@ import AppKit
 import SwiftUI
 
 enum Palette {
-    static let orange = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
+    static let claudeOrange = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
+    /// Couleur d'accent choisie dans les réglages (orange Claude par défaut).
+    static var accent: Color { Preferences.shared.accent }
     static let amber = Color(red: 0xF5 / 255, green: 0xB8 / 255, blue: 0x3D / 255)
     static let green = Color(red: 0x4A / 255, green: 0xDE / 255, blue: 0x80 / 255)
     static let red = Color(red: 0xF8 / 255, green: 0x71 / 255, blue: 0x71 / 255)
@@ -58,50 +60,33 @@ private struct NotchSizeKey: PreferenceKey {
     }
 }
 
-private struct ListHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// Hauteur cumulée des lignes sous la liste des sessions (espacement compris) : la liste leur cède la place
-/// pour que le panneau tienne dans sa fenêtre.
-private struct RowsBelowListKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value += nextValue() }
-}
-
-private extension View {
-    /// Déclare la hauteur de la ligne, plus l'espacement du VStack qui la précède.
-    func countedBelowList(spacing: CGFloat) -> some View {
-        background(GeometryReader { proxy in
-            Color.clear.preference(key: RowsBelowListKey.self, value: proxy.size.height + spacing)
-        })
-    }
-}
-
 // MARK: - Racine
 
 struct NotchRootView: View {
     @ObservedObject var model: NotchViewModel
     @ObservedObject var store: SessionStore
-    @ObservedObject var monitor: ClaudeMonitor
+    @ObservedObject var registry: ModuleRegistry
     @ObservedObject var prefs: Preferences
-    let tools: ToolsFeed
     let actions: NotchActions
 
     private var expanded: Bool { model.isExpanded }
-    private var indicator: NotchIndicator { store.indicator }
-    private var showsEars: Bool { indicator != .none }
+    private var compact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
+    private var ears: EarsChoice {
+        EarsChoice.choose(claude: store.indicator, module: registry.moduleEars, showEars: prefs.showEars)
+    }
+    private var showsEars: Bool { ears != .none }
     private var topRadius: CGFloat { expanded ? 12 : 6 }
-    private var bottomRadius: CGFloat { expanded ? 24 : (showsEars ? 12 : 9) }
+    private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : (showsEars ? 12 : 9) }
     private var bodyWidth: CGFloat {
-        if expanded { return NotchController.expandedWidth }
+        if expanded { return prefs.expandedWidth(compact: compact) }
         return model.notchSize.width + (showsEars ? 2 * NotchController.earWidth : 0)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             notch
+                // Les couleurs d'accent sont lues au rendu : la vue est reconstruite quand l'accent change.
+                .id(prefs.accentHex)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -111,22 +96,30 @@ struct NotchRootView: View {
     private var notch: some View {
         ZStack(alignment: .top) {
             if expanded {
-                ExpandedPanel(store: store, monitor: monitor, prefs: prefs, tools: tools,
-                              toolsPane: $model.toolsPane, notchSize: model.notchSize, actions: actions)
+                ExpandedPanel(registry: registry, prefs: prefs, selection: $model.selectedTab, compact: compact,
+                              notchSize: model.notchSize, actions: actions)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
                             .animation(notchSpring.delay(0.06)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
-            } else if showsEars {
-                CollapsedEars(indicator: indicator, ears: store.ears, notchSize: model.notchSize)
-                    .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+            } else {
+                switch ears {
+                case .claude(let indicator):
+                    CollapsedEars(indicator: indicator, ears: store.ears, notchSize: model.notchSize)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                case .module(let content):
+                    ModuleEarsView(ears: content, notchSize: model.notchSize)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                case .none:
+                    EmptyView()
+                }
             }
         }
         .frame(width: bodyWidth, alignment: .top)
         .frame(minHeight: model.notchSize.height, alignment: .top)
         .padding(.horizontal, topRadius)
-        .background(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius).fill(Color.black))
+        .background(background)
         .clipShape(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius))
         .shadow(color: .black.opacity(expanded ? 0.45 : 0), radius: 14, y: 6)
         // Replié et sans activité : exactement la notch, donc invisible.
@@ -137,6 +130,17 @@ struct NotchRootView: View {
         .onPreferenceChange(NotchSizeKey.self) { size in model.contentSize = size }
         .animation(notchSpring, value: expanded)
         .animation(notchSpring, value: showsEars)
+        .animation(notchSpring, value: compact)
+        .animation(notchSpring, value: model.selectedTab)
+    }
+
+    /// Noir, translucide une fois déplié si les réglages le demandent ; la bande de la notch reste opaque.
+    private var background: some View {
+        ZStack(alignment: .top) {
+            NotchShape(topRadius: topRadius, bottomRadius: bottomRadius)
+                .fill(Color.black.opacity(expanded ? prefs.backgroundOpacity : 1))
+            Color.black.frame(height: model.notchSize.height)
+        }
     }
 }
 
@@ -168,7 +172,30 @@ struct CollapsedEars: View {
         let sessions = Text(verbatim: "\(ears.sessions)").foregroundColor(.white.opacity(0.85))
         guard ears.agents > 0 else { return sessions }
         return sessions + Text(verbatim: "·").foregroundColor(Palette.secondary)
-            + Text(verbatim: "\(ears.agents)").foregroundColor(Palette.orange)
+            + Text(verbatim: "\(ears.agents)").foregroundColor(Palette.accent)
+    }
+}
+
+/// Oreilles d'un module (minuteur, lecture en cours…) : symbole à gauche, texte court à droite.
+struct ModuleEarsView: View {
+    let ears: ModuleEars
+    let notchSize: CGSize
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Image(systemName: ears.symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Palette.accent)
+                .frame(width: NotchController.earWidth)
+            Color.clear.frame(width: notchSize.width)
+            Text(ears.text)
+                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(width: NotchController.earWidth)
+        }
+        .frame(height: notchSize.height)
     }
 }
 
@@ -271,7 +298,7 @@ final class AnimatedGlyphView: NSView {
         switch style {
         case .spinner:
             let font = NSFont.systemFont(ofSize: size, weight: .bold)
-            let color = NSColor(Palette.orange)
+            let color = NSColor(Palette.accent)
             let images = Self.glyphs.compactMap { glyph in
                 Self.render(scale: scale, box: bounds.size) { rect in
                     let text = NSAttributedString(string: glyph, attributes: [.font: font, .foregroundColor: color])
@@ -333,76 +360,51 @@ final class AnimatedGlyphView: NSView {
 
 // MARK: - Déplié
 
+/// Panneau déplié : bande de la notch, en-tête (onglets, accessoire de l'onglet actif, menu « … »), puis le
+/// contenu de l'onglet actif. En plein écran compact : le résumé de chaque module, sans onglets.
 struct ExpandedPanel: View {
-    @ObservedObject var store: SessionStore
-    @ObservedObject var monitor: ClaudeMonitor
+    @ObservedObject var registry: ModuleRegistry
     @ObservedObject var prefs: Preferences
-    @ObservedObject var tools: ToolsFeed
-    @Binding var toolsPane: ToolsPane?
+    @Binding var selection: String
+    let compact: Bool
     let notchSize: CGSize
     let actions: NotchActions
 
-    @State private var listHeight: CGFloat = 0
-    @State private var rowsBelowList: CGFloat = 0
-    @State private var openChecklists: Set<String> = []
-
-    private static let spacing: CGFloat = 10
-    private static let bottomPadding: CGFloat = 14
-    /// Ligne « ✻ Claude · CLI · Desktop · … », sous la bande de la barre des menus.
+    static let spacing: CGFloat = 10
+    static let bottomPadding: CGFloat = 14
+    static let horizontalPadding: CGFloat = 14
+    /// Ligne des onglets, sous la bande de la barre des menus.
     static let headerHeight: CGFloat = 24
-    private static let maxListHeight: CGFloat = 296
-    private static let minListHeight: CGFloat = 120
     /// Fenêtre de 480 pt moins la place de l'ombre.
-    private static let maxPanelHeight: CGFloat = 460
+    static let maxPanelHeight: CGFloat = 460
 
-    /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge).
-    private var listMaxHeight: CGFloat {
-        let available = Self.maxPanelHeight - notchSize.height - Self.headerHeight - Self.spacing
-            - Self.bottomPadding - rowsBelowList
-        return min(Self.maxListHeight, max(Self.minListHeight, available))
+    private var width: CGFloat { prefs.expandedWidth(compact: compact) }
+
+    /// Place laissée au contenu sous l'en-tête pour que le panneau tienne dans sa fenêtre.
+    private var contentMaxHeight: CGFloat {
+        Self.maxPanelHeight - notchSize.height - Self.headerHeight - Self.spacing - Self.bottomPadding
     }
 
-    private var untrackedCount: Int { monitor.cliPids.subtracting(store.trackedPids).count }
-    private var cliActive: Bool {
-        !monitor.cliPids.isEmpty || store.sessions.values.contains { $0.source == .cli && $0.phase != .ended }
+    private var selected: (any NotchModule)? {
+        registry.enabled.first { $0.id == selection } ?? registry.enabled.first
     }
 
     var body: some View {
-        let sessions = store.sortedSessions
         VStack(alignment: .leading, spacing: Self.spacing) {
             header
-            if sessions.isEmpty {
-                EmptyStateView()
-            } else {
-                sessionList(sessions)
-            }
-            if untrackedCount > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "info.circle")
-                    Text(String(format: L(untrackedCount,
-                                          one: "%d session sans suivi — apparaîtra au prochain message",
-                                          other: "%d sessions sans suivi — apparaîtront au prochain message"),
-                                untrackedCount))
-                        .lineLimit(1)
-                }
-                .font(.system(size: 11))
-                .foregroundColor(Palette.secondary)
-                .padding(.horizontal, 4)
-                .countedBelowList(spacing: Self.spacing)
-            }
-            if tools.hasContent {
-                ToolsSection(feed: tools, pane: $toolsPane, reveal: actions.revealFile)
-                    .countedBelowList(spacing: Self.spacing)
-            }
-            if monitor.desktopRunning {
-                DesktopRow(frontmost: monitor.desktopFrontmost, open: actions.openDesktop)
-                    .countedBelowList(spacing: Self.spacing)
+            if compact {
+                compactContent
+            } else if let module = selected {
+                module.makeView()
+                    .id(module.id)
+                    .transition(.opacity.animation(.easeOut(duration: 0.15)))
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, Self.horizontalPadding)
         .padding(.bottom, Self.bottomPadding)
-        .frame(width: NotchController.expandedWidth, alignment: .top)
-        .onPreferenceChange(RowsBelowListKey.self) { height in rowsBelowList = height }
+        .frame(width: width, alignment: .top)
+        .environment(\.notchContentWidth, width - 2 * Self.horizontalPadding)
+        .environment(\.notchContentMaxHeight, contentMaxHeight)
     }
 
     /// La bande à hauteur de barre des menus reste vide : son milieu est la notch physique. L'en-tête vient dessous.
@@ -414,32 +416,112 @@ struct ExpandedPanel: View {
     }
 
     private var headerRow: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 6) {
-                switch store.indicator {
-                case .working: GlyphSpinner(size: 13)
-                case .attention: PulsingHand(size: 12)
-                default:
-                    Text(verbatim: "✻")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Palette.orange)
-                        .frame(width: 17, height: 17)
-                }
-                Text(verbatim: "Claude")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Palette.primary)
+        HStack(spacing: 6) {
+            if compact {
+                registry.module(ModuleRegistry.claudeId)?.makeTabIcon()
+                Spacer(minLength: 8)
+            } else {
+                NotchTabBar(modules: registry.enabled, selection: $selection)
+                Spacer(minLength: 8)
+                selected?.makeHeaderAccessory()
             }
-            Spacer(minLength: 8)
-            HStack(spacing: 6) {
-                StatusPill(text: "CLI", active: cliActive)
-                StatusPill(text: "Desktop", active: monitor.desktopRunning)
-                moreMenu
-            }
+            NotchMoreMenu(prefs: prefs, actions: actions)
         }
     }
 
-    private var moreMenu: some View {
+    /// Résumé de chaque module activé qui en fournit un, dans l'ordre des onglets.
+    private var compactContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(registry.enabled.map { $0.id }, id: \.self) { id in
+                registry.module(id)?.makeCompactView()
+            }
+        }
+    }
+}
+
+/// Barre d'onglets en icônes. L'onglet actif porte aussi son titre, dans une capsule qui glisse d'un onglet à
+/// l'autre. Clic, ou survol de 0,2 s, pour changer d'onglet (en passant dessus, rien ne change).
+struct NotchTabBar: View {
+    let modules: [any NotchModule]
+    @Binding var selection: String
+
+    @Namespace private var namespace
+    @State private var hovered: String?
+
+    static let hoverDelay: TimeInterval = 0.2
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(modules.map { $0.id }, id: \.self) { id in
+                if let module = modules.first(where: { $0.id == id }) {
+                    tab(module)
+                }
+            }
+        }
+        .animation(notchSpring, value: selection)
+    }
+
+    private func tab(_ module: any NotchModule) -> some View {
+        let active = module.id == selection
+        return HStack(spacing: 5) {
+            Group {
+                if let icon = module.makeTabIcon() {
+                    icon
+                } else {
+                    Image(systemName: module.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .frame(width: 17, height: 17)
+            if active {
+                Text(module.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .transition(.opacity)
+            }
+        }
+        .foregroundColor(active ? Palette.primary : .white.opacity(hovered == module.id ? 0.85 : 0.5))
+        .padding(.horizontal, active ? 8 : 5)
+        .frame(height: 22)
+        .background {
+            if active {
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .matchedGeometryEffect(id: "active-tab", in: namespace)
+            }
+        }
+        .contentShape(Capsule())
+        .onTapGesture { selection = module.id }
+        .onHover { inside in hover(module.id, inside) }
+        .help(module.title)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(module.title)
+        .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func hover(_ id: String, _ inside: Bool) {
+        if inside {
+            hovered = id
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.hoverDelay) {
+                if hovered == id, selection != id { selection = id }
+            }
+        } else if hovered == id {
+            hovered = nil
+        }
+    }
+}
+
+/// Menu « … » de l'en-tête.
+struct NotchMoreMenu: View {
+    @ObservedObject var prefs: Preferences
+    let actions: NotchActions
+
+    var body: some View {
         Menu {
+            Button("Réglages…", action: actions.openSettings)
+                .keyboardShortcut(",", modifiers: .command)
+            Divider()
             Toggle("Toujours visible", isOn: $prefs.alwaysVisible)
             Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
             Divider()
@@ -460,45 +542,6 @@ struct ExpandedPanel: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-    }
-
-    private func sessionList(_ sessions: [Session]) -> some View {
-        let estimate = CGFloat(sessions.count) * 72
-        return TimelineView(.periodic(from: .now, by: 1)) { context in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 8) {
-                    ForEach(sessions) { session in
-                        SessionCard(session: session, now: context.date,
-                                    showTasks: checklistBinding(session.id),
-                                    onTap: { actions.activate(session) })
-                    }
-                }
-                .background(GeometryReader { proxy in
-                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
-                })
-            }
-            .frame(height: min(listHeight > 0 ? listHeight : estimate, listMaxHeight))
-            .mask(listFade(overflowing: tools.hasContent && listHeight > listMaxHeight + 1))
-        }
-        .onPreferenceChange(ListHeightKey.self) { height in listHeight = height }
-    }
-
-    /// Liste tronquée par la section outils : fondu en bas plutôt qu'une carte coupée net.
-    private func listFade(overflowing: Bool) -> some View {
-        VStack(spacing: 0) {
-            Color.black
-            LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
-                .frame(height: overflowing ? 22 : 0)
-        }
-    }
-
-    private func checklistBinding(_ id: String) -> Binding<Bool> {
-        Binding(
-            get: { openChecklists.contains(id) },
-            set: { isOpen in
-                if isOpen { openChecklists.insert(id) } else { openChecklists.remove(id) }
-            }
-        )
     }
 }
 
@@ -602,10 +645,10 @@ struct SessionCard: View {
                     let count = session.activeAgents.count
                     Text(String(format: L(count, one: "%d agent", other: "%d agents"), count))
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Palette.orange)
+                        .foregroundColor(Palette.accent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Palette.orange.opacity(0.15)))
+                        .background(Capsule().fill(Palette.accent.opacity(0.15)))
                 }
                 Spacer(minLength: 8)
                 Text(timeText)
@@ -804,11 +847,11 @@ extension Session {
             return SessionStatus(label: L("Prête"), detail: lastMessage, isCode: false, color: Palette.secondary)
         case .thinking:
             return SessionStatus(label: L("Réfléchit…"), detail: lastPrompt.map { String(format: L("« %@ »"), $0) },
-                                 isCode: false, color: Palette.orange)
+                                 isCode: false, color: Palette.accent)
         case .tool:
             let tool = currentTool
             return SessionStatus(label: tool?.label ?? L("Outil"), detail: tool?.detail, isCode: tool?.isCode ?? false,
-                                 color: Palette.orange)
+                                 color: Palette.accent)
         case .waitingPermission:
             return SessionStatus(label: L("Attend ta permission"), detail: attentionText, isCode: true,
                                  color: Palette.amber)
@@ -823,7 +866,7 @@ extension Session {
             return SessionStatus(label: L("Erreur"), detail: errorText, isCode: false, color: Palette.red)
         case .compacting:
             return SessionStatus(label: L("Compacte le contexte"), detail: nil, isCode: false,
-                                 color: Palette.orange)
+                                 color: Palette.accent)
         case .ended:
             return SessionStatus(label: L("Session terminée"), detail: nil, isCode: false,
                                  color: Palette.secondary)
@@ -843,7 +886,7 @@ extension TaskItem.Status {
     var color: Color {
         switch self {
         case .completed: return Palette.green
-        case .inProgress: return Palette.orange
+        case .inProgress: return Palette.accent
         case .pending: return Palette.secondary
         }
     }

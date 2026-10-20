@@ -242,10 +242,10 @@ struct OnboardingView: View {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Palette.orange.opacity(0.16))
+                        .fill(Palette.accent.opacity(0.16))
                     Image(systemName: "rectangle.topthird.inset.filled")
                         .font(.system(size: 22, weight: .medium))
-                        .foregroundColor(Palette.orange)
+                        .foregroundColor(Palette.accent)
                 }
                 .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: 3) {
@@ -355,7 +355,7 @@ struct OnboardingView: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .tint(Palette.orange)
+                .tint(Palette.accent)
             }
         }
         .controlSize(.large)
@@ -371,7 +371,7 @@ private struct ChangeRow: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 13))
-                .foregroundColor(Palette.orange)
+                .foregroundColor(Palette.accent)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 2) {
                 Text(path)

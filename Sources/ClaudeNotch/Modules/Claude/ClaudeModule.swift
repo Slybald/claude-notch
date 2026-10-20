@@ -1,0 +1,332 @@
+import SwiftUI
+
+/// Onglet « Claude » : les sessions Claude Code, la section outils et la ligne Claude Desktop.
+/// Le suivi des sessions (`SessionStore`, `ClaudeMonitor`) tourne en permanence, géré par `AppCore` : il nourrit
+/// les oreilles et la visibilité de la notch. Le module, lui, ne vit que panneau déplié (section outils).
+final class ClaudeModule: NotchModule {
+    let id = ModuleRegistry.claudeId
+    let title = "Claude"
+    let symbol = "sparkle"
+
+    let store: SessionStore
+    let monitor: ClaudeMonitor
+    let tools: ToolsFeed
+    let prefs: Preferences
+    /// État des hooks (menu « … », réglages) ; injectable pour les tests.
+    let hooks: HookSetup
+    /// Posées par `NotchController.start()` (elles referment le panneau).
+    var actions = NotchActions()
+
+    /// Volet ouvert dans la section outils ; tout est replié à chaque ouverture du panneau.
+    @Published var toolsPane: ToolsPane?
+    /// Listes de tâches dépliées, par session ; oubliées à la fermeture du panneau.
+    @Published var openChecklists: Set<String> = []
+
+    init(store: SessionStore, monitor: ClaudeMonitor, tools: ToolsFeed, prefs: Preferences,
+         hooks: HookSetup = .shared) {
+        self.store = store
+        self.monitor = monitor
+        self.tools = tools
+        self.prefs = prefs
+        self.hooks = hooks
+    }
+
+    func start() {
+        tools.setActive(true)
+        // État des hooks pour le menu « … » (settings.json a pu changer depuis).
+        hooks.refresh()
+    }
+
+    func stop() {
+        tools.setActive(false)
+        if toolsPane != nil { toolsPane = nil }
+        if !openChecklists.isEmpty { openChecklists = [] }
+    }
+
+    func makeView() -> AnyView {
+        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools))
+    }
+
+    func makeCompactView() -> AnyView? {
+        AnyView(ClaudeCompactView(store: store, activate: { [weak self] in self?.actions.activate($0) }))
+    }
+
+    func makeSettingsView() -> AnyView? {
+        AnyView(ClaudeSettingsView(prefs: prefs, setup: hooks))
+    }
+
+    func makeTabIcon() -> AnyView? {
+        AnyView(ClaudeTabIcon(store: store))
+    }
+
+    func makeHeaderAccessory() -> AnyView? {
+        AnyView(ClaudeHeaderPills(store: store, monitor: monitor))
+    }
+}
+
+// MARK: - Onglet
+
+private struct ListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Hauteur cumulée des lignes sous la liste des sessions (espacement compris) : la liste leur cède la place
+/// pour que le panneau tienne dans sa fenêtre.
+private struct RowsBelowListKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value += nextValue() }
+}
+
+private extension View {
+    /// Déclare la hauteur de la ligne, plus l'espacement du VStack qui la précède.
+    func countedBelowList(spacing: CGFloat) -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: RowsBelowListKey.self, value: proxy.size.height + spacing)
+        })
+    }
+}
+
+/// Sessions, sessions sans suivi, section outils, ligne Claude Desktop.
+struct ClaudePanel: View {
+    @ObservedObject var module: ClaudeModule
+    @ObservedObject var store: SessionStore
+    @ObservedObject var monitor: ClaudeMonitor
+    @ObservedObject var tools: ToolsFeed
+
+    @Environment(\.notchContentMaxHeight) private var contentMaxHeight
+    @State private var listHeight: CGFloat = 0
+    @State private var rowsBelowList: CGFloat = 0
+
+    private static let spacing = ExpandedPanel.spacing
+    static let maxListHeight: CGFloat = 296
+    private static let minListHeight: CGFloat = 120
+
+    /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge).
+    private var listMaxHeight: CGFloat {
+        min(Self.maxListHeight, max(Self.minListHeight, contentMaxHeight - rowsBelowList))
+    }
+
+    private var untrackedCount: Int { monitor.cliPids.subtracting(store.trackedPids).count }
+
+    var body: some View {
+        let sessions = store.sortedSessions
+        VStack(alignment: .leading, spacing: Self.spacing) {
+            if sessions.isEmpty {
+                EmptyStateView()
+            } else {
+                sessionList(sessions)
+            }
+            if untrackedCount > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                    Text(String(format: L(untrackedCount,
+                                          one: "%d session sans suivi — apparaîtra au prochain message",
+                                          other: "%d sessions sans suivi — apparaîtront au prochain message"),
+                                untrackedCount))
+                        .lineLimit(1)
+                }
+                .font(.system(size: 11))
+                .foregroundColor(Palette.secondary)
+                .padding(.horizontal, 4)
+                .countedBelowList(spacing: Self.spacing)
+            }
+            if tools.hasContent {
+                ToolsSection(feed: tools, pane: $module.toolsPane, reveal: { module.actions.revealFile($0) })
+                    .countedBelowList(spacing: Self.spacing)
+            }
+            if monitor.desktopRunning {
+                DesktopRow(frontmost: monitor.desktopFrontmost, open: { module.actions.openDesktop() })
+                    .countedBelowList(spacing: Self.spacing)
+            }
+        }
+        .onPreferenceChange(RowsBelowListKey.self) { height in rowsBelowList = height }
+    }
+
+    private func sessionList(_ sessions: [Session]) -> some View {
+        let estimate = CGFloat(sessions.count) * 72
+        return TimelineView(.periodic(from: .now, by: 1)) { context in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 8) {
+                    ForEach(sessions) { session in
+                        SessionCard(session: session, now: context.date,
+                                    showTasks: checklistBinding(session.id),
+                                    onTap: { module.actions.activate(session) })
+                    }
+                }
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                })
+            }
+            .frame(height: min(listHeight > 0 ? listHeight : estimate, listMaxHeight))
+            .mask(listFade(overflowing: tools.hasContent && listHeight > listMaxHeight + 1))
+        }
+        .onPreferenceChange(ListHeightKey.self) { height in listHeight = height }
+    }
+
+    /// Liste tronquée par la section outils : fondu en bas plutôt qu'une carte coupée net.
+    private func listFade(overflowing: Bool) -> some View {
+        VStack(spacing: 0) {
+            Color.black
+            LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+                .frame(height: overflowing ? 22 : 0)
+        }
+    }
+
+    private func checklistBinding(_ id: String) -> Binding<Bool> {
+        Binding(
+            get: { module.openChecklists.contains(id) },
+            set: { isOpen in
+                if isOpen { module.openChecklists.insert(id) } else { module.openChecklists.remove(id) }
+            }
+        )
+    }
+}
+
+// MARK: - En-tête
+
+/// Icône de l'onglet : spinner quand Claude travaille, main qui pulse quand il attend, ✻ sinon.
+struct ClaudeTabIcon: View {
+    @ObservedObject var store: SessionStore
+
+    var body: some View {
+        switch store.indicator {
+        case .working: GlyphSpinner(size: 13)
+        case .attention: PulsingHand(size: 12)
+        default:
+            Text(verbatim: "✻")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Palette.accent)
+                .frame(width: 17, height: 17)
+        }
+    }
+}
+
+/// Pastilles CLI et Desktop, à droite des onglets quand l'onglet Claude est actif.
+struct ClaudeHeaderPills: View {
+    @ObservedObject var store: SessionStore
+    @ObservedObject var monitor: ClaudeMonitor
+
+    private var cliActive: Bool {
+        !monitor.cliPids.isEmpty || store.sessions.values.contains { $0.source == .cli && $0.phase != .ended }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            StatusPill(text: "CLI", active: cliActive)
+            StatusPill(text: "Desktop", active: monitor.desktopRunning)
+        }
+    }
+}
+
+// MARK: - Plein écran compact
+
+/// Sessions en cours : état et une ligne chacune. Un clic ramène l'app hôte devant, comme une carte.
+struct ClaudeCompactView: View {
+    @ObservedObject var store: SessionStore
+    let activate: (Session) -> Void
+
+    static let maxSessions = 4
+
+    var body: some View {
+        let live = store.sortedSessions.filter { $0.phase != .ended }
+        VStack(alignment: .leading, spacing: 6) {
+            if live.isEmpty {
+                Text("Aucune session en cours")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Palette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            ForEach(live.prefix(Self.maxSessions)) { session in
+                row(session)
+            }
+            if live.count > Self.maxSessions {
+                let more = live.count - Self.maxSessions
+                Text(String(format: L(more, one: "+ %d autre session", other: "+ %d autres sessions"), more))
+                    .font(.system(size: 10.5))
+                    .foregroundColor(Palette.secondary)
+                    .padding(.leading, 26)
+            }
+        }
+    }
+
+    private func row(_ session: Session) -> some View {
+        let status = session.status
+        return HStack(alignment: .top, spacing: 8) {
+            PhaseIcon(phase: session.phase)
+                .frame(width: 16, height: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.projectName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Palette.primary)
+                    .lineLimit(1)
+                (Text(status.label).foregroundColor(status.color)
+                    + Text(verbatim: status.detail.map { " · \($0)" } ?? "").foregroundColor(.white.opacity(0.7)))
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Palette.amber.opacity(session.phase.needsAttention ? 0.9 : 0), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture { activate(session) }
+    }
+}
+
+// MARK: - Réglages
+
+/// Réglages › Claude : réponses depuis la notch (à venir), état des hooks.
+struct ClaudeSettingsView: View {
+    @ObservedObject var prefs: Preferences
+    @ObservedObject var setup: HookSetup
+
+    var body: some View {
+        SettingsPane {
+            Section {
+                Toggle("Répondre depuis la notch", isOn: $prefs.replyFromNotch)
+                SettingsNote(L("Accorder une permission ou répondre à une question sans quitter la notch. "
+                    + "Le réglage est gardé ; la fonction arrive dans une prochaine version."))
+            }
+            Section("Hooks Claude Code") {
+                LabeledContent("État") {
+                    Text(statusText)
+                        .foregroundColor(setup.status == .installed ? Palette.green : Palette.amber)
+                }
+                HStack {
+                    switch setup.status {
+                    case .installed:
+                        Button("Réinstaller les hooks", action: setup.update)
+                    case .outdated, .scriptOutdated:
+                        Button("Mettre à jour les hooks", action: setup.update)
+                    case .notInstalled, .unreadable:
+                        Button("Installer les hooks Claude Code", action: setup.showOnboarding)
+                    }
+                    Spacer()
+                    Button("Désinstaller Claude Notch…", action: setup.confirmAndUninstall)
+                }
+                SettingsNote(L("Les hooks relaient chaque événement de Claude Code à l'app, en local (127.0.0.1)."))
+            }
+        }
+        .onAppear { setup.refresh() }
+    }
+
+    private var statusText: String {
+        switch setup.status {
+        case .installed: return L("Installés")
+        case .outdated, .scriptOutdated: return L("À mettre à jour")
+        case .notInstalled: return L("Non installés")
+        case .unreadable(let message): return String(format: L("settings.json illisible : %@"), message)
+        }
+    }
+}

@@ -10,15 +10,12 @@ final class SnapshotTests: XCTestCase {
         ProcessInfo.processInfo.environment["CLAUDE_NOTCH_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
     }
 
-    func testRenderStates() throws {
-        guard let outputDir else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
-        _ = NSApplication.shared
+    /// Trois sessions : une au travail (tâches, agents), une qui attend une permission, une terminée.
+    private static func sampleStore() -> SessionStore {
         let store = SessionStore()
         let context = ProcessContext(source: .cli, hostName: "iTerm2", hostBundleId: "com.googlecode.iterm2")
         func send(_ name: String, _ sid: String, _ extra: [String: Any] = [:]) {
-            var raw: [String: Any] = ["hook_event_name": name, "session_id": sid, "cwd": "/Users/x/Projets/\(sid)"]
-            raw.merge(extra) { $1 }
-            store.handle(HookEvent(raw: raw), context: context)
+            store.send(name, sid, extra, context: context)
         }
         send("SessionStart", "mon-app", ["source": "startup"])
         send("UserPromptSubmit", "mon-app", ["prompt": "Lance les tests puis corrige le parseur"])
@@ -38,24 +35,23 @@ final class SnapshotTests: XCTestCase {
 
         send("UserPromptSubmit", "site", ["prompt": "Mets à jour le README"])
         send("Stop", "site", ["last_assistant_message": "## **README à jour** : section installation réécrite."])
+        return store
+    }
 
-        let model = NotchViewModel()
-        model.notchSize = CGSize(width: 185, height: 32)
-        model.hasNotch = true
-        let actions = NotchActions(activate: { _ in }, openDesktop: {}, clearEnded: {}, quit: {})
-        let monitor = ClaudeMonitor()
-        let noTools = ToolsFeed(paths: LayoutTests.absentPaths)
-        func root(_ store: SessionStore, _ tools: ToolsFeed) -> NotchRootView {
-            NotchRootView(model: model, store: store, monitor: monitor, prefs: Preferences(), tools: tools,
-                          actions: actions)
+    func testRenderStates() throws {
+        guard let outputDir else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
+        let store = Self.sampleStore()
+        let empty = SessionStore()
+        func notch(_ store: SessionStore, _ tools: ToolsFeed = ToolsFeed(paths: LayoutTests.absentPaths),
+                   expanded: Bool = true) -> NotchHarness {
+            let notch = NotchHarness(self, store: store, tools: tools)
+            notch.model.isExpanded = expanded
+            return notch
         }
 
-        try render(root(store, noTools), name: "collapsed", to: outputDir)
-        model.isExpanded = true
-        try render(root(store, noTools), name: "expanded", to: outputDir)
-
-        let empty = SessionStore()
-        try render(root(empty, noTools), name: "empty", to: outputDir)
+        try render(notch(store, expanded: false).root, name: "collapsed", to: outputDir)
+        try render(notch(store).root, name: "expanded", to: outputDir)
+        try render(notch(empty).root, name: "empty", to: outputDir)
 
         // Section outils : fichiers récents (dont un supprimé), git avec deux dépôts à traiter, usage du jour.
         let fixtures = try ToolsFixtures()
@@ -64,28 +60,69 @@ final class SnapshotTests: XCTestCase {
         let tools = ToolsFeed(paths: fixtures.paths) { !$0.hasSuffix("old-config.ts") }
         tools.refreshNow()
 
-        model.toolsPane = nil
-        try render(root(store, tools), name: "tools", to: outputDir)
-        model.toolsPane = .files
-        try render(root(store, tools), name: "tools-files", to: outputDir)
-        model.toolsPane = .git
-        try render(root(store, tools), name: "tools-git", to: outputDir)
-        model.toolsPane = nil
-        try render(root(empty, tools), name: "tools-no-session", to: outputDir)
+        for (pane, name) in [(nil, "tools"), (ToolsPane.files, "tools-files"), (.git, "tools-git")] {
+            let withTools = notch(store, tools)
+            withTools.claude.toolsPane = pane
+            try render(withTools.root, name: name, to: outputDir)
+        }
+        try render(notch(empty, tools).root, name: "tools-no-session", to: outputDir)
 
         // Beaucoup de sessions et volet ouvert : la liste rétrécit, tout tient dans le panneau.
+        let crowded = Self.sampleStore()
         for index in 0..<5 {
-            send("UserPromptSubmit", "projet-\(index)", ["prompt": "Tâche \(index)"])
+            crowded.send("UserPromptSubmit", "projet-\(index)", ["prompt": "Tâche \(index)"])
         }
-        model.toolsPane = .files
-        try render(root(store, tools), name: "tools-crowded", to: outputDir)
+        let crowdedNotch = notch(crowded, tools)
+        crowdedNotch.claude.toolsPane = .files
+        try render(crowdedNotch.root, name: "tools-crowded", to: outputDir)
+
+        // Onglets : chaque module vide, et les trois tailles de panneau.
+        for id in ["media", "quicksettings", "shelf", "clipboard", "timer", "notes"] {
+            let tab = notch(store)
+            tab.model.selectedTab = id
+            try render(tab.root, name: "tab-\(id)", to: outputDir)
+        }
+        for size in [PanelSize.compact, .large] {
+            let sized = notch(store)
+            sized.prefs.panelSize = size
+            try render(sized.root, name: "panel-\(size.rawValue)", to: outputDir)
+        }
+        let translucent = notch(store)
+        translucent.prefs.backgroundOpacity = 0.8
+        try render(translucent.root, name: "panel-opacity-80", to: outputDir)
+
+        // Plein écran, réglage compact : demi-largeur, sessions en cours et résumés des modules.
+        let fullScreen = notch(crowded)
+        fullScreen.model.isFullScreen = true
+        try render(fullScreen.root, name: "fullscreen-compact", to: outputDir)
+        let fullScreenEmpty = notch(empty)
+        fullScreenEmpty.model.isFullScreen = true
+        try render(fullScreenEmpty.root, name: "fullscreen-compact-empty", to: outputDir)
+
+        // Oreilles d'un module (minuteur) quand Claude ne fait rien.
+        let idle = notch(empty, expanded: false)
+        let timer = FakeModule(id: "timer", ears: ModuleEars(symbol: "timer", text: "4:59"), keepsRunning: true)
+        let registry = ModuleRegistry(modules: [idle.claude, timer], prefs: idle.prefs)
+        registry.reconcile()
+        try render(NotchRootView(model: idle.model, store: empty, registry: registry, prefs: idle.prefs,
+                                 actions: NotchActions()), name: "collapsed-module-ears", to: outputDir)
+
+        // Couleur d'accent : lue dans les réglages partagés, remise en état ensuite.
+        let original = Preferences.shared.accentHex
+        Preferences.shared.accentHex = "4C8DFF"
+        defer {
+            Preferences.shared.accentHex = original
+            UserDefaults.standard.removeObject(forKey: "appearance.accent")
+        }
+        try render(notch(store).root, name: "accent-blue", to: outputDir)
+        try render(notch(store, expanded: false).root, name: "accent-blue-collapsed", to: outputDir)
+        Preferences.shared.accentHex = original
 
         // Git propre et usage seul.
         try fixtures.writeSample(now: Date(), gitClean: true)
         try FileManager.default.removeItem(at: fixtures.paths.files)
         tools.refreshNow()
-        model.toolsPane = nil
-        try render(root(empty, tools), name: "tools-git-clean", to: outputDir)
+        try render(notch(empty, tools).root, name: "tools-git-clean", to: outputDir)
 
         // Autres données (lecture seule) : `CLAUDE_NOTCH_TOOLS_DIR` = dossier contenant files.jsonl, state.json
         // et today.json, ou `standard` pour les vrais fichiers partagés de l'utilisateur.
@@ -97,8 +134,9 @@ final class SnapshotTests: XCTestCase {
             real.refreshNow()
             print("TOOLS \(real.debugSummary)")
             for (pane, name) in [(nil, "tools-real"), (ToolsPane.files, "tools-real-files"), (.git, "tools-real-git")] {
-                model.toolsPane = pane
-                try render(root(store, real), name: name, to: outputDir)
+                let realNotch = notch(store, real)
+                realNotch.claude.toolsPane = pane
+                try render(realNotch.root, name: name, to: outputDir)
             }
         }
 
@@ -118,10 +156,26 @@ final class SnapshotTests: XCTestCase {
                        "onboarding-error")
     }
 
+    /// Fenêtre de réglages, chaque volet. Réglages jetables ; aucun bouton n'est actionné.
+    func testRenderSettings() throws {
+        guard let outputDir else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
+        let notch = NotchHarness(self)
+        let sections: [(SettingsSection, String)] = [
+            (.general, "general"), (.tabs, "tabs"), (.appearance, "appearance"), (.module("claude"), "claude"),
+            (.updates, "updates"), (.about, "about"),
+        ]
+        for (section, name) in sections {
+            let view = SettingsView(prefs: notch.prefs, registry: notch.registry, updater: Updater(),
+                                    selection: section)
+            try render(view, name: "settings-\(name)", to: outputDir, size: SettingsWindow.size, background: nil)
+        }
+    }
+
     /// Fenêtre hors écran + rendu de l'arbre de calques (ScrollView compris, contrairement à ImageRenderer).
     private func render<V: View>(_ view: V, name: String, to dir: URL,
-                                 size: CGSize = CGSize(width: 640, height: 480)) throws {
-        let hosting = NSHostingView(rootView: view.background(Color(white: 0.85)))
+                                 size: CGSize = NotchController.panelSize,
+                                 background: Color? = Color(white: 0.85)) throws {
+        let hosting = NSHostingView(rootView: view.background(background ?? Color(nsColor: .windowBackgroundColor)))
         hosting.frame = CGRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
