@@ -112,11 +112,11 @@ func spin(timeout: TimeInterval = 5, until condition: () -> Bool) -> Bool {
 
 /// Serveur de hooks réel sur un port libre, jeton et fichier dans un dossier temporaire, réglages jetables.
 final class ReplyServerFixture {
-    let port = UInt16.random(in: 49_200...60_000)
+    private(set) var port: UInt16 = 0
     let prefs: Preferences
     let replies: ReplyCenter
     let access: HookAccess
-    let server: HookServer
+    private(set) var server: HookServer!
     let home: URL
     private let sink = Sink()
 
@@ -133,17 +133,26 @@ final class ReplyServerFixture {
         // Même emplacement relatif que l'app : le script le lit sous $HOME.
         access = HookAccess(file: home.appendingPathComponent("Library/Application Support/ClaudeNotch/hook-token"))
         let sink = self.sink
-        server = HookServer(port: port, access: access, replies: replies) { event, _ in
-            DispatchQueue.main.async { sink.events.append(event) }
-        }
-        try server.start()
-        testCase.addTeardownBlock { [server] in server.stop() }
         let file = access.file!
-        // Le jeton n'est écrit qu'une fois le port à nous.
-        guard spin(until: { FileManager.default.fileExists(atPath: file.path) }) else {
-            throw NSError(domain: "ReplyServerFixture", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "serveur de test non démarré (port \(port))"])
+        // Port pris au hasard : déjà occupé (autre programme, test voisin), on en essaie un autre. Le jeton n'est
+        // écrit qu'une fois le port à nous.
+        for attempt in 1...3 {
+            port = UInt16.random(in: 49_200...60_000)
+            let candidate = HookServer(port: port, access: access, replies: replies) { event, _ in
+                DispatchQueue.main.async { sink.events.append(event) }
+            }
+            try candidate.start()
+            if spin(until: { FileManager.default.fileExists(atPath: file.path) }) {
+                server = candidate
+                break
+            }
+            candidate.stop()
+            guard attempt < 3 else {
+                throw NSError(domain: "ReplyServerFixture", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: "serveur de test non démarré (3 ports essayés)"])
+            }
         }
+        testCase.addTeardownBlock { [server] in server?.stop() }
     }
 
     var receivedEvents: [HookEvent] { sink.events }
