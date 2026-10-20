@@ -27,6 +27,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Changed
 
 - No more one-second timer while there is no session.
+- Release builds are signed with a fixed self-signed certificate instead of ad hoc, so macOS keeps the accesses
+  granted to the app (calendar, Bluetooth, Automation, folders) from one update to the next. Moving to the first
+  release signed this way asks for them one last time. Local builds stay ad hoc.
+- Release workflow: the signing certificate comes from the `SIGNING_CERT_P12` and `SIGNING_CERT_PASSWORD`
+  secrets (temporary keychain), the signature is checked before the DMG is made; a missing secret fails the job.
 
 ## [1.1.0] - 2026-10-20
 

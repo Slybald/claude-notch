@@ -50,8 +50,8 @@ Interface available in English and French (follows the system language). Screens
 
 ### First launch
 
-Claude Notch is not notarized (there is no Apple Developer ID behind it, the app is signed ad hoc), so macOS
-blocks it the first time you open it. Two ways around it:
+Claude Notch is not notarized (there is no Apple Developer ID behind it; releases are signed with a
+self-signed certificate), so macOS blocks it the first time you open it. Two ways around it:
 
 - Open the app once, dismiss the warning, then go to **System Settings › Privacy & Security**, scroll down
   and click **Open Anyway** next to the message about ClaudeNotch. Confirm.
@@ -60,6 +60,11 @@ blocks it the first time you open it. Two ways around it:
   ```sh
   xattr -dr com.apple.quarantine /Applications/ClaudeNotch.app
   ```
+
+The certificate is the same for every release, so macOS recognises each update as the same app and keeps the
+accesses you granted (calendar, Bluetooth, Automation, folders). Older versions were signed ad hoc, a signature
+that changes with every build: when you move to the first release signed with the certificate, macOS asks for
+these accesses one last time, then no longer.
 
 On first launch, a window offers to install the Claude Code hooks. It adds Claude Notch's entries to
 `~/.claude/settings.json` (a timestamped backup is written next to it first, and your existing hooks are kept)
@@ -141,8 +146,9 @@ If companion tools are installed in `~/.local/share/<tool>/` (`git-radar`, `clau
 `claude-recap`), Claude Notch runs their background jobs itself instead of LaunchAgents: macOS denies
 `~/Documents`, `~/Desktop` and `~/Downloads` to scripts started by launchd, while the access granted once to
 an app is inherited by the processes it starts. A missing tool is skipped. Logs:
-`~/Library/Logs/ClaudeNotch/<tool>.log`; state: `jobs` key of `/state`. Since the app is signed ad hoc, macOS
-may ask for these accesses again after each update.
+`~/Library/Logs/ClaudeNotch/<tool>.log`; state: `jobs` key of `/state`. Releases keep the same signing
+certificate, so these accesses survive updates. An app built from source is signed ad hoc and loses them at
+each build.
 
 ## Shared logs
 
@@ -188,13 +194,16 @@ Code map and design decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```sh
 swift build
 swift test
-scripts/build.sh      # universal (arm64 + x86_64) build/ClaudeNotch.app, signed ad hoc
+scripts/build.sh      # universal (arm64 + x86_64) build/ClaudeNotch.app, signed ad hoc by default
 scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked after creation
 ```
 
 - `VERSION=1.2.3 scripts/build.sh` sets the app version (default: `CFBundleShortVersionString` of
   `Resources/Info.plist`). `RELEASE_CHANNEL=1` marks the app as a release build
   (`ClaudeNotchUpdateChannel = release` in its Info.plist): only those update themselves.
+- `SIGN_KEYCHAIN=<keychain> SIGN_IDENTITY=<certificate name> scripts/build.sh` signs with that certificate
+  instead of ad hoc (both variables or neither). This is what the release workflow does; local builds stay ad
+  hoc, and macOS asks again for its accesses after each one.
 - `scripts/install.sh` builds and installs from source; `scripts/uninstall.sh` removes it.
 - Translations: `Resources/en.lproj` and `Resources/fr.lproj`. The French text in the code is the key;
   `LocalizationTests` checks that every key used in the code has an English translation.
@@ -212,6 +221,22 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
 
   The private signing key is also in the maintainer's keychain. Losing it breaks automatic updates for every
   existing installation: they only accept DMGs signed with that key.
+- **Code signature**: the release workflow signs the app with a self-signed certificate (CN `Claude Notch
+  Self-Signed`, code signing, 10 years) so that its designated requirement stays the same from one version to
+  the next and macOS keeps the accesses granted to the app (TCC). Two more repository secrets are needed:
+  `SIGNING_CERT_P12` (the `.p12`, base64) and `SIGNING_CERT_PASSWORD`; the job fails right away without them.
+  The workflow imports the certificate into a temporary keychain and deletes it at the end. Backup in the
+  maintainer's login keychain, as generic passwords with service `io.github.slybald.claudenotch.code-signing`
+  and accounts `p12-base64` and `p12-password`. To put the secrets back from it:
+
+  ```sh
+  S=io.github.slybald.claudenotch.code-signing
+  printf %s "$(security find-generic-password -s $S -a p12-base64 -w)" | gh secret set SIGNING_CERT_P12 -R Slybald/claude-notch
+  printf %s "$(security find-generic-password -s $S -a p12-password -w)" | gh secret set SIGNING_CERT_PASSWORD -R Slybald/claude-notch
+  ```
+
+  Do not replace this certificate lightly: a new one changes the requirement and every user gets the access
+  prompts again.
 
 ## License
 
@@ -259,8 +284,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 
 #### Premier lancement
 
-Claude Notch n'est pas notarisée (pas de compte Apple Developer ID, l'app est signée ad hoc) : macOS la
-bloque à la première ouverture. Deux façons de passer outre :
+Claude Notch n'est pas notarisée (pas de compte Apple Developer ID ; les releases sont signées avec un
+certificat auto-signé) : macOS la bloque à la première ouverture. Deux façons de passer outre :
 
 - Ouvre l'app une fois, ferme l'avertissement, puis va dans **Réglages Système › Confidentialité et
   sécurité**, descends et clique sur **Ouvrir quand même** à côté du message sur ClaudeNotch. Confirme.
@@ -269,6 +294,11 @@ bloque à la première ouverture. Deux façons de passer outre :
   ```sh
   xattr -dr com.apple.quarantine /Applications/ClaudeNotch.app
   ```
+
+Le certificat est le même à chaque release : macOS reconnaît chaque mise à jour comme la même app et garde les
+accès que tu as accordés (calendrier, Bluetooth, Automation, dossiers). Les versions précédentes étaient
+signées ad hoc, une signature qui change à chaque build : au passage à la première release signée avec le
+certificat, macOS redemande ces accès une dernière fois, puis plus jamais.
 
 Au premier lancement, une fenêtre propose d'installer les hooks de Claude Code. Elle ajoute les entrées de
 Claude Notch dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à côté avant, tes hooks
@@ -355,8 +385,9 @@ Si des outils compagnons sont installés dans `~/.local/share/<outil>/` (`git-ra
 `course-sorter`, `claude-recap`), Claude Notch lance lui-même leurs tâches de fond à la place de
 LaunchAgents : macOS refuse `~/Documents`, `~/Desktop` et `~/Downloads` aux scripts démarrés par launchd,
 alors que l'accès accordé une fois à une app est hérité par les processus qu'elle lance. Un outil absent est
-ignoré. Journaux : `~/Library/Logs/ClaudeNotch/<outil>.log` ; état : clé `jobs` de `/state`. L'app étant
-signée ad hoc, macOS peut redemander ces accès après chaque mise à jour.
+ignoré. Journaux : `~/Library/Logs/ClaudeNotch/<outil>.log` ; état : clé `jobs` de `/state`. Les releases
+gardent le même certificat de signature, ces accès survivent donc aux mises à jour. Une app compilée depuis
+les sources est signée ad hoc et les perd à chaque build.
 
 ### Registres partagés
 
@@ -402,13 +433,16 @@ Carte du code et décisions de conception (en anglais) : [docs/ARCHITECTURE.md](
 ```sh
 swift build
 swift test
-scripts/build.sh      # build/ClaudeNotch.app universelle (arm64 + x86_64), signée ad hoc
+scripts/build.sh      # build/ClaudeNotch.app universelle (arm64 + x86_64), signée ad hoc par défaut
 scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifié après création
 ```
 
 - `VERSION=1.2.3 scripts/build.sh` fixe la version de l'app (par défaut : `CFBundleShortVersionString` de
   `Resources/Info.plist`). `RELEASE_CHANNEL=1` marque l'app comme build de release
   (`ClaudeNotchUpdateChannel = release` dans son Info.plist) : seules celles-là se mettent à jour seules.
+- `SIGN_KEYCHAIN=<trousseau> SIGN_IDENTITY=<nom du certificat> scripts/build.sh` signe avec ce certificat au
+  lieu d'ad hoc (les deux variables, ou aucune). C'est ce que fait le workflow de release ; les builds locaux
+  restent ad hoc et macOS redemande leurs accès après chacun.
 - `scripts/install.sh` compile et installe depuis les sources ; `scripts/uninstall.sh` retire tout.
 - Traductions : `Resources/en.lproj` et `Resources/fr.lproj`. Le texte français du code sert de clé ;
   `LocalizationTests` vérifie que chaque clé utilisée dans le code a sa traduction anglaise.
@@ -427,6 +461,23 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifi�
 
   La clé privée de signature est aussi dans le trousseau du mainteneur. La perdre casse la mise à jour
   automatique de toutes les installations existantes : elles n'acceptent que les DMG signés avec cette clé.
+- **Signature du code** : le workflow de release signe l'app avec un certificat auto-signé (CN `Claude Notch
+  Self-Signed`, signature de code, 10 ans) pour que son exigence désignée reste identique d'une version à
+  l'autre et que macOS garde les accès accordés à l'app (TCC). Deux secrets de dépôt de plus sont nécessaires :
+  `SIGNING_CERT_P12` (le `.p12`, en base64) et `SIGNING_CERT_PASSWORD` ; le job échoue tout de suite sans eux.
+  Le workflow importe le certificat dans un trousseau temporaire et le supprime à la fin. Sauvegarde dans le
+  trousseau de session du mainteneur, en mots de passe génériques de service
+  `io.github.slybald.claudenotch.code-signing` et de comptes `p12-base64` et `p12-password`. Pour remettre les
+  secrets depuis cette sauvegarde :
+
+  ```sh
+  S=io.github.slybald.claudenotch.code-signing
+  printf %s "$(security find-generic-password -s $S -a p12-base64 -w)" | gh secret set SIGNING_CERT_P12 -R Slybald/claude-notch
+  printf %s "$(security find-generic-password -s $S -a p12-password -w)" | gh secret set SIGNING_CERT_PASSWORD -R Slybald/claude-notch
+  ```
+
+  Ne remplace pas ce certificat à la légère : un nouveau change l'exigence et tous les utilisateurs
+  revoient les demandes d'accès.
 
 ### Licence
 

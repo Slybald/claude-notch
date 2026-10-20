@@ -13,11 +13,13 @@ organised and why some choices were made, so they are not undone by accident.
   these renders (`layer.render` and `cacheDisplay` alike); a window-server capture of the same view shows them
   tinted, as on screen.
 - Memory and CPU of the notch view: `CLAUDE_NOTCH_FOOTPRINT=1 swift test --filter FootprintTests`.
-- `scripts/build.sh` (universal app, ad hoc signed, in `build/`; `VERSION=x.y.z` sets the version,
-  `RELEASE_CHANNEL=1` marks a release build), `scripts/make-dmg.sh` (DMG + SHA-256), `scripts/install.sh`
-  (developer install), `scripts/update-signing.swift` (Ed25519 key generation, signing, verification).
-- Release: push a `vX.Y.Z` tag; `.github/workflows/release.yml` builds the app with `RELEASE_CHANNEL=1`,
-  makes the DMG, signs it with the `UPDATE_SIGNING_KEY` secret and creates the release (DMG, `.sha256`, `.sig`).
+- `scripts/build.sh` (universal app in `build/`, ad hoc signed unless `SIGN_KEYCHAIN` and `SIGN_IDENTITY` are
+  set; `VERSION=x.y.z` sets the version, `RELEASE_CHANNEL=1` marks a release build), `scripts/make-dmg.sh`
+  (DMG + SHA-256), `scripts/install.sh` (developer install), `scripts/update-signing.swift` (Ed25519 key
+  generation, signing, verification).
+- Release: push a `vX.Y.Z` tag; `.github/workflows/release.yml` imports the signing certificate into a temporary
+  keychain, builds the app with `RELEASE_CHANNEL=1`, checks its code signature, makes the DMG, signs it with the
+  `UPDATE_SIGNING_KEY` secret and creates the release (DMG, `.sha256`, `.sig`).
 - Live diagnostics of the running app: `GET http://127.0.0.1:47823/state` (sessions, notch, tools, jobs,
   version, updater; `notch` gives the window level seen by the window server, the Space, occlusion, screen,
   front app, full-screen state, tab and running modules).
@@ -121,8 +123,36 @@ Apple Events and Bluetooth are already there) nor another module's files.
   `open-url` handler; the identifier is passed by the hook from `CLAUDE_CODE_HOST_SESSION_ID`.
 - **Localization**: the French strings are the keys, English lives in `Resources/en.lproj`; any user-visible
   `String` goes through `L()`; `LocalizationTests` checks coverage.
-- Ad hoc signature, no notarization: macOS blocks the first launch and may ask again for folder access after
-  each reinstall.
+- **Code signature**: release builds are signed with a self-signed certificate (CN `Claude Notch Self-Signed`,
+  extended key usage `codeSigning`, 10 years), not ad hoc. The designated requirement of an ad hoc signature is
+  the build's `cdhash`, which changes with every build, so macOS (TCC) sees each update as a new app and asks
+  again for calendar, Bluetooth, Automation and protected folders. With the certificate the requirement is
+  `identifier "<bundle id>" and certificate leaf = H"<SHA-1 of the certificate>"`, the same for every build
+  signed with it, so the grants carry over from one version to the next.
+  - `scripts/build.sh` signs with `codesign --sign "$SIGN_IDENTITY" --keychain "$SIGN_KEYCHAIN"` when both
+    variables are set (the release workflow sets them), otherwise ad hoc (local builds, `scripts/install.sh`).
+    Only one of the two is an error, so a release cannot silently fall back to ad hoc. No hardened runtime: it
+    would require entitlements and block code loaded by third-party processes (mediaremote-adapter, loaded by
+    perl).
+  - The `.p12` and its password are the repository secrets `SIGNING_CERT_P12` (base64) and
+    `SIGNING_CERT_PASSWORD`. The workflow imports them into a temporary keychain (`set-key-partition-list`, so
+    `codesign` never prompts), builds, runs `codesign --verify --deep --strict` and requires a `certificate leaf
+    = H"…"` requirement without `cdhash`, then deletes the keychain (`if: always()`). Missing secrets fail the
+    job before the tests.
+  - Backup: the maintainer's login keychain, generic passwords of service
+    `io.github.slybald.claudenotch.code-signing`, accounts `p12-base64` and `p12-password` (the README shows how
+    to put the secrets back). The certificate is made with `openssl req -x509` (RSA 2048, `-days 3650`) and
+    exported with `openssl pkcs12 -export -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1`, the
+    format `security import` reads on every macOS version.
+  - Never replace the certificate lightly: another one has another `H"…"`, so every user is asked for the
+    accesses again. It is also what happens when it expires (10 years): `codesign` then refuses to sign and
+    the release fails.
+  - Consequence for users: the first release signed this way has a different requirement from the ad hoc
+    versions, so macOS asks one last time for the accesses already granted; after that, never again.
+  - Not a notarization: there is still no Developer ID, so macOS blocks the first launch of a downloaded copy
+    (Open Anyway or `xattr -dr com.apple.quarantine`).
+  - Independent from the Ed25519 key above: that one protects the update download, this one gives the app a
+    stable identity.
 - **Update channel**: only an app built with `RELEASE_CHANNEL=1` (Info.plist key `ClaudeNotchUpdateChannel =
   release`, set by the release workflow) checks for updates; local builds and `scripts/install.sh` never do.
   The signal is a GitHub release (`/releases/latest`, drafts and pre-releases ignored), not a commit.
