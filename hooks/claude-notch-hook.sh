@@ -15,7 +15,7 @@ case "${1:-}" in
 permission)
     [ -r "$TOKEN" ] || exit 0
     # exec : un « No » au terminal tue curl (SIGTERM), l'app voit la connexion se fermer et retire sa carte.
-    exec curl -sf --connect-timeout 0.5 --max-time 598 \
+    exec curl -q -sf --noproxy "*" --connect-timeout 0.5 --max-time 598 \
         -H @"$TOKEN" \
         -H 'Content-Type: application/json' \
         -H 'Expect:' \
@@ -32,7 +32,7 @@ inbox)
     CURL=
     trap 'if [ -n "$CURL" ]; then kill "$CURL" 2>/dev/null; fi; exit 0' HUP INT TERM
     cat > "$IN"
-    curl -sf -o "$OUT" --connect-timeout 0.5 --max-time 86000 \
+    curl -q -sf --noproxy "*" -o "$OUT" --connect-timeout 0.5 --max-time 86000 \
         -H @"$TOKEN" \
         -H 'Content-Type: application/json' \
         -H 'Expect:' \
@@ -53,7 +53,7 @@ trap 'exit 0' HUP INT TERM
 cat > "$TMP"
 
 send() {
-    curl -s -o /dev/null --connect-timeout 0.5 --max-time 2 \
+    curl -q -s --noproxy "*" -o /dev/null --connect-timeout 0.5 --max-time 2 \
         -H @"$TOKEN" \
         -H 'Content-Type: application/json' \
         -H 'Expect:' \
