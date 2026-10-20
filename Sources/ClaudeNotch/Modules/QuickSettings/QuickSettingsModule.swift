@@ -46,7 +46,7 @@ final class QuickSettingsModule: NotchModule {
     private let open: (URL) -> Void
 
     private var started = false
-    private var devicesLoaded = false
+    private var visibleViews = 0
     private var supportChecked = false
     private var tickTimer: Timer?
     private var verifyWork: DispatchWorkItem?
@@ -112,10 +112,6 @@ final class QuickSettingsModule: NotchModule {
         now = clock()
         backends.power.startMonitoring { [weak self] in self?.lowPowerChanged() }
         backends.battery.startMonitoring { [weak self] in self?.refreshBattery(forceAccessories: false) }
-        backends.wifi.startMonitoring { [weak self] in
-            guard let self, self.devicesLoaded else { return }
-            self.refreshWiFi()
-        }
         lowPower = backends.power.isLowPowerEnabled
         if !supportChecked {
             supportChecked = true
@@ -137,19 +133,28 @@ final class QuickSettingsModule: NotchModule {
         lowPowerWork?.cancel()
         lowPowerWork = nil
         stopCaffeine()
-        devicesLoaded = false
+        visibleViews = 0
         if issue != nil { issue = nil }
     }
 
-    /// L'onglet (ou le résumé) s'affiche : relit ce qui n'a pas de notification (Bluetooth) et rafraîchit le reste.
-    /// Le premier accès au Bluetooth peut afficher la demande d'autorisation du système.
+    /// L'onglet s'affiche : relit ce qui n'a pas de notification (Bluetooth) et rafraîchit le reste. Le Wi-Fi n'est
+    /// écouté que pendant l'affichage de l'onglet. Le premier accès au Bluetooth peut afficher la demande
+    /// d'autorisation du système.
     func viewAppeared() {
         guard started else { return }
-        devicesLoaded = true
+        visibleViews += 1
+        backends.wifi.startMonitoring { [weak self] in self?.refreshWiFi() }
         refreshWiFi()
         refreshBluetooth()
         lowPower = backends.power.isLowPowerEnabled
         refreshBattery(forceAccessories: true)
+    }
+
+    /// L'onglet disparaît (autre onglet, panneau replié). Un compteur plutôt qu'un booléen : en changeant d'onglet
+    /// deux fois vite, la nouvelle vue apparaît avant que l'ancienne ne disparaisse.
+    func viewDisappeared() {
+        visibleViews = max(0, visibleViews - 1)
+        if visibleViews == 0 { backends.wifi.stopMonitoring() }
     }
 
     // MARK: - Lectures

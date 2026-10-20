@@ -24,7 +24,8 @@ final class QuickSettingsTests: XCTestCase {
         let f = QuickSettingsFixture(self)
         f.power.lowPower = true
         f.module.start()
-        XCTAssertTrue(f.wifi.monitoring && f.power.monitoring && f.battery.monitoring)
+        XCTAssertTrue(f.power.monitoring && f.battery.monitoring)
+        XCTAssertFalse(f.wifi.monitoring, "le Wi-Fi n'est écouté que pendant l'affichage de l'onglet")
         XCTAssertTrue(f.module.lowPower)
         XCTAssertTrue(f.module.lowPowerSupported)
         XCTAssertEqual(f.module.mac?.percent, 78)
@@ -37,6 +38,9 @@ final class QuickSettingsTests: XCTestCase {
         XCTAssertEqual(f.module.wifi, true)
         XCTAssertTrue(f.module.wifiConnected)
         XCTAssertEqual(f.module.bluetooth, true)
+        XCTAssertTrue(f.wifi.monitoring)
+        f.module.viewDisappeared()
+        XCTAssertFalse(f.wifi.monitoring)
     }
 
     func testStartTwiceListensOnce() {
@@ -69,7 +73,7 @@ final class QuickSettingsTests: XCTestCase {
         XCTAssertEqual(f.wifi.reads, reads, "plus d'écoute après stop()")
     }
 
-    func testDeviceEventsOnlyMatterOnceTheTabWasShown() {
+    func testWiFiEventsOnlyMatterWhileTheTabIsShown() {
         let f = QuickSettingsFixture(self)
         f.module.start()
         f.wifi.fire()
@@ -79,6 +83,25 @@ final class QuickSettingsTests: XCTestCase {
         f.wifi.fire()
         XCTAssertEqual(f.module.wifi, false)
         XCTAssertFalse(f.module.wifiConnected)
+        f.module.viewDisappeared()
+        f.wifi.power = true
+        f.wifi.fire()
+        XCTAssertEqual(f.module.wifi, false, "onglet masqué : plus d'écoute")
+    }
+
+    /// En changeant d'onglet vite, la nouvelle vue apparaît avant que l'ancienne ne disparaisse.
+    func testQuickTabSwitchKeepsListening() {
+        let f = QuickSettingsFixture(self)
+        f.module.start()
+        f.module.viewAppeared()
+        f.module.viewAppeared()
+        f.module.viewDisappeared()
+        XCTAssertTrue(f.wifi.monitoring)
+        f.module.viewDisappeared()
+        XCTAssertFalse(f.wifi.monitoring)
+        f.module.viewDisappeared()
+        f.module.viewAppeared()
+        XCTAssertTrue(f.wifi.monitoring, "un compteur jamais négatif")
     }
 
     func testMissingHardwareHidesTilesState() {

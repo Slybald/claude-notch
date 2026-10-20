@@ -37,6 +37,7 @@ struct QuickSettingsView: View {
         }
         .animation(notchSpring, value: module.issue)
         .onAppear { module.viewAppeared() }
+        .onDisappear { module.viewDisappeared() }
     }
 
     // MARK: Tuiles
