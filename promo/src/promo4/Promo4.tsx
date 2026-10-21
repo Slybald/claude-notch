@@ -184,11 +184,12 @@ export const Promo4: React.FC<Promo4Props> = ({ format, lang }) => {
   const a = cameraAt(t4, L, tg);
   const b = cameraAt(t4 - 1 / FPS2, L, tg);
   const camSpeed = Math.abs(a.tx - b.tx) + Math.abs(a.ty - b.ty) + Math.abs(a.s - b.s) * Math.max(L.w, L.h); // px par image
-  const fast = camSpeed > 9 || FAST.some(([x, y]) => t3 >= x && t3 < y);
+  // Seuil : la pointe des grands mouvements de caméra (un flou partout coûterait 5 fois le rendu 4K).
+  const fast = camSpeed > 20 || FAST.some(([x, y]) => t3 >= x && t3 < y);
   const shot = <Shot format={format} lang={lang} L={L} tg={tg} />;
   return (
     <LangProvider lang={lang}>
-      <AbsoluteFill style={{ background: "#EDEDE8" }}>{fast ? <MotionBlur n={6}>{shot}</MotionBlur> : shot}</AbsoluteFill>
+      <AbsoluteFill style={{ background: "#EDEDE8" }}>{fast ? <MotionBlur n={5}>{shot}</MotionBlur> : shot}</AbsoluteFill>
     </LangProvider>
   );
 };

@@ -1,4 +1,4 @@
-// Rendu des vidéos : node scripts/render.mjs [--v=4|3|2|1] [--target=16x9|9x16|both] [--lang=en|fr] [--scale=2] [--preview] [--frames=0-120]
+// Rendu des vidéos : node scripts/render.mjs [--v=4|3|2|1] [--target=16x9|9x16|both] [--lang=en|fr] [--scale=2] [--preview] [--frames=0-120] [--concurrency=8]
 // v4 (par défaut) et v3 : 60 i/s, muettes, sortie dans out/v4/ ou out/v3/ (notch-promo-*). v2 : out/v2/ (claude-notch-*). v1 : 30 i/s, musique facultative (public/music.*), sortie dans out/.
 // 4K par défaut (scale 2 sur la composition 1080p), puis 1080p dérivé par ffmpeg.
 import fs from "node:fs";
@@ -61,6 +61,7 @@ for (const [id, format, name] of jobs) {
     scale,
     crf: preview ? 24 : 15,
     x264Preset: preview ? "veryfast" : "slow",
+    concurrency: arg("concurrency", null) ? Number(arg("concurrency", null)) : null,
     pixelFormat: "yuv420p",
     frameRange: frames ? frames.split("-").map(Number) : null,
     audioCodec: "aac",
