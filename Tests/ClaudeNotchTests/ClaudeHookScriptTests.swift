@@ -273,6 +273,58 @@ final class ClaudeHookScriptTests: XCTestCase {
         XCTAssertEqual(fixture.replies.headless, ["s1"])
     }
 
+    /// Relance ou mise à jour de l'app pendant l'attente : la connexion tombe, le script la rétablit quand l'app revient
+    /// (nouveau jeton, nouvelle preuve, comme à chaque lancement) et un message passe encore. Sans cela, la session
+    /// restait sans attente jusqu'à son prochain Stop (constaté avec la 1.5.0 sur une vraie session Desktop).
+    func testInboxReconnectsWhenTheAppRestarts() throws {
+        let fixture = try ReplyServerFixture(self)
+        let hook = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "20"])
+        XCTAssertTrue(spin { fixture.replies.waiting == ["s1"] })
+
+        fixture.server.stop()
+        XCTAssertTrue(spin { fixture.replies.waiting.isEmpty }, "connexion fermée avec l'app")
+        XCTAssertTrue(hook.process.isRunning, "le script attend le retour de l'app")
+
+        let access = HookAccess(file: fixture.access.file)
+        let restarted = HookServer(port: fixture.port, access: access, replies: fixture.replies) { _, _ in }
+        try restarted.start()
+        defer { restarted.stop() }
+        XCTAssertTrue(spin(timeout: 15) { fixture.replies.waiting == ["s1"] }, "attente rétablie")
+        XCTAssertEqual(fixture.replies.send("Après la relance", to: "s1"), .delivered)
+        XCTAssertTrue(hook.finish())
+        XCTAssertEqual(hook.status, 2)
+        XCTAssertEqual(hook.stderr, "Après la relance")
+    }
+
+    /// L'app ne revient pas : le script abandonne après le délai (0, rien sur stderr), sans bloquer Claude.
+    func testInboxGivesUpWhenTheAppDoesNotComeBack() throws {
+        let fixture = try ReplyServerFixture(self)
+        let hook = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "2"])
+        XCTAssertTrue(spin { fixture.replies.waiting == ["s1"] })
+        fixture.server.stop()
+        XCTAssertTrue(hook.finish(timeout: 12))
+        XCTAssertEqual(hook.status, 0)
+        XCTAssertEqual(hook.stderr, "")
+        XCTAssertGreaterThan(hook.duration, 2, "il a attendu le retour de l'app")
+
+        // App déjà arrêtée au départ : pas de nouvelle tentative, la session n'attend rien.
+        let absent = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "30"])
+        XCTAssertTrue(absent.finish(timeout: 5))
+        XCTAssertEqual(absent.status, 0)
+        XCTAssertLessThan(absent.duration, 2)
+    }
+
+    /// Une décision de permission n'est jamais rejouée : app arrêtée pendant la demande, le terminal garde la main.
+    func testPermissionIsNotRetriedWhenTheAppStops() throws {
+        let fixture = try ReplyServerFixture(self)
+        let hook = try run("permission", permission, fixture, environment: ["CLAUDE_NOTCH_RETRY": "30"])
+        XCTAssertTrue(spin { fixture.replies.requests.count == 1 })
+        fixture.server.stop()
+        XCTAssertTrue(hook.finish(timeout: 5))
+        XCTAssertEqual(hook.status, 0)
+        XCTAssertEqual(hook.stdout, "")
+    }
+
     // MARK: - Relais
 
     func testRelayCarriesTheToken() throws {

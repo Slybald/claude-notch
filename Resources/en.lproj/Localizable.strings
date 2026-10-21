@@ -338,6 +338,8 @@
 "Tes dernières copies, à reprendre d'un clic." = "Your recent copies, one click to reuse them.";
 "Un minuteur, ou un cycle Pomodoro." = "A countdown, or a Pomodoro cycle.";
 "Des notes en texte brut, toujours à portée." = "Plain-text notes, always within reach.";
+"Tes conversations récentes et une réponse rapide." = "Your recent conversations and a quick reply.";
+"Tes messages non lus d'Apple Mail." = "Your unread Apple Mail messages.";
 "Sans eux, l'onglet Claude ne voit pas tes sessions. Rien n'est modifié avant « Appliquer »." = "Without them, the Claude tab can’t see your sessions. Nothing changes until you click “Apply”.";
 "Au moins un onglet reste activé." = "At least one tab stays on.";
 "macOS ne te demande une autorisation (calendrier, Bluetooth…) que lorsque tu utilises l'onglet concerné." = "macOS only asks for a permission (calendar, Bluetooth…) when you use the tab that needs it.";

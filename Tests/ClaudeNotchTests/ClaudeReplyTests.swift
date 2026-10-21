@@ -411,6 +411,20 @@ final class ClaudeReplyTests: XCTestCase {
         XCTAssertEqual(replies.waiting, ["d1"])
     }
 
+    /// `/state` dit par où une session est joignable : de quoi voir sans ps si une attente est connectée.
+    func testChannelTellsHowASessionCanBeReached() {
+        replies.processArguments = { _ in ["claude", "--input-format", "stream-json"] }
+        XCTAssertEqual(replies.channel(for: "s1"), "none")
+        replies.wait(sessionId: "s1", pid: getpid(), desktop: true, atStop: true) { _ in }
+        XCTAssertEqual(replies.channel(for: "s1"), "waiting")
+        replies.wait(sessionId: "sdk", pid: getpid(), desktop: false, atStop: true) { _ in }
+        XCTAssertEqual(replies.channel(for: "sdk"), "headless")
+        XCTAssertEqual(replies.send("Plus tard", to: "s2"), .queued)
+        XCTAssertEqual(replies.channel(for: "s2"), "queued")
+        replies.releaseAll()
+        XCTAssertEqual(replies.channel(for: "s1"), "none", "après un arrêt de l'app tout repart de zéro")
+    }
+
     // MARK: - Carte
 
     /// Outils MCP, Skill, Agent : la carte montre tout ce qui part, pas seulement le nom de l'outil.

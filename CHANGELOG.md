@@ -22,6 +22,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   hook only after you trust it with `/hooks`; the settings say so.
 - `docs/CODEX.md`: what is possible with Codex and why (hooks, `notify`, session files, app-server, approvals), measured on
   Codex 0.154.
+
+### Not possible
+
+- Writing a message to a running Codex session and answering Codex's own questions: Codex offers no safe way (no hook).
+
+## [1.6.0] - 2026-10-21
+
+### Added
+
+- Two optional tabs, **off by default** (turn them on in Settings › Tabs or by editing the tabs in the notch):
+  **Messages** shows your recent iMessage and SMS conversations with an unread badge on the collapsed notch and a quick
+  reply; **Mail** shows the unread count of Apple Mail and the latest unread messages, and opens one on click.
+  Messages needs Full Disk Access (macOS has no dialog for it: the tab explains it and links to System Settings),
+  Contacts for names, and Automation to reply. Mail needs Automation and is never launched by Claude Notch. Nothing
+  is stored or sent outside the Mac, and no permission is asked before you open the tab. Feasibility, measures and
+  limits: [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
 - Profiles: Developer, Student, Creative and Minimal. A profile is a starting point (which tabs, in which order, how
   the panel opens, the ears) inside the same app: one update, one signature. The first step of the setup assistant
   offers them (optional, nothing changes without a choice), and **Settings › General › Change Profile…** shows what a
@@ -30,9 +46,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - `docs/EDITIONS.md` compares three ways to make "editions" (profiles, separate builds, installable modules) and
   explains why profiles come first.
 
-### Not possible
+### Fixed
 
-- Writing a message to a running Codex session and answering Codex's own questions: Codex offers no safe way (no hook).
+- Messages to a Claude session from the notch were left queued after the app restarted (an update, a relaunch):
+  every waiting hook dropped with the app and only came back at the session's next turn. The hook now reconnects
+  by itself when the app is back (within 30 seconds).
+- When a message cannot reach an idle session right away, the conversation says it will go on Claude's next turn
+  (not "at the end of the turn") and offers **Open** to write in the session at once.
+
+### Changed
+
+- `/state` shows how each session can be reached (`replyChannel`).
 
 ## [1.5.0] - 2026-10-21
 

@@ -132,6 +132,14 @@ final class ReplyCenter: ObservableObject {
 
     var isEnabled: Bool { prefs.replyFromNotch }
 
+    /// Voie vers la session, pour `/state` : une attente connectée (message immédiat), des messages en file, une
+    /// session sans terminal fermée aux messages, ou rien (le prochain `Stop` en ouvrira une).
+    func channel(for sessionId: String) -> String {
+        if waiting.contains(sessionId) { return "waiting" }
+        if queued[sessionId] != nil { return "queued" }
+        return headless.contains(sessionId) ? "headless" : "none"
+    }
+
     /// Plus ancienne demande tenue pour la session.
     func request(for sessionId: String) -> Request? {
         requests.first { $0.sessionId == sessionId }

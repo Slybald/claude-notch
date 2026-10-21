@@ -29,6 +29,8 @@ final class HookServer {
     private let handler: Handler
     private let queue = DispatchQueue(label: AppIdentity.bundleId + ".server", qos: .userInitiated)
     private var listener: NWListener?
+    /// Connexions ouvertes (sur `queue`) : `stop()` les ferme, comme l'arrêt de l'app, pour que les hooks tenus le voient.
+    private var connections: [ObjectIdentifier: NWConnection] = [:]
     private let paused = OSAllocatedUnfairLock(initialState: false)
     private let codexPaused = OSAllocatedUnfairLock(initialState: true)
 
@@ -88,11 +90,24 @@ final class HookServer {
     func stop() {
         listener?.cancel()
         listener = nil
+        queue.async { [self] in
+            let open = connections.values
+            connections = [:]
+            open.forEach { $0.cancel() }
+        }
     }
 
     // MARK: - Connexions
 
     private func accept(_ connection: NWConnection) {
+        connections[ObjectIdentifier(connection)] = connection
+        connection.stateUpdateHandler = { [weak self, weak connection] state in
+            guard let connection else { return }
+            switch state {
+            case .cancelled, .failed: self?.connections[ObjectIdentifier(connection)] = nil
+            default: break
+            }
+        }
         connection.start(queue: queue)
         receive(on: connection, buffer: Data())
     }

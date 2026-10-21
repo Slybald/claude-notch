@@ -56,7 +56,7 @@ Interface available in English and French (follows the system language). Screens
 ## Tabs
 
 The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default, except Claude
-and Codex when they are not found on the Mac. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
+and Codex when they are not found on the Mac, and Messages and Mail, which stay off until you turn them on. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
 change the order, or pick the tab that opens by default. You can also do it in the notch, like apps on an iPhone:
 press and hold the tab bar, then drag the icons, hide a tab with **−** or bring one back with **+**, and click **Done**
 (or press Esc, or click outside the bar). The panel reopens on the last tab you used, or on Claude (or Codex) when a session
@@ -80,6 +80,11 @@ needs you.
   sleep and restarts.
 - **Quick notes**: plain-text notes. Pin the ones you use, delete with undo, and search once you have more than
   eight.
+- **Messages** (off by default): your recent iMessage and SMS conversations, an unread badge on the collapsed notch
+  and a quick reply. It reads the Messages database on your Mac, which needs Full Disk Access; nothing is stored or
+  sent anywhere. Details and limits in [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+- **Mail** (off by default): the unread count of Apple Mail and the latest unread messages (sender, subject). Click
+  one to open it in Mail. Claude Notch never launches Mail: it only reads it while it is open.
 
 ## Reply from the notch
 
@@ -275,6 +280,13 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
   and the "Done" ear still signal the end.
 - **Paste from other apps** (macOS 15.4 and later): so the Clipboard tab can read what you copy. macOS may ask each
   time, or block it. When it is blocked, nothing is recorded, and the tab and the settings link to System Settings.
+- **Full Disk Access** (Messages tab, off by default): to read the Messages database. macOS has no dialog for it: add
+  Claude Notch yourself in System Settings › Privacy & Security › Full Disk Access, then relaunch the app. Without it
+  the tab says so and links to System Settings.
+- **Contacts** (Messages tab): to show contact names instead of numbers. Asked when you click **Allow** in the tab.
+- **Automation: Messages** (Apple Events): to send a quick reply. macOS asks the first time you send.
+- **Automation: Mail** (Apple Events): to read the unread count and the latest messages. Asked when you click
+  **Allow** in the Mail tab.
 - **Desktop, Documents, Downloads**: only for the optional companion tools (see [Tools section](#tools-section)).
 - Wi-Fi: the network name is not read, so Location is not requested. If macOS refuses to change the Wi-Fi state,
   the tile says so.
@@ -368,7 +380,10 @@ hooks it already receives:
   restarts. Sessions without a terminal other than the Code tab of Claude Desktop (`claude -p`, SDK, IDEs)
   cannot receive a message: the conversation offers to open the session instead. With Claude Desktop, plans were
   not checked, nor how its window shows a turn started from the notch. The conversation keeps the last 6 lines
-  per session, in memory only.
+  per session, in memory only. After the app restarts (update, relaunch) a session that is idle has no waiting
+  hook until its next turn ends: the held hooks reconnect by themselves when the app comes back within 30 seconds
+  (hooks started by an older script do not), and otherwise a message is queued and the conversation says it will
+  go on Claude's next turn, with an **Open** button.
 - Codex: a new hook only runs after you trust it with `/hooks` in Codex. `codex exec` never asks for approvals, so
   nothing is held there; the interactive CLI and the app's engine do. The Codex app's own window was not driven during
   development. No free message to a running session, no answer to Codex's own questions (no hook for them), and a card
@@ -512,7 +527,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 ### Onglets
 
 La notch déployée est une rangée d'onglets. Clique sur un onglet, ou survole-le un instant. Tous les onglets sont
-activés par défaut, sauf Claude et Codex s'ils ne sont pas sur le Mac. Dans **Réglages › Onglets**, tu peux masquer
+activés par défaut, sauf Claude et Codex s'ils ne sont pas sur le Mac, et Messages et Mail, qui restent désactivés tant
+que tu ne les actives pas. Dans **Réglages › Onglets**, tu peux masquer
 un onglet (un onglet masqué ne fait aucun travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Tu
 peux aussi le faire dans la notch, comme les apps sur iPhone : appui long sur la barre d'onglets, puis glisse les
 icônes, masque un onglet avec **−** ou remets-en un avec **+**, et clique sur **OK** (ou Échap, ou un clic hors de la
@@ -535,6 +551,12 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
   règles. Il continue de compter après une mise en veille ou un redémarrage.
 - **Notes rapides** : des notes en texte brut. Épingle celles que tu utilises, supprime avec annulation, et cherche
   dès que tu en as plus de huit.
+- **Messages** (désactivé par défaut) : tes conversations iMessage et SMS récentes, une pastille de non-lus sur la
+  notch repliée et une réponse rapide. Il lit la base de Messages sur ton Mac, ce qui exige l'Accès complet au
+  disque ; rien n'est enregistré ni envoyé ailleurs. Détails et limites dans
+  [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+- **Mail** (désactivé par défaut) : le nombre de messages non lus d'Apple Mail et les derniers (expéditeur, objet).
+  Un clic en ouvre un dans Mail. Claude Notch ne lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
 
 ### Répondre depuis la notch
 
@@ -742,6 +764,14 @@ lancement.
 - **Coller depuis d'autres apps** (macOS 15.4 et plus récent) : pour que l'onglet Presse-papiers puisse lire ce que
   tu copies. macOS peut le demander à chaque fois, ou le bloquer. Bloqué, rien ne peut être enregistré ; l'onglet et
   les réglages renvoient vers Réglages Système.
+- **Accès complet au disque** (onglet Messages, désactivé par défaut) : pour lire la base de Messages. macOS n'a pas
+  de fenêtre pour ça : ajoute Claude Notch toi-même dans Réglages Système › Confidentialité et sécurité › Accès
+  complet au disque, puis relance l'app. Sans lui, l'onglet le dit et renvoie vers Réglages Système.
+- **Contacts** (onglet Messages) : pour afficher les noms des contacts au lieu des numéros. Demandé quand tu cliques
+  sur **Autoriser** dans l'onglet.
+- **Automatisation : Messages** (Apple Events) : pour envoyer une réponse rapide. macOS le demande au premier envoi.
+- **Automatisation : Mail** (Apple Events) : pour lire le nombre de non-lus et les derniers messages. Demandé quand
+  tu cliques sur **Autoriser** dans l'onglet Mail.
 - **Bureau, Documents, Téléchargements** : seulement pour les outils compagnons facultatifs (voir
   [Section outils](#section-outils)).
 - Wi-Fi : le nom du réseau n'est pas lu, donc la localisation n'est pas demandée. Si macOS refuse de changer l'état
@@ -839,7 +869,11 @@ partir de hooks qu'elle reçoit déjà :
   qu'après son redémarrage. Une session sans terminal autre que l'onglet Code de Claude Desktop (`claude -p`,
   SDK, IDE) ne peut pas recevoir de message : la conversation propose d'ouvrir la session. Avec Claude Desktop,
   les plans n'ont pas été vérifiés, ni la façon dont sa fenêtre montre un tour démarré depuis la notch. La
-  conversation garde les 6 dernières répliques de chaque session, en mémoire seulement.
+  conversation garde les 6 dernières répliques de chaque session, en mémoire seulement. Après un redémarrage de
+  l'app (mise à jour, relance), une session au repos n'a plus de hook en attente jusqu'à la fin de son prochain
+  tour : les hooks tenus se reconnectent seuls si l'app revient dans les 30 secondes (pas ceux lancés par un
+  ancien script), sinon un message reste en file et la conversation dit qu'il partira au prochain tour de Claude,
+  avec un bouton **Ouvrir**.
 - Codex : un hook neuf ne tourne qu'après ta validation par `/hooks` dans Codex. `codex exec` ne demande jamais d'approbation :
   rien n'y est tenu ; le CLI interactif et le moteur de l'app, si. La fenêtre de l'app Codex elle-même n'a pas été pilotée
   pendant le développement. Pas de message libre à une session en cours, pas de réponse aux questions propres de Codex (aucun hook), et

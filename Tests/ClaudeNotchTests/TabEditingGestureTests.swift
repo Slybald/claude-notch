@@ -259,9 +259,10 @@ final class TabEditingGestureTests: XCTestCase {
     /// par un clic. Pendant le suivi du menu (boucle bloquante), un minuteur relève les éléments, en choisit un et
     /// ferme le menu ; l'onglet choisi revient en bout de barre.
     func testPlusMenuListsHiddenTabs() throws {
-        // Tous les onglets affichés (Codex n'est activé d'office que s'il est détecté) : rien de masqué au départ.
-        notch.registry.setEnabled("codex", true)
-        wait(0.3)
+        // Codex, Messages et Mail sont masqués au départ (Codex n'est activé d'office que s'il est détecté) : on les
+        // affiche pour partir de « rien de masqué ».
+        ["codex", "messages", "mail"].forEach { notch.registry.showTab($0) }
+        wait(0.5)
         XCTAssertTrue(shown.contains("codex"))
         longPress(tabCenter(0))
         // Le « … » disparaît avec la transition d'entrée : il ne reste que le « + ».

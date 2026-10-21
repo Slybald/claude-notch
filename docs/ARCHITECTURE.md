@@ -69,6 +69,13 @@ organised and why some choices were made, so they are not undone by accident.
     (sounds and notifications), `ModuleStorage` (`ModuleScheduler` and `SecureJSONFile`, shared with Notes),
     `TimerViews`.
   - `Notes/` (`notes`): `NotesModule` (list, limits, undo, save) and `NotesViews` (plain-text editor).
+  - `Messages/` (`messages`, off by default): `MessagesModule` (state, badge, quick reply), `MessagesBackends`
+    (read-only `chat.db` through `SQLite3`, Contacts, FSEvents watcher, AppleScript sender: all behind protocols),
+    `MessagesModels` (typedstream decoder for `attributedBody`, dates, contact book), `MessagesViews`.
+  - `Mail/` (`mail`, off by default): `MailModule` (state, 2-minute counter poll while Mail runs), `MailModels` (the
+    AppleScript and the parser of its answer), `MailViews`. `AppleEvents.swift` is shared by both: Automation status
+    without a prompt, `osascript` runner with a time limit, System Settings privacy links. See
+    [MESSAGES-MAIL.md](MESSAGES-MAIL.md).
 - `Preferences`: every setting (UserDefaults, observable, values clamped). `SettingsWindow`: the settings
   window (SwiftUI in an `NSWindow`, sidebar) and the main menu (⌘, ⌘W, editing).
 - `NotchShell`: notch rules that do not need a window: visibility (`NotchVisibilityRule`), screen choice and
@@ -86,7 +93,7 @@ organised and why some choices were made, so they are not undone by accident.
 The expanded notch is a row of tabs; each tab is a module. Adding a module means: a folder
 `Sources/ClaudeNotch/Modules/<Name>/`, its string tables `Resources/{en,fr}.lproj/<Name>.strings`, and one line
 in `ModuleRegistry.standardModules`. A module never edits `Info.plist` (the usage descriptions for calendars,
-Apple Events and Bluetooth are already there) nor another module's files.
+Apple Events and Bluetooth are already there; Messages added the one for Contacts) nor another module's files.
 
 - **Contract** (`NotchModule`, an `ObservableObject`): stable `id` (the settings key: never change it), localized
   `title`, SF Symbol `symbol`, `makeView()`. Optional, with defaults: `makeCompactView()` (full-screen summary),
@@ -158,6 +165,12 @@ Apple Events and Bluetooth are already there) nor another module's files.
   settings under `<id>.<name>`. The accent color is read through `Palette.accent`; the notch view is rebuilt
   when it changes. "Reply from the notch" (`claude.replyFromNotch`, off by default): off, the reply hooks get
   an immediate "no decision".
+- **Messages and Mail** (`docs/MESSAGES-MAIL.md`): optional tabs for everyone, off by default, no permission before the
+  tab is opened. They only run collapsed (`keepsRunningWhenCollapsed`) once a first read worked (`<id>.armed`):
+  Messages listens to FSEvents on `chat.db` / `chat.db-wal` (no timer), Mail polls a counter script every 2 minutes
+  only while Mail runs and never launches it (`application id … is not running` guard, checked). Message text and
+  AppleScript arguments never go through string interpolation. Under XCTest the default accesses are inert
+  (`ModuleEnvironment.isTesting`): tests never read real messages or run `osascript` (except the closed-Mail guard).
 - **Localization per table**: `L("…", table: "Media")` or `Text("…", tableName: "Media")`; without a table,
   `Localizable`. `LocalizationTests` checks every table: each key used in the code is translated in its table, no
   unused keys, French identity, same format specifiers, same tables in `en.lproj` and `fr.lproj`.
@@ -253,6 +266,18 @@ Apple Events and Bluetooth are already there) nor another module's files.
     (SDK, IDE, `-p`, an old script without the header) keeps the 204 and gets "Answer in *app*". End to end with
     the real server, script and `claude`: waiter held at `Stop`, message delivered, answer ~3 s later.
   - Not checked: ExitPlanMode with Desktop, and how the Desktop window displays a turn started by a hook.
+  - **Held waiter lost at an app restart** (found with 1.5.0 on real Desktop sessions: a message to an idle session
+    stayed queued, `waiting` 0, no `inbox` process). Not a Desktop limit: a `claude` started with the real Code-tab
+    flags and the installed hooks, against the real app, keeps the `Stop` hook alive while idle and during the next
+    turn (`ps`), and `ReplyCenter.wait` holds the argv of every real Desktop session of the machine. What happens:
+    when the app quits (update, relaunch, crash) the connection of every held hook drops, the script exits 0, and
+    Claude does not start it again before the next `Stop`. A session idle since before the relaunch has no waiter
+    until then. Fix: in `inbox` mode the script retries when the connection was cut (curl 52/56), every second, until
+    the app is back (`CLAUDE_NOTCH_RETRY`, 30 s by default; 7/22/28 while it is not up or has not rewritten its
+    token), then holds again; it gives up (exit 0) after the delay or when its parent is gone. `permission` is never
+    retried. Hooks started by an older script keep the old behaviour until their next `Stop`. `HookServer.stop()`
+    now closes the open connections like a quit does (tests). `/state` shows `replyChannel` per session
+    (`waiting`, `queued`, `headless`, `none`).
 - **CLI, same version** (interactive `claude` in a pty): `PermissionRequest` is called for Bash and AskUserQuestion,
   the terminal dialog stays up ("Allowed by PermissionRequest hook" when the hook answers first).
 - **Codex** (measured on Codex CLI 0.154, details in [CODEX.md](CODEX.md)): the tab follows Codex through its own

@@ -198,6 +198,14 @@ final class ClaudeSnapshotTests: XCTestCase {
         history.claude.drafts.composing = "site"
         try render(history.root, name: "conversation-history", to: outputDir)
 
+        // Session au repos sans attente connectée (app relancée depuis son dernier Stop) : le message partira à son
+        // prochain tour, et « Ouvrir » permet d'écrire tout de suite dans Desktop.
+        let idle = Scene(self, desktop: true)
+        idle.done("site", "Le README est à jour.")
+        idle.claude.drafts.composing = "site"
+        idle.claude.drafts.messages["site"] = "Ajoute une FAQ"
+        try render(idle.root, name: "conversation-idle-no-waiter", to: outputDir)
+
         // Aucune voie vers la session (ancien script, SDK) : « Réponds dans Claude Desktop » et le bouton qui l'ouvre.
         let fallback = Scene(self, desktop: true)
         fallback.replies.processArguments = { _ in streamJSON }
