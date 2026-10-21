@@ -373,6 +373,21 @@ enum QuickSettingsFormat {
         return String(format: L("%dm", table: "QuickSettings"), max(minutes, 1))
     }
 
+    /// Oreilles de la vitesse fixe : « 4,2k » (milliers de tours par minute).
+    static func earsRPM(_ rpm: Int) -> String {
+        String(format: L("%.1fk", table: "QuickSettings"), Double(rpm) / 1000)
+    }
+
+    /// « 2317 · 2320 tr/min ».
+    static func rpm(_ fans: [Double]) -> String {
+        String(format: L("%@ tr/min", table: "QuickSettings"), fans.map { String(Int($0.rounded())) }.joined(separator: " · "))
+    }
+
+    /// « 62 °C ».
+    static func celsius(_ value: Double) -> String {
+        String(format: L("%d °C", table: "QuickSettings"), Int(value.rounded()))
+    }
+
     /// Minutes restantes arrondies au-dessus (jamais « 0 » tant que la caféine tourne) ; nil = sans limite.
     static func remainingMinutes(of session: CaffeineSession, now: Date) -> Int? {
         guard let end = session.end else { return nil }

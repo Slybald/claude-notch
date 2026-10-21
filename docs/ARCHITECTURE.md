@@ -62,6 +62,10 @@ organised and why some choices were made, so they are not undone by accident.
   - `QuickSettings/` (`quicksettings`): `QuickSettingsModule` (tiles, scenes, caffeine, automatic switch),
     `QuickSettingsBackends` (the system accesses, behind protocols: CoreWLAN, IOBluetooth loaded at runtime,
     `pmset`, IOPS, IOPMAssertion, `shortcuts run`), `QuickSettingsModels` (pure parsers and state), `QuickSettingsViews`.
+    Fans: `FanController` (reading while the tab is shown, fixed speed held by the helper), `FanBackend` (SMC reads,
+    helper install, `sudo -n fanctl hold`), `FanAuthorization` (pure: sudoers rule and root install command),
+    `FanViews`. The SMC code is the `FanControl` library (`Sources/FanControl`), shared with the `fanctl` helper
+    (`Sources/fanctl`, root, `auto` and `hold` only). See [FANS.md](FANS.md).
   - `Shelf/` (`shelf`): `ShelfModule`, `ShelfStore` (bookmarks in `shelf.json`), `ShelfAppKit` (drag and drop,
     Quick Look, `ShelfDropView`, the AppKit view under the notch's SwiftUI content), `ShelfViews`.
   - `Clipboard/` (`clipboard`): `ClipboardModule` (capture by change count, limits, suspension), `ClipboardSystem`

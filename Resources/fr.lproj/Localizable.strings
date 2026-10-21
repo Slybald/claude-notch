@@ -382,3 +382,5 @@
 "%d autre activité" = "%d autre activité";
 "%d autres activités" = "%d autres activités";
 "Ouvre l'onglet correspondant" = "Ouvre l'onglet correspondant";
+"L'outil des ventilateurs reste en place" = "L'outil des ventilateurs reste en place";
+"Pour le retirer : sudo rm %@ %@" = "Pour le retirer : sudo rm %@ %@";

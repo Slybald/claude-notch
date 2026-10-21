@@ -2,8 +2,8 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// Onglet « Réglages rapides » : Wi-Fi, Bluetooth, Concentration, économie d'énergie, caféine, batterie, et trois
-/// scènes. Textes dans Resources/{en,fr}.lproj/QuickSettings.strings.
+/// Onglet « Réglages rapides » : Wi-Fi, Bluetooth, Concentration, économie d'énergie, caféine, batterie,
+/// ventilateurs (`FanController`) et trois scènes. Textes dans Resources/{en,fr}.lproj/QuickSettings.strings.
 ///
 /// - Arrêté, le module ne fait rien. Démarré, il n'écoute que des notifications du système (batterie IOPS,
 ///   économie d'énergie, Wi-Fi) : aucun polling. Seule la caféine à durée limitée arme un minuteur, une fois par
@@ -18,6 +18,7 @@ final class QuickSettingsModule: NotchModule {
     var title: String { L("Réglages rapides", table: "QuickSettings") }
 
     let prefs: QuickSettingsPrefs
+    let fans: FanController
 
     /// nil : ce Mac n'a pas de Wi-Fi (ou pas encore lu).
     @Published private(set) var wifi: Bool?
@@ -67,6 +68,7 @@ final class QuickSettingsModule: NotchModule {
         self.settleDelay = settleDelay
         self.open = open
         prefs = QuickSettingsPrefs(defaults: defaults)
+        fans = FanController(backend: backends.fans, defaults: defaults)
         focus = prefs.focusState
         now = clock()
         snapshot = prefs.snapshot
@@ -74,6 +76,11 @@ final class QuickSettingsModule: NotchModule {
         prefs.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        // Vitesse fixe : le registre relit `keepsRunningWhenCollapsed` et les oreilles.
+        fans.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        fans.report = { [weak self] issue in self?.issue = issue }
         // `$x` émet avant l'affectation : on passe la nouvelle valeur.
         prefs.$caffeineKeepsDisplayOn.dropFirst().removeDuplicates()
             .sink { [weak self] keepsDisplayOn in self?.reacquireCaffeine(keepDisplayOn: keepsDisplayOn) }
@@ -91,10 +98,15 @@ final class QuickSettingsModule: NotchModule {
 
     // MARK: - Contrat
 
-    var keepsRunningWhenCollapsed: Bool { caffeine != nil || prefs.autoAutonomy }
+    /// La vitesse fixe tourne panneau replié : l'outil attend des nouvelles de l'app (sinon il rend la main).
+    var keepsRunningWhenCollapsed: Bool { caffeine != nil || prefs.autoAutonomy || fans.isFixed }
 
-    /// Caféine active : une tasse et le temps restant, en dernier recours (priorité basse).
+    /// Vitesse fixe : un ventilateur et la vitesse demandée (rien n'est lu panneau replié), avant la caféine. Sinon
+    /// caféine active : une tasse et le temps restant, en dernier recours (priorité basse).
     var ears: ModuleEars? {
+        if case .fixed(let rpm) = fans.mode {
+            return ModuleEars(symbol: "fanblades.fill", text: QuickSettingsFormat.earsRPM(rpm), priority: Self.earsPriority)
+        }
         guard let caffeine else { return nil }
         let text = QuickSettingsFormat.earsDuration(minutes: QuickSettingsFormat.remainingMinutes(of: caffeine, now: now))
         return ModuleEars(symbol: "cup.and.saucer.fill", text: text, priority: Self.earsPriority)
@@ -121,6 +133,7 @@ final class QuickSettingsModule: NotchModule {
             backends.power.checkSupport { [weak self] supported in self?.lowPowerSupported = supported }
         }
         refreshBattery(forceAccessories: false)
+        fans.start()
     }
 
     /// Libère tout, caféine comprise : un module arrêté ne tient plus rien. (Tant que la caféine est active, le
@@ -139,6 +152,7 @@ final class QuickSettingsModule: NotchModule {
         lowPowerWork?.cancel()
         lowPowerWork = nil
         stopCaffeine()
+        fans.stop()
         visibleViews = 0
         if issue != nil { issue = nil }
     }
@@ -155,6 +169,7 @@ final class QuickSettingsModule: NotchModule {
         lowPower = backends.power.isLowPowerEnabled
         refreshAuthorization()
         refreshBattery(forceAccessories: true)
+        fans.viewAppeared()
     }
 
     /// L'onglet disparaît (autre onglet, panneau replié). Un compteur plutôt qu'un booléen : en changeant d'onglet
@@ -162,6 +177,7 @@ final class QuickSettingsModule: NotchModule {
     func viewDisappeared() {
         visibleViews = max(0, visibleViews - 1)
         if visibleViews == 0 { backends.wifi.stopMonitoring() }
+        fans.viewDisappeared()
     }
 
     // MARK: - Lectures

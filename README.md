@@ -328,6 +328,10 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
   and, in the same prompt, adds a system rule limited to turning this mode on and off
   (`/etc/sudoers.d/claude-notch-lowpower`); later changes need no password. "Remove the authorization" in Settings
   or uninstalling removes it.
+- Fixed fan speed needs root to write to the SMC. The first fixed speed asks for your password once and installs a
+  small helper (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows
+  only this helper (`/etc/sudoers.d/claude-notch-fans`). Reading speeds and temperatures needs nothing. "Remove the
+  authorization" in Settings or uninstalling removes both. See [docs/FANS.md](docs/FANS.md).
 
 ## How it works
 
@@ -853,6 +857,11 @@ lancement.
   ce mode (`/etc/sudoers.d/claude-notch-lowpower`) ; ensuite, plus de mot de passe. Retirée par « Retirer
   l'autorisation » dans les réglages ou à la
   désinstallation.
+- La vitesse fixe des ventilateurs exige root pour écrire dans le SMC. La première vitesse fixe demande ton mot de
+  passe une fois et installe un petit outil (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) et
+  une règle système qui n'autorise que lui (`/etc/sudoers.d/claude-notch-fans`). Lire les vitesses et les températures
+  ne demande rien. « Retirer l'autorisation » dans les réglages ou la désinstallation retire les deux. Voir
+  [docs/FANS.md](docs/FANS.md).
 
 ### Fonctionnement
 

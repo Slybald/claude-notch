@@ -233,7 +233,18 @@ final class HookSetup: ObservableObject {
                     alert.informativeText = L("Pour la retirer : sudo rm /etc/sudoers.d/claude-notch-lowpower")
                     alert.runModal()
                 }
-                Self.finishUninstall(hooks: hooks)
+                // Outil des ventilateurs et sa règle : retirés aussi (après avoir rendu la main à macOS).
+                FanAuthorization.remove { result in
+                    if case .failure = result {
+                        let alert = NSAlert()
+                        alert.alertStyle = .warning
+                        alert.messageText = L("L'outil des ventilateurs reste en place")
+                        alert.informativeText = String(format: L("Pour le retirer : sudo rm %@ %@"),
+                                                       FanAuthorization.rulePath, FanAuthorization.helperPath)
+                        alert.runModal()
+                    }
+                    Self.finishUninstall(hooks: hooks)
+                }
             }
         }
     }

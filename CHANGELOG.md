@@ -32,6 +32,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   - one request at a time: once it is settled, the next one starts its one second again, so a repeated press never
     settles two requests; questions and plans still need the mouse;
   - same deciders as a click: nothing is ever "always allowed", the timeouts and "first answer wins" are unchanged.
+- **Fans in Quick Settings.** A Fans card shows both fan speeds and the hottest CPU and GPU temperatures, read only
+  while the tab is shown. **Fixed speed** sets the fans to a speed of your choice with a slider, never below the Mac's
+  minimum nor above its maximum; **Give control back to macOS** is always visible while it is active, and the
+  collapsed notch shows the speed in an index tab. Absent on Macs without fans; read-only on Intel Macs.
+- The first fixed speed installs, after one administrator password, a small helper
+  (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows only this
+  helper, with only `auto` or `hold`. The helper checks every request against the bounds read from the Mac.
+- Safety: macOS gets control back when the app quits or crashes, freezes for 30 s, on sleep or session change, above
+  105 °C, or when macOS itself takes a fan back. "Remove the authorization" (Settings › Quick Settings) and
+  uninstalling remove the helper and its rule. Details and measurements: [docs/FANS.md](docs/FANS.md).
 
 ## [1.8.0] - 2026-10-21
 

@@ -382,3 +382,5 @@
 "%d autre activité" = "%d other activity";
 "%d autres activités" = "%d other activities";
 "Ouvre l'onglet correspondant" = "Opens the matching tab";
+"L'outil des ventilateurs reste en place" = "The fan tool is still installed";
+"Pour le retirer : sudo rm %@ %@" = "To remove it: sudo rm %@ %@";

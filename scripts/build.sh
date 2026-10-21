@@ -68,6 +68,15 @@ chmod 755 "$APP/Contents/Resources/codex-notch-hook.sh"
 cp "$ROOT/hooks/notch" "$APP/Contents/Resources/notch"
 chmod 755 "$APP/Contents/Resources/notch"
 
+# Outil des ventilateurs (Sources/fanctl) : livré dans Helpers, jamais exécuté de là. L'app le copie dans
+# /Library/PrivilegedHelperTools (root:wheel) à la demande de l'utilisateur, après vérification de son empreinte.
+FANCTL="$(dirname "$BIN")/fanctl"
+mkdir -p "$APP/Contents/Helpers"
+cp "$FANCTL" "$APP/Contents/Helpers/fanctl"
+for arch in arm64 x86_64; do
+    lipo "$FANCTL" -verify_arch "$arch" || { echo "Architecture $arch absente de $FANCTL" >&2; exit 1; }
+done
+
 # Lecture en cours : mediaremote-adapter (Vendor/mediaremote-adapter, BSD-3-Clause, commit noté dans COMMIT).
 # Depuis macOS 15.4, MediaRemote ne répond qu'aux binaires d'Apple : /usr/bin/perl lance le script, qui charge
 # ce framework (l'app ne le lie pas) ; le client de test sert à la commande « test ». Universels, signés avec

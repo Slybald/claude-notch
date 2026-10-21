@@ -3,8 +3,8 @@ import SwiftUI
 
 // MARK: - Onglet
 
-/// Grille de tuiles (Wi-Fi, Bluetooth, Concentration, économie d'énergie, caféine, batterie), durée de la caféine,
-/// batteries des accessoires, scènes, et le message d'erreur éventuel.
+/// Grille de tuiles (Wi-Fi, Bluetooth, Concentration, économie d'énergie, caféine, batterie), ventilateurs, durée
+/// de la caféine, batteries des accessoires, scènes, et le message d'erreur éventuel.
 struct QuickSettingsView: View {
     @ObservedObject var module: QuickSettingsModule
 
@@ -27,6 +27,7 @@ struct QuickSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: ExpandedPanel.spacing) {
             grid
+            FanCard(fans: module.fans)
             caffeineRow
             if !module.accessories.isEmpty { AccessoriesCard(accessories: module.accessories) }
             scenes
@@ -227,7 +228,7 @@ struct QuickSettingsView: View {
 // MARK: - Composants
 
 /// Réaction au clic : léger enfoncement.
-private struct PressStyle: ButtonStyle {
+struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -235,7 +236,7 @@ private struct PressStyle: ButtonStyle {
     }
 }
 
-private struct Spinner: View {
+struct Spinner: View {
     var body: some View {
         ProgressView()
             .controlSize(.small)
@@ -609,6 +610,10 @@ struct QuickSettingsSettingsView: View {
 
             if module.lowPowerSupported { lowPowerSection }
 
+            if module.fans.status?.supportsManual == true || module.fans.authorization != .notInstalled {
+                FanSettingsSection(fans: module.fans)
+            }
+
             Section {
                 Toggle(isOn: $prefs.autonomyBluetoothOff) {
                     Text("Autonomie : couper aussi le Bluetooth", tableName: "QuickSettings")
@@ -639,7 +644,11 @@ struct QuickSettingsSettingsView: View {
                 SettingsNote(L("Une seule fois par descente, sur batterie. Désactivé par défaut.", table: "QuickSettings"))
             }
         }
-        .onAppear { module.refreshAuthorization() }
+        .onAppear {
+            module.refreshAuthorization()
+            module.fans.refreshAuthorization()
+            module.fans.read()
+        }
     }
 
     // MARK: Économie d'énergie
