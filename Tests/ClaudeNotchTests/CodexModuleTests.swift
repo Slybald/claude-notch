@@ -165,5 +165,7 @@ final class CodexModuleTests: XCTestCase {
         XCTAssertEqual(offered(detected: false, enabled: ["codex"]), ["claude", "codex", "media"],
                        "assistant relancé avec l'onglet déjà activé")
         XCTAssertFalse(SetupTab.usage(of: "codex").isEmpty, "une ligne d'usage par onglet")
+        XCTAssertEqual(NotchProfile.codexId, "codex")
+        XCTAssertTrue(NotchProfile.agentsOnThisMac().isEmpty, "jamais le vrai Mac sous XCTest : ni Claude ni Codex")
     }
 }

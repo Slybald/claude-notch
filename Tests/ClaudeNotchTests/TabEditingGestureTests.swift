@@ -127,6 +127,7 @@ final class TabEditingGestureTests: XCTestCase {
     }
 
     func testDragMovesTabAndSavesOrder() {
+        let hiddenSlot = notch.registry.ordered.map { $0.id }.firstIndex(of: "codex")
         longPress(tabCenter(0))
         XCTAssertTrue(notch.model.isEditingTabs)
         let before = shown
@@ -135,7 +136,11 @@ final class TabEditingGestureTests: XCTestCase {
         var expected = before
         expected.insert(expected.removeFirst(), at: 2)
         XCTAssertEqual(shown, expected, "onglet glissé de deux cases")
-        XCTAssertEqual(Array(notch.prefs.tabOrder.prefix(3)), Array(expected.prefix(3)), "enregistré dans les réglages")
+        // L'ordre enregistré est celui de tous les onglets : un onglet masqué (Codex, désactivé tant qu'il n'est pas
+        // détecté) garde sa case, seuls les onglets affichés s'y redistribuent.
+        let saved = notch.prefs.tabOrder
+        XCTAssertEqual(saved.filter { expected.contains($0) }, expected, "enregistré dans les réglages")
+        XCTAssertEqual(saved.firstIndex(of: "codex"), hiddenSlot, "l'onglet masqué garde sa case")
         XCTAssertTrue(notch.model.isEditingTabs, "le glisser ne sort pas du mode")
     }
 
@@ -254,6 +259,10 @@ final class TabEditingGestureTests: XCTestCase {
     /// par un clic. Pendant le suivi du menu (boucle bloquante), un minuteur relève les éléments, en choisit un et
     /// ferme le menu ; l'onglet choisi revient en bout de barre.
     func testPlusMenuListsHiddenTabs() throws {
+        // Tous les onglets affichés (Codex n'est activé d'office que s'il est détecté) : rien de masqué au départ.
+        notch.registry.setEnabled("codex", true)
+        wait(0.3)
+        XCTAssertTrue(shown.contains("codex"))
         longPress(tabCenter(0))
         // Le « … » disparaît avec la transition d'entrée : il ne reste que le « + ».
         let deadline = Date().addingTimeInterval(2)
