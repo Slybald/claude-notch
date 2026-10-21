@@ -73,6 +73,8 @@ final class BubbleController {
     private var notchPending = false
     /// Fin du rebond de la goutte qui rentre dans la notch.
     private var snapEnd = Date.distantPast
+    /// Repli de la notch programmé à la fin de ce rebond.
+    private var foldWork: DispatchWorkItem?
     /// Fenêtre agrandie au champ de la notch (retour aimanté) ; nil ailleurs.
     private var fieldFrame: CGRect?
     /// Fin de la détente : la fenêtre reprend la taille de la bulle.
@@ -258,10 +260,7 @@ final class BubbleController {
         window.ignoresMouseEvents = false
         bubble.scale = 1
         clearField()
-        if notchPending {
-            notchPending = false
-            collapseNotch()
-        }
+        foldNow()
         endGoo(after: 0)
         apply(.reset)
         if wasOpen { registry.setPanelOpen(false) }
@@ -426,12 +425,23 @@ final class BubbleController {
         guard notchPending else { return }
         notchPending = false
         let generation = gooGeneration
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, snapEnd.timeIntervalSinceNow)) { [weak self] in
+        let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            self.foldWork = nil
             self.collapseNotch()
             self.persistPhase()
-            if self.gooGeneration == generation { self.endGoo(after: 0) }
+            if self.gooGeneration == generation { self.endGoo(after: max(0, self.snapEnd.timeIntervalSinceNow)) }
         }
+        foldWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, snapEnd.timeIntervalSinceNow), execute: work)
+    }
+
+    /// Repli de la notch fait tout de suite : avant d'ouvrir le panneau de la bulle, que le repli refermerait.
+    private func foldNow() {
+        finishDetach()
+        guard let work = foldWork else { return }
+        work.perform()
+        work.cancel()
     }
 
     /// Relâché avant le seuil : la goutte rentre, le panneau revient.
@@ -718,7 +728,7 @@ final class BubbleController {
         }
         guard model.bubble == .bubble else { return }
         cancelMove()
-        finishDetach()
+        foldNow()
         clearField()
         if !registry.enabled.contains(where: { $0.id == model.selectedTab }), let first = registry.enabled.first {
             model.selectedTab = first.id
