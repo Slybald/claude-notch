@@ -48,7 +48,10 @@ struct EarTab: Equatable, Identifiable {
     }
 
     /// Couleur d'accent de l'activité (hex) ; nil = l'accent choisi dans les réglages (Claude).
-    var accentHex: String? { EarTabs.accentHex(forId: id) }
+    var accentHex: String? {
+        if case .module(let ears) = kind, let hex = ears.accentHex { return hex }
+        return EarTabs.accentHex(forId: id)
+    }
 }
 
 extension SessionStore.EarsContent {

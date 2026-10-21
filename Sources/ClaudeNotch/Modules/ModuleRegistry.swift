@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 
 extension ModuleRegistry {
     /// Tous les onglets, dans l'ordre par défaut. Ajouter un module = une ligne ici.
@@ -38,13 +39,16 @@ final class ModuleRegistry: ObservableObject {
     private(set) var running: Set<String> = []
 
     private let prefs: Preferences
+    /// Intercalaires posés par les scripts de l'utilisateur (API locale), après ceux des modules.
+    let external: LocalAPI
     private var panelOpen = false
     private var cancellables = Set<AnyCancellable>()
 
-    init(modules: [any NotchModule], prefs: Preferences) {
+    init(modules: [any NotchModule], prefs: Preferences, external: LocalAPI = .shared) {
         precondition(Set(modules.map { $0.id }).count == modules.count, "identifiants de module en double")
         self.modules = modules
         self.prefs = prefs
+        self.external = external
         refreshOrder()
         // `objectWillChange` part avant le changement : on relit au tour de boucle suivant.
         prefs.objectWillChange
@@ -60,6 +64,10 @@ final class ModuleRegistry: ObservableObject {
                 .sink { [weak self] _ in self?.reconcile() }
                 .store(in: &cancellables)
         }
+        external.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.reconcile() }
+            .store(in: &cancellables)
         // Au lancement, notch repliée : les modules qui tournent replié (oreilles, minuteur) démarrent tout de suite.
         reconcile()
     }
@@ -150,8 +158,19 @@ final class ModuleRegistry: ObservableObject {
         }
         let entries = enabled.filter { running.contains($0.id) }.compactMap { module in
             module.ears.map { ModuleEarsEntry(id: module.id, ears: $0) }
-        }
+        } + external.earsEntries
         if entries != earsEntries { earsEntries = entries }
+    }
+
+    /// Titre d'un intercalaire : celui du module, ou celui que le script a donné.
+    func earTitle(_ id: String) -> String {
+        module(id)?.title ?? external.item(earId: id)?.title ?? id
+    }
+
+    /// Contenu d'un intercalaire déployé.
+    func earDetailView(_ id: String) -> AnyView? {
+        if let module = module(id) { return module.makeTabDetailView() }
+        return external.item(earId: id).map { AnyView(ExternalEarDetail(ear: $0, api: external)) }
     }
 
     /// Intercalaires de la notch repliée, du plus prioritaire au moins prioritaire. Sans onglet Claude, Claude ne compte pas.

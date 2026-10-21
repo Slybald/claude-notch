@@ -9,7 +9,8 @@ import os
 /// ne parle pas au serveur, même par DNS rebinding. Sauf `/health`, elle doit aussi porter le jeton du fichier
 /// partagé avec le script (`HookAccess`) ; en retour, une décision ou un message porte la preuve que c'est bien
 /// l'app qui répond. Routes : `/hook` (événements async), `/permission` et `/inbox`
-/// (requêtes longues des hooks synchrones, confiées à `ReplyCenter`), `GET /state` (diagnostic). Aucune route
+/// (requêtes longues des hooks synchrones, confiées à `ReplyCenter`), `GET /state` (diagnostic), `/api/…` (API
+/// locale des scripts de l'utilisateur, avec son propre jeton : `LocalAPI`). Aucune route
 /// ne permet à un client de décider : une décision n'est que la réponse à la requête d'un hook, après un clic.
 final class HookServer {
     typealias Handler = (HookEvent, ProcessContext) -> Void
@@ -22,6 +23,8 @@ final class HookServer {
     var stateProvider: (() -> [String: Any])?
     /// Suivi des sessions Codex (routes `/codex/hook` et `/codex/permission`). À poser avant `start()`.
     weak var codex: CodexRelay?
+    /// API locale (routes `/api/…`). À poser avant `start()` ; nil : 404.
+    var api: LocalAPI?
 
     let port: UInt16
     let access: HookAccess
@@ -68,6 +71,7 @@ final class HookServer {
             self?.accept(connection)
         }
         let access = self.access
+        let api = self.api
         listener.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
@@ -77,6 +81,7 @@ final class HookServer {
                 } catch {
                     NSLog("ClaudeNotch : jeton des hooks impossible à écrire (%@).", String(describing: error))
                 }
+                DispatchQueue.main.async { api?.serverDidStart() }
             case .failed(let error):
                 self?.onFailure?(error)
             default:
@@ -143,6 +148,11 @@ final class HookServer {
             return reply(403, "Forbidden", on: connection)
         }
         if request.path == "/health" { return reply(204, "No Content", on: connection) }
+        // API locale : son propre jeton, jamais celui des hooks (voir `LocalAPI`).
+        if request.path.hasPrefix("/api/"), let api {
+            let response = DispatchQueue.main.sync { api.handle(request) }
+            return reply(response.status, response.reason, body: response.body, on: connection)
+        }
         guard access.accepts(request.headers[HookAccess.headerKey]) else {
             return reply(401, "Unauthorized", on: connection)
         }
@@ -324,8 +334,13 @@ struct HookAccess {
     }
 
     func accepts(_ presented: String?) -> Bool {
+        Self.constantTimeEquals(presented, token)
+    }
+
+    /// Temps constant pour une longueur donnée ; une attente vide n'ouvre rien. Sert aussi à l'API locale.
+    static func constantTimeEquals(_ presented: String?, _ expected: String) -> Bool {
         let given = Array((presented ?? "").utf8)
-        let expected = Array(token.utf8)
+        let expected = Array(expected.utf8)
         guard given.count == expected.count, !expected.isEmpty else { return false }
         var difference: UInt8 = 0
         for index in expected.indices { difference |= given[index] ^ expected[index] }
@@ -341,8 +356,8 @@ struct HookAccess {
     }
 
     /// Fichier temporaire créé en 0600 (`O_EXCL`) dans le même dossier, puis `rename` : jamais de secret
-    /// lisible par un autre compte, ni de fichier à moitié écrit.
-    private static func write(_ text: String, to file: URL) throws {
+    /// lisible par un autre compte, ni de fichier à moitié écrit. Sert aussi au jeton de l'API locale.
+    static func write(_ text: String, to file: URL) throws {
         let temporary = file.deletingLastPathComponent()
             .appendingPathComponent(".\(file.lastPathComponent)-\(UUID().uuidString)")
         let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)

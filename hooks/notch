@@ -1,0 +1,201 @@
+#!/bin/sh
+# claude-notch-cli
+# notch : pose des intercalaires dans la notch de Claude Notch depuis un terminal ou un script (API locale,
+# docs/API.md). Le jeton est lu dans le fichier 0600 que l'app écrit tant que l'API est activée, et passé à curl
+# par -H @fichier, jamais en argument (invisible dans ps). Chaque texte est échappé pour JSON ici ; l'app le valide
+# ensuite (schéma strict, tailles bornées). Rien de ce que reçoit l'app n'est exécuté.
+
+URL="http://127.0.0.1:${CLAUDE_NOTCH_PORT:-47823}/api/v1/ears"
+TOKEN="$HOME/Library/Application Support/ClaudeNotch/api-token"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  notch show --title TEXT [--text SHORT] [--detail TEXT] [--icon SYMBOL] [--color NAME]
+             [--ttl SECONDS] [--id ID] [--app BUNDLE_ID] [--client NAME]
+  notch run [--title TEXT] [--id ID] [--client NAME] [--] COMMAND [ARGUMENTS...]
+  notch clear [--id ID]
+  notch help
+
+show   Puts an ear tab beside the collapsed notch and prints its id. It stays 60 s by default
+       (--ttl, 3600 at most); the same --id replaces it. --text (12 characters at most) shows
+       at rest, --title (40) and --detail (160) when the pointer is over it. --app adds a
+       button that opens that app (bundle identifier, for example com.apple.Terminal).
+run    Shows an hourglass while COMMAND runs, then a check mark or a cross with the duration.
+       Exits with the status of COMMAND.
+clear  Removes one ear tab (--id) or all of them.
+
+Turn the local API on first: Claude Notch, Settings, Scripts. Icons and colors: docs/API.md.
+EOF
+}
+
+die() {
+    printf 'notch: %s\n' "$1" >&2
+    exit 1
+}
+
+# Chaîne JSON entre guillemets : \ et " échappés, caractères de contrôle en \u00XX, retours à la ligne en \n.
+# Octet par octet (LC_ALL=C) : l'UTF-8 passe tel quel.
+json() {
+    printf '"'
+    printf '%s' "$1" | LC_ALL=C awk '
+        BEGIN { ORS = ""; for (i = 1; i < 32; i++) ctl[sprintf("%c", i)] = sprintf("\\u%04x", i) }
+        {
+            if (NR > 1) print "\\n"
+            n = length($0)
+            for (i = 1; i <= n; i++) {
+                c = substr($0, i, 1)
+                if (c == "\\") print "\\\\"
+                else if (c == "\"") print "\\\""
+                else if (c in ctl) print ctl[c]
+                else print c
+            }
+        }'
+    printf '"'
+}
+
+# Ajoute "nom":"valeur" au corps quand la valeur n'est pas vide.
+add() {
+    [ -n "$2" ] || return 0
+    BODY="$BODY,\"$1\":$(json "$2")"
+}
+
+# Requête à l'app : méthode, fin du chemin, corps JSON éventuel. Corps de la réponse dans $REPLY_BODY.
+send() {
+    [ -r "$TOKEN" ] || {
+        printf 'notch: the local API is off or Claude Notch is not running (Settings, Scripts).\n' >&2
+        return 1
+    }
+    OUT=$(mktemp "${TMPDIR:-/tmp}/notch.XXXXXX") || return 1
+    if [ -n "${3:-}" ]; then
+        CODE=$(printf '%s' "$3" | curl -q -s --noproxy '*' --path-as-is --connect-timeout 1 --max-time 5 \
+            -o "$OUT" -w '%{http_code}' -X "$1" -H @"$TOKEN" -H 'Content-Type: application/json' -H 'Expect:' \
+            --data-binary @- "$URL$2")
+    else
+        CODE=$(curl -q -s --noproxy '*' --path-as-is --connect-timeout 1 --max-time 5 \
+            -o "$OUT" -w '%{http_code}' -X "$1" -H @"$TOKEN" "$URL$2")
+    fi
+    STATUS=$?
+    REPLY_BODY=$(cat "$OUT")
+    rm -f "$OUT"
+    case "$CODE" in
+    2??) return 0 ;;
+    esac
+    if [ "$STATUS" -ne 0 ]; then
+        MESSAGE="Claude Notch is not running."
+    else
+        MESSAGE=$(printf '%s' "$REPLY_BODY" | sed -n 's/.*"message":"\(.*\)".*/\1/p')
+        [ -n "$MESSAGE" ] || MESSAGE="HTTP $CODE"
+    fi
+    printf 'notch: %s\n' "$MESSAGE" >&2
+    return 1
+}
+
+# Corps de « show » à partir des options.
+body() {
+    BODY="{\"client\":$(json "$CLIENT")"
+    add id "$ID"
+    add title "$TITLE"
+    add text "$TEXT"
+    add detail "$DETAIL"
+    add icon "$ICON"
+    add color "$COLOR"
+    add app "$APP"
+    [ -z "$TTL" ] || BODY="$BODY,\"ttl\":$TTL"
+    BODY="$BODY}"
+}
+
+CMD=${1:-help}
+[ $# -gt 0 ] && shift
+TITLE= TEXT= DETAIL= ICON= COLOR= TTL= ID= APP= CLIENT=notch
+while [ $# -gt 0 ]; do
+    case "$1" in
+    --)
+        shift
+        break
+        ;;
+    --title | --text | --detail | --icon | --color | --ttl | --id | --app | --client)
+        [ $# -ge 2 ] || die "$1 needs a value"
+        case "$1" in
+        --title) TITLE=$2 ;;
+        --text) TEXT=$2 ;;
+        --detail) DETAIL=$2 ;;
+        --icon) ICON=$2 ;;
+        --color) COLOR=$2 ;;
+        --ttl) TTL=$2 ;;
+        --id) ID=$2 ;;
+        --app) APP=$2 ;;
+        --client) CLIENT=$2 ;;
+        esac
+        shift 2
+        ;;
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    *)
+        [ "$CMD" = run ] && break
+        die "unknown option: $1 (see notch help)"
+        ;;
+    esac
+done
+
+# Des chiffres seulement (rien ne s'ajoute au JSON), et un identifiant sûr dans une URL.
+case "$TTL" in
+'' | [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) ;;
+*) die "--ttl: whole number of seconds, 1 to 3600" ;;
+esac
+case "$ID" in
+*[!A-Za-z0-9._-]*) die "--id: letters, digits, dot, dash or underscore" ;;
+esac
+
+case "$CMD" in
+show)
+    [ $# -eq 0 ] || die "unexpected argument: $1 (see notch help)"
+    body
+    send POST "" "$BODY" || exit 1
+    printf '%s\n' "$REPLY_BODY" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'
+    ;;
+clear)
+    [ $# -eq 0 ] || die "unexpected argument: $1 (see notch help)"
+    if [ -n "$ID" ]; then send DELETE "/$ID" || exit 1; else send DELETE "" || exit 1; fi
+    ;;
+run)
+    [ $# -gt 0 ] || die "run needs a command, for example: notch run -- make"
+    [ -n "$TITLE" ] || TITLE=$(basename "$1" | cut -c1-40)
+    [ -n "$ID" ] || ID="run-$$"
+    ICON=hourglass COLOR=yellow TEXT="…" TTL=3600 DETAIL=
+    body
+    # API coupée ou app fermée : la commande tourne quand même, sans intercalaire.
+    if send POST "" "$BODY"; then NOTIFY=1; else NOTIFY=; fi
+    START=$(date +%s)
+    # Ctrl-C arrête la commande (même groupe de processus) ; le shell attend sa fin puis affiche la croix.
+    trap ':' INT TERM
+    "$@"
+    STATUS=$?
+    trap - INT TERM
+    ELAPSED=$(($(date +%s) - START))
+    if [ "$ELAPSED" -lt 60 ]; then
+        TEXT="${ELAPSED}s"
+    elif [ "$ELAPSED" -lt 3600 ]; then
+        TEXT=$(printf '%dm%02d' $((ELAPSED / 60)) $((ELAPSED % 60)))
+    else
+        TEXT=$(printf '%dh%02d' $((ELAPSED / 3600)) $((ELAPSED % 3600 / 60)))
+    fi
+    if [ "$STATUS" -eq 0 ]; then
+        ICON=checkmark.circle.fill COLOR=green DETAIL=
+    else
+        ICON=xmark.circle.fill COLOR=red DETAIL="exit code $STATUS"
+    fi
+    TTL=60
+    body
+    [ -z "$NOTIFY" ] || send POST "" "$BODY" || :
+    exit "$STATUS"
+    ;;
+help | -h | --help)
+    usage
+    ;;
+*)
+    die "unknown command: $CMD (see notch help)"
+    ;;
+esac

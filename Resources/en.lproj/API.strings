@@ -1,0 +1,25 @@
+/* Claude Notch: English texts of the local API (Settings, Scripts, ear tabs of scripts). The key is the French text used in the code. */
+"%@ · %d appel" = "%@ · %d call";
+"%@ · %d appels" = "%@ · %d calls";
+"API locale" = "Local API";
+"Ancienne version" = "Older version";
+"Aucun pour l'instant" = "None yet";
+"Autoriser les scripts de ce Mac à poser des intercalaires" = "Let scripts on this Mac add ear tabs";
+"Build fini" = "Build done";
+"Commande notch" = "notch command";
+"Coupée par défaut. Seuls les programmes de ton compte qui lisent son jeton (un fichier réservé à ton compte, renouvelé à chaque lancement) peuvent l'appeler, jamais une page web. Un intercalaire ne lance rien : un texte court, une icône de la liste et, au plus, un bouton qui ouvre une app." = "Off by default. Only programs of your account that read its token (a file only your account can read, renewed at each launch) can call it, never a web page. An ear tab runs nothing: a short text, an icon from the list and, at most, a button that opens an app.";
+"Derniers clients" = "Recent clients";
+"Installer" = "Install";
+"Installée" = "Installed";
+"Installée seulement sur ton clic, jamais par-dessus un autre programme. Si le terminal ne la trouve pas, ajoute ~/.local/bin à ton PATH. Toutes les options : docs/API.md." = "Installed only when you click, never over another program. If the terminal does not find it, add ~/.local/bin to your PATH. All the options: docs/API.md.";
+"La commande n'est pas livrée avec cette copie de l'app." = "This copy of the app does not include the command.";
+"Le nom que chaque programme se donne, gardé en mémoire jusqu'à la fermeture de l'app." = "The name each program gives itself, kept in memory until the app quits.";
+"Mettre à jour" = "Update";
+"Ouvrir %@" = "Open %@";
+"Pas installée" = "Not installed";
+"Pas livrée avec cette copie de l'app" = "Not included in this copy of the app";
+"Retirer" = "Remove";
+"Scripts" = "Scripts";
+"Un autre programme porte ce nom" = "Another program has this name";
+"Un autre programme s'appelle déjà « notch » à cet endroit : rien n'a été modifié." = "Another program is already called “notch” there: nothing was changed.";
+"via %@" = "via %@";
