@@ -57,6 +57,22 @@ enum LaunchAgent {
         return true
     }
 
+    /// LaunchAgent présent mais tourné vers un autre exécutable (app renommée en Oriel.app, ou réinstallée
+    /// ailleurs) : réécrit vers `executable`. Absent (option décochée) ou illisible : rien. Rend vrai s'il a changé.
+    @discardableResult
+    static func refresh(in directory: URL = directory, executable: String? = Bundle.main.executablePath) -> Bool {
+        guard let executable, let data = try? Data(contentsOf: plistURL(in: directory)),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              plist["ProgramArguments"] as? [String] != [executable] else { return false }
+        do {
+            try write(executable: executable, in: directory)
+        } catch {
+            NSLog("ClaudeNotch : mise à jour du LaunchAgent impossible (%@).", String(describing: error))
+            return false
+        }
+        return true
+    }
+
     private static func write(executable: String, in directory: URL) throws {
         let plist: [String: Any] = [
             "Label": label,

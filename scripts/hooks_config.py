@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ajoute ou retire les hooks Claude Notch dans settings.json.
+"""Ajoute ou retire les hooks d'Oriel dans settings.json.
 
     hooks_config.py install <chemin du script de hook>
     hooks_config.py uninstall
@@ -39,8 +39,8 @@ EVENTS = [
     "PreCompact",
     "PostCompact",
 ]
-REWAKE_MESSAGE = "Message from the user, sent from Claude Notch:"
-REWAKE_SUMMARY = "Message from Claude Notch"
+REWAKE_MESSAGE = "Message from the user, sent from Oriel:"
+REWAKE_SUMMARY = "Message from Oriel"
 
 
 def entries(hook_path):
@@ -163,7 +163,7 @@ def main():
         print(f"{path} : déjà à jour.")
         return
     write(path, settings)
-    print(f"{path} : hooks Claude Notch {'installés' if sys.argv[1] == 'install' else 'retirés'}.")
+    print(f"{path} : hooks d'Oriel {'installés' if sys.argv[1] == 'install' else 'retirés'}.")
 
 
 if __name__ == "__main__":

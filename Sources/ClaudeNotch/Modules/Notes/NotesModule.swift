@@ -297,6 +297,22 @@ final class NotesModule: NotchModule {
         insertEmptyNote()
     }
 
+    /// Barre de commande : une note avec ce texte (plafonné), sélectionnée ; la note vide qui attendait disparaît.
+    /// Faux au plafond de notes.
+    @discardableResult
+    func addNote(_ text: String) -> Bool {
+        loadIfNeeded()
+        let text = String(text.prefix(Self.maxLength))
+        guard !text.isEmpty, notes.count < Self.maxNotes else { return false }
+        purgeEmpty(keeping: nil)
+        let note = Note(text: text, created: clock())
+        notes = (notes + [note]).sorted(by: Note.isOrderedBefore)
+        selectedID = note.id
+        save()
+        file.flush()
+        return true
+    }
+
     /// Texte tapé dans l'éditeur. Rend le texte retenu (tronqué au plafond).
     @discardableResult
     func setText(_ text: String, for id: UUID) -> String {

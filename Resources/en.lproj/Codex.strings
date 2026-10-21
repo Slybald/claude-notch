@@ -66,7 +66,7 @@
 "hooks.json illisible" = "Unreadable hooks.json";
 "Corrige-le ou ouvre les réglages pour voir pourquoi." = "Fix it, or open Settings to see why.";
 "À approuver dans Codex" = "To approve in Codex";
-"Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex)." = "Codex ignores the Claude Notch hooks until you approve them.\n1. Click \"Approve in Codex\".\n2. Start a new conversation in the ChatGPT app (or run codex).";
+"Codex ignore les hooks d'Oriel tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex)." = "Codex ignores the Oriel hooks until you approve them.\n1. Click \"Approve in Codex\".\n2. Start a new conversation in the ChatGPT app (or run codex).";
 "Approuver dans Codex" = "Approve in Codex";
 "Ouvre une nouvelle conversation dans l'app ChatGPT ou lance codex dans un terminal. Les conversations déjà ouvertes ne sont pas suivies." = "Start a new conversation in the ChatGPT app, or run codex in a terminal. Conversations that are already open are not tracked.";
 
@@ -78,7 +78,7 @@
 "1. Clique sur « Approuver dans Codex »." = "1. Click \"Approve in Codex\".";
 "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex) : les conversations déjà ouvertes ne sont pas suivies." = "2. Start a new conversation in the ChatGPT app (or run codex): conversations that are already open are not tracked.";
 "Vérifier" = "Check";
-"Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché." = "Claude Notch only writes ~/.codex/hooks.json (timestamped backup); your notify is never touched.";
+"Oriel n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché." = "Oriel only writes ~/.codex/hooks.json (timestamped backup); your notify is never touched.";
 "« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml (la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : « Review hooks » dans l'app, /hooks dans le terminal." = "\"Approve\" asks Codex itself to record the approval of these hooks in config.toml (the request behind the app's \"Review hooks\" button). You can also review them yourself: \"Review hooks\" in the app, /hooks in the terminal.";
 
 /* Demandes à Codex */
@@ -89,6 +89,12 @@
 "Un réglage plus prioritaire (administrateur, projet) impose l'état de ces hooks." = "A higher-priority setting (administrator, project) sets the state of these hooks.";
 "réponse inattendue" = "unexpected answer";
 "Codex s'est arrêté" = "Codex stopped";
-"Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé)." = "Codex does not see the Claude Notch hooks (hooks.json not loaded).";
+"Codex ne voit pas les hooks d'Oriel (hooks.json non chargé)." = "Codex does not see the Oriel hooks (hooks.json not loaded).";
 "Hooks approuvés. Ouvre une nouvelle conversation Codex pour les voir à l'œuvre." = "Hooks approved. Start a new Codex conversation to see them at work.";
 "Codex n'a pas approuvé %d hooks." = "Codex did not approve %d hooks.";
+
+/* Quota */
+"pas de quota pour ce compte" = "no quota for this account";
+"Afficher le quota (5 h et 7 jours)" = "Show quota (5 h and 7 days)";
+"Quota" = "Quota";
+"Lu par Codex lui-même (compte ChatGPT), seulement panneau ouvert : au plus une fois par minute, puis toutes les 5 min. Rien sans compte ChatGPT." = "Read by Codex itself (ChatGPT account), only while the panel is open: at most once a minute, then every 5 min. Nothing without a ChatGPT account.";

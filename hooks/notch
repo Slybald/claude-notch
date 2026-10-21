@@ -1,6 +1,6 @@
 #!/bin/sh
 # claude-notch-cli
-# notch : pose des intercalaires dans la notch de Claude Notch depuis un terminal ou un script (API locale,
+# notch : pose des intercalaires dans la notch d'Oriel depuis un terminal ou un script (API locale,
 # docs/API.md). Le jeton est lu dans le fichier 0600 que l'app écrit tant que l'API est activée, et passé à curl
 # par -H @fichier, jamais en argument (invisible dans ps). Chaque texte est échappé pour JSON ici ; l'app le valide
 # ensuite (schéma strict, tailles bornées). Rien de ce que reçoit l'app n'est exécuté.
@@ -26,7 +26,7 @@ run    Shows an hourglass while COMMAND runs, then a check mark or a cross with 
        Exits with the status of COMMAND.
 clear  Removes one ear tab (--id) or all of them.
 
-Turn the local API on first: Claude Notch, Settings, Scripts. Icons and colors: docs/API.md.
+Turn the local API on first: Oriel, Settings, Scripts. Icons and colors: docs/API.md.
 EOF
 }
 
@@ -64,7 +64,7 @@ add() {
 # Requête à l'app : méthode, fin du chemin, corps JSON éventuel. Corps de la réponse dans $REPLY_BODY.
 send() {
     [ -r "$TOKEN" ] || {
-        printf 'notch: the local API is off or Claude Notch is not running (Settings, Scripts).\n' >&2
+        printf 'notch: the local API is off or Oriel is not running (Settings, Scripts).\n' >&2
         return 1
     }
     OUT=$(mktemp "${TMPDIR:-/tmp}/notch.XXXXXX") || return 1
@@ -83,7 +83,7 @@ send() {
     2??) return 0 ;;
     esac
     if [ "$CURL_STATUS" -ne 0 ]; then
-        MESSAGE="Claude Notch is not running."
+        MESSAGE="Oriel is not running."
     else
         MESSAGE=$(printf '%s' "$REPLY_BODY" | sed -n 's/.*"message":"\(.*\)".*/\1/p')
         [ -n "$MESSAGE" ] || MESSAGE="HTTP $CODE"

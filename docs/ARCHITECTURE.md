@@ -3,6 +3,10 @@
 For contributors. The [README](../README.md) describes the product; this page explains how the code is
 organised and why some choices were made, so they are not undone by accident.
 
+The product is called Oriel (formerly Claude Notch). Internal names keep the old one on purpose: the Swift module
+and `Sources/ClaudeNotch`, the executable `ClaudeNotch`, the bundle identifier, the data folder, the hook scripts.
+The list and the reasons are in [RENAME.md](RENAME.md).
+
 ## Commands
 
 - `swift build`: must produce **zero warnings** (the only tolerated one is the toolchain's
@@ -32,8 +36,8 @@ organised and why some choices were made, so they are not undone by accident.
 - `HookServer`: minimal HTTP server on 127.0.0.1:47823. It resolves the process context *before* replying,
   while the hook process is still alive. Exact `Host`, no `Origin`, token (`HookAccess`) on every route but
   `/health` and `/api/…`; `/permission` and `/inbox` are long requests handed to `ReplyCenter`; `/codex/hook` and `/codex/permission` do the
-  same for Codex (`CodexRelay`); `/api/…` goes to `LocalAPI` with its own token. `HookEvent`: tolerant JSON
-  reading, every field optional.
+  same for Codex (`CodexRelay`); `/claude/status` hands the `statusLine` JSON to `ClaudeUsageStore` (quota gauges);
+  `/api/…` goes to `LocalAPI` with its own token. `HookEvent`: tolerant JSON reading, every field optional.
 - `ProcessInspector`: walks the ancestors of the hook's `$PPID` to find the Claude process, the host app
   (outermost `.app` bundle) and the source (CLI or Desktop). `ClaudeMonitor`: is Claude Desktop running,
   which `claude` processes are alive (2 s scan, only while the Claude tab is on).
@@ -45,6 +49,12 @@ organised and why some choices were made, so they are not undone by accident.
   and `EarTabViews` (their drawing), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen. `NotchShell`: rules tested without a real screen (visibility, screen choice, real or
   virtual notch, "hidden until" text). `HotKeys`: global shortcuts and the keys of the panel.
+- `Command/`: the command bar. `CommandBarModel` (pure: `CommandVerb`, `CommandQuery`, `NotchCommand`, `CommandParser`,
+  `FuzzyMatch`, the model that routes a query to the modules and ranks the answers) and `CommandBarView` (the field, an
+  AppKit `NSTextField` because SwiftUI's `TextField` gets no ↑ ↓ before macOS 14, the rows, the prefix chips).
+- `Bubble` (pure: phases, detach and magnet thresholds, screen clamping, position per screen, revolver geometry and
+  detents, drop shapes), `BubbleViews` (corner handle, drop canvas, revolver bubble, bubble panel) and `BubbleWindow`
+  (`BubbleController`: the bubble window, the drop window, detaching and reattaching). See "Detached notch" below.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
   per module:
   - `Claude/`: sessions, compact summary, Claude settings. `ReplyCenter` holds the long requests of `/permission`
@@ -52,13 +62,20 @@ organised and why some choices were made, so they are not undone by accident.
     `ApprovalQueue` (approve with the keyboard, see below) and `ApprovalViews` (key caps, rank, settings row);
     `ConversationViews` draws the conversation of a session (last lines, message field, or "Answer in *app*" +
     **Open**) and the card that proposes to turn replies on.
+  - `Quota/`: not a tab. `QuotaModels` (`QuotaWindow`, `QuotaSnapshot`: percent, reset, 5 h / 7 d labels, expiry) and
+    `QuotaViews` (the ring and the one-line strip shared by the Claude and Codex tabs).
   - `Codex/` (`codex`): `CodexModule` (tab, ears, settings, `CodexRelay` for the server), `CodexStore` (per-session state
     machine fed by Codex's hooks, one `kqueue` per Codex process, one-shot deadlines, no periodic timer),
     `CodexApprovals` (the held `PermissionRequest` requests), `CodexHookInstaller` (`~/.codex/hooks.json`),
-    `CodexProcess` (Codex process and host app from the hook's `$PPID`), `CodexViews`. See [CODEX.md](CODEX.md).
+    `CodexProcess` (Codex process and host app from the hook's `$PPID`), `CodexUsage` (quota gauge store), `CodexViews`.
+    See [CODEX.md](CODEX.md).
   - `Media/` (`media`): `MediaModule` (life cycle, settings), `NowPlaying` (state rebuilt from the
     `mediaremote-adapter` JSON lines; `MediaRemoteAdapter` runs the helper and restarts it with a growing delay),
-    `MediaCalendar` (EventKit and the Calendar opener), `MediaViews`.
+    `MediaCalendar` (week maths and the Calendar opener), `MediaViews`.
+  - `Agenda/` (`agenda`): `AgendaModule` (calendar access, one planned wake-up, ears), `AgendaModels` (pure: `MeetingLink`,
+    `AgendaMath.focus` / `nextWake`, texts), `AgendaViews` (tab, unfolded index tab, compact line, settings).
+    `Modules/CalendarSource.swift` (shared with Media): `CalendarSource`, `EventKitCalendar`, `MediaEvent` (with `location`
+    and `meeting`). See "Agenda: a live index tab" below.
   - `QuickSettings/` (`quicksettings`): `QuickSettingsModule` (tiles, scenes, caffeine, automatic switch),
     `QuickSettingsBackends` (the system accesses, behind protocols: CoreWLAN, IOBluetooth loaded at runtime,
     `pmset`, IOPS, IOPMAssertion, `shortcuts run`), `QuickSettingsModels` (pure parsers and state), `QuickSettingsViews`.
@@ -95,7 +112,7 @@ organised and why some choices were made, so they are not undone by accident.
 - `Localization`: the `L()` helper, with an optional table. `LaunchAgent`: open at login.
 - `Updater`: automatic updates from GitHub releases (check, signature, install, relaunch) and its menu items.
 - `LocalAPI`: the local API of the user's scripts (`/api/v1/ears`, see [API.md](API.md)): token, strict schema
-  (`ExternalEar`), rate limit, expiry, the ear tabs it hands to `ModuleRegistry` (ids `api.<id>`), and `NotchCommand`
+  (`ExternalEar`), rate limit, expiry, the ear tabs it hands to `ModuleRegistry` (ids `api.<id>`), and `NotchCLI`
   (installs `hooks/notch` in `~/.local/bin`). `LocalAPIViews`: the unfolded card of a script's tab and Settings › Scripts.
 
 ## Modules (tabs)
@@ -109,7 +126,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   `title`, SF Symbol `symbol`, `makeView()`. Optional, with defaults: `makeCompactView()` (full-screen summary),
   `ears` (with a `priority`), `keepsRunningWhenCollapsed`, `makeSettingsView()` (a `SettingsPane`, listed in the
   settings sidebar), `licenseNotices` (About › Licenses), `makeTabIcon()`, `makeHeaderAccessory()`,
-  `isEnabledByDefault`, `start()` / `stop()`.
+  `isEnabledByDefault`, `start()` / `stop()`, `commandVerb` and `commands(for:)` (the command bar, below).
 - **Life cycle**: the registry calls `start()` when a module is enabled *and* useful (the panel is open, or the
   module returns `keepsRunningWhenCollapsed`, re-read after each of its `objectWillChange`), and `stop()` as soon
   as that is no longer true, including when it is disabled. Stopped, a module does no work at all: no timer, no
@@ -117,7 +134,8 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   compact mode has its summaries.
 - **Running while collapsed** (`keepsRunningWhenCollapsed`): Clipboard while its capture is not suspended (the
   history must not have holes); Player while its tab and its ears are on; Quick Settings while a caffeine is
-  active or the automatic switch is on; Timer while a timer counts, is paused, or shows its "Done" ears.
+  active or the automatic switch is on; Timer while a timer counts, is paused, or shows its "Done" ears; Agenda while
+  Calendar access is granted and its ears are on (see "Agenda" below).
 - **Views** are built on demand (shown tab, compact mode, settings) and thrown away: state that must survive a
   tab switch lives in the module (`@Published`). Content width and maximum height come from the environment
   (`\.notchContentWidth`, `\.notchContentMaxHeight`): the whole panel must stay under 460 pt.
@@ -152,14 +170,21 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **Ears = index tabs** (collapsed notch; Claude only while its tab is on; Codex is an ordinary module here, see
   "Codex" below). Every activity that has ears gets its own tab against the notch: Claude (waiting for you >
   working > just finished, 5 s) first, then the running modules by decreasing priority (timer 5, Codex 9 while it waits
-  and 6 otherwise, player 1, caffeine −10; tab order breaks ties). The first goes on the left against the notch, the second
+  and 6 otherwise, agenda 6 five minutes before an appointment and 2 otherwise, player 1, caffeine −10; tab order breaks ties). The first goes on the left against the notch, the second
   on the right against it, then each side one step further (`EarTabs.distribute`, pure): at most three per side, and with
   more than six the sixth place becomes "+N" (the activities left out). "Show the ears" off: the collapsed notch is exactly
   the notch. Module ears also keep the notch window on screen. This replaced the 1.2.2 rotation (Claude and the other
   ears took turns every 4 s, with its `Timer`, `EarsRotation` and `appearance.alternateEars`): it was a misreading of
   "index tabs", which are side by side, not one after another.
+  - **Geometry** (`EarTabsGeometryTests`, measured on the rendered silhouette against the physical notch): the collapsed
+    shape on a real notch has no top flares (`topRadius` 0), so it is exactly `notchRect` (185 × 32 pt on the 14" built-in
+    display: screen width − the two auxiliary areas) and `contentSize` equals the notch; the 6 pt flares are kept only on
+    the virtual notch and once expanded. The tab against the notch has exactly its height (no step), its rank-0 `overlap`
+    runs down to the notch's bottom so no gap is left in the notch's rounded bottom corners, and the deployed card's inner
+    corner radius never starts above the notch's bottom.
   - **Look** (`EarTabViews.swift`): each tab is its own shape (rounded outer bottom corner) drawn in the notch's black,
-    one step shorter than the previous one going outwards (a staircase, `EarTabs.height`), with a discreet accent per
+    the first as tall as the notch, then one step shorter than the previous one going outwards (a staircase,
+    `EarTabs.height`), with a discreet accent per
     activity (`EarTabs.accentHex`: Claude takes the accent of the settings). Setting `appearance.earTabs`
     (`EarTabsMode`): **visible** (default: icon and a very short text, `4:59`, `1·6`, equalizer bars, always readable at a
     glance, same footprint as the old ears for the usual Claude + player case) or **retracted** (8 pt sliver until
@@ -199,6 +224,30 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   AppleScript arguments never go through string interpolation. A Mail reply leaves only through
   `MailModule.sendReply()` (click on Send or Return in the field), never on open, refresh or close. Under XCTest the default accesses are inert
   (`ModuleEnvironment.isTesting`): tests never read real messages or run `osascript` (except the closed-Mail guard).
+- **Command bar** (`Command/`, opened by `keyboard.commandBar` or **…** › **Command Bar…**, `NotchViewModel.isCommandBarOpen`):
+  it replaces the panel's content while it is open (`NotchRootView`), takes the keyboard like a text field
+  (`NotchKeyboard`) and closes together with the panel (Esc, a command run, the shortcut again: `closeCommandBar` =
+  `collapse`). The commands come from the modules, not from a list in the bar: a module (or the local API: both are a `CommandSource`) declares one `commandVerb` (a
+  letter or `>`, never translated) and answers `commands(for: CommandQuery)` with `NotchCommand`s (id, symbol, title,
+  detail, score, `run`). Rules: `commands(for:)` is pure and `run` only executes on Return or a click on the row
+  (`CommandBarTests.testNothingRunsBeforeReturn`); `run` returns a failure message instead of closing the bar when the
+  action did not happen (Claude's full queue); the bar asks `registry.commandSources` (the modules enabled **and**
+  running, then the scripts' tabs), so a search never starts a stopped or hidden module; with a verb typed only that module is asked, without one every module
+  is asked and answers only what is unambiguous (a duration with its unit, a scene, an email or an event with 3+ letters),
+  the clipboard and the scripts' tabs never; at most five rows (the panel stays under 460 pt: `CommandBarSnapshotTests.testFullBarFitsInPanel`). The grammar
+  is one-key verbs shown under the field (`t` timer, `n` note, `c` clipboard, `s` scene or fans back to macOS, `m` latest
+  emails, `a` agenda, `i` scripts' tabs, `>` Claude; keys only when the names do not fit), no natural language; a letter is a verb only before a
+  space, so plain text stays plain. Typed, the verb leaves the field and becomes a pill; Backspace on an empty field
+  brings it back. Ranking: score, then tab order, then the module's own order; `FuzzyMatch` is case and accent blind,
+  every word must match, a word matches by inclusion (best at the start of the text or of a word) or, in a text of 64
+  characters or less, by letters that follow closely. A module's commands live in its folder (`TimerCommands`,
+  `NotesCommands`, `ClipboardCommands`, `QuickSettingsCommands`, `ClaudeCommands`, `MailCommands`, `AgendaCommands`,
+  and `LocalAPICommands` for the scripts' tabs); an email opens in Mail (never a reply), a meeting is joined through
+  `AgendaModule.join` (same link check as its button); texts are in the `Command` table.
+  The Claude verb exists only with "Reply from the notch" on, and sends through `ReplyCenter.send` like the chat
+  field. VoiceOver: the field is labelled, rows are buttons with title and detail, the chips say their key, and the
+  results count and the selected row are announced because the focus stays in the field (`announcementRequested`;
+  checked by the code only, not with a running VoiceOver).
 - **Localization per table**: `L("…", table: "Media")` or `Text("…", tableName: "Media")`; without a table,
   `Localizable`. `LocalizationTests` checks every table: each key used in the code is translated in its table, no
   unused keys, French identity, same format specifiers, same tables in `en.lproj` and `fr.lproj`.
@@ -210,7 +259,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   this wrong (visibility "when Claude is open", Claude tab that could not be disabled, hooks pushed at every
   launch); 1.2.1 fixed it.
   - **Detection** (`HookInstaller.claudeCodePresent`): `~/.claude` or `$CLAUDE_CONFIG_DIR` is a folder. Hooks
-    already installed by Claude Notch live in `~/.claude`, so they count. Never real under XCTest
+    already installed by Oriel live in `~/.claude`, so they count. Never real under XCTest
     (`claudeCodeOnThisMac` checks `NSClassFromString("XCTestCase")`).
   - **Decided once** (`Preferences.decideClaudeTab`, `AppCore.start`): at the first launch of 1.2.1 or later, the
     Claude tab is enabled only if Claude Code is detected, and the result is saved in `tabs.enabled`. It never
@@ -308,6 +357,29 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     (`waiting`, `queued`, `headless`, `none`).
 - **CLI, same version** (interactive `claude` in a pty): `PermissionRequest` is called for Bash and AskUserQuestion,
   the terminal dialog stays up ("Allowed by PermissionRequest hook" when the hook answers first).
+- **Quota gauges** (`Modules/Quota/`, `ClaudeUsage`, `StatusLineRelay`, `CodexUsage`; docs in README › Quota gauges and
+  [CODEX.md](CODEX.md)). One ring per window (5 h, 7 d), amber from 80 %, red from 95 %, under the session list of the Claude and
+  Codex tabs and in their compact summary (so also in the unfolded index tab and the full screen summary, where the strip drops
+  the reset times when too narrow and carries the agent's name). Nothing when the tab is off or there is no figure; no ear.
+  - **Claude**: the only source is the `statusLine` JSON (`rate_limits.five_hour` / `seven_day`: `used_percentage`,
+    `resets_at` in epoch seconds; absent without Pro or Max and before the first answer of a session; hooks do not carry it).
+    Measured on Claude Code 2.1.304 by running one short real session with a capture script as `statusLine`: the first call has
+    no `rate_limits`, the one after the first answer has both windows. Claude Code allows ONE `statusLine` command, so
+    `StatusLineInstaller` (Settings › Claude › Show quota, off by default) swaps the `command` for `hooks/claude-notch-statusline.sh`
+    in place (other keys such as `padding` and the key order stay, timestamped backup, `HookInstaller.loadSettings` / `save`),
+    keeps the old command in `claude-notch-statusline.previous` (0600, next to the script) and the script runs it again with
+    the same JSON (`sh -c`, as Claude Code does). Not a plain command (`type` other than `command`, no `command`): refused,
+    nothing touched. Uninstall (the switch, or Uninstall Oriel) puts the exact old command back; a `statusLine` the user
+    changed since is left alone. The script POSTs to `/claude/status` only when the JSON has `rate_limits`, never fails the
+    status line (`curl` 1 s at most, app closed = nothing), and `ClaudeUsage.parse` keeps only the percentages and reset times,
+    in memory. `HookServer.isPaused` (Claude tab off) answers 204 without reading. The figure is the account's, so the last one
+    received from any session is the one shown; windows past `resets_at` are dropped, like Claude Code does.
+  - **Codex**: `CodexAppServer.rateLimits()` (`account/rateLimits/read`, one process of about 1 s). `CodexUsageStore` reads only
+    between `CodexModule.start()` and `stop()` (panel open): cache of 60 s, one 5-minute timer, an error keeps the last figure and
+    waits 15 min, `forget()` (tab or setting off) discards a read still in flight. The intercalaire hides a figure older than 15 min.
+  - Tests: `QuotaTests` (both parsers, store with a double, installer, real relay script against the real server) and
+    `QuotaSnapshotTests` (PNG). `StatusLineInstaller.standard` points at a missing folder under XCTest: a test never touches the
+    real `~/.claude`.
 - **Codex** (measured on Codex CLI 0.154, details in [CODEX.md](CODEX.md)): the tab follows Codex through its own
   hooks (`~/.codex/hooks.json`), never `notify` or `config.toml`, never the compressed rollout files.
   - **Same optional rules as Claude**: `CodexHookInstaller.codexPresent` (`~/.codex`, `$CODEX_HOME`, `Codex.app`, a
@@ -405,6 +477,41 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   - The window is 800 × 480 pt so the widest custom panel (720 pt), its radii and shadow fit. A light custom
     background is darkened (relative luminance ≤ 0.06): the panel is always dark-themed, its text white.
   - "Invisible in screenshots" sets `sharingType = .none`; it does not touch the window level.
+- **Detached notch (bubble)** (`Bubble*.swift`, `NotchViewModel.bubble`, settings `bubble.*`):
+  - **Phases** (`BubblePhase`, pure): attached → detaching (drag from the corner) → bubble ⇄ bubble panel → reattaching →
+    attached; `reset` goes straight back (setting turned off). While detached the notch never expands: hover and click on
+    the notch do nothing, an index tab opens the bubble panel on its tab, the global shortcut toggles the bubble panel,
+    the command bar opens inside the bubble panel (and closes with it, or at reattach), a keyboard approval opens its
+    card there (`revealApproval`), `collapse()` (open a session, settings…) closes it. A file dragged to the notch does not open the Shelf then.
+  - **Handle**: an arc and a dot in the bottom right corner of the expanded panel (not in compact full screen nor in tab
+    edit mode). A 0.3 s long press (SwiftUI) starts the drag; the drags and the mouse-up then come from a local event
+    monitor (they go to the window of the mouse-down, even outside it) that is removed at the mouse-up. Menu, right
+    click and VoiceOver detach without dragging (`detachAutomatically`).
+  - **Drop** ("gooey" metaballs): a separate window under the notch, a `Canvas` with `blur` then `alphaThreshold`
+    (macOS 12+, no shader). Shapes are pure functions of the progress or the elapsed time (`Goo`, `GooState`): body (the
+    panel shrinking halfway towards the notch), a neck drawn as a band (circles alone break into beads once thin) pinched
+    in the middle down to 5.5 pt (`neckFloor`: thinner, the threshold erases it), and the drop. At 120 pt
+    (`detachDistance`) it snaps: the body springs back into the notch, the bubble window takes the drop's place at the
+    same size (scale 0.72) and bounces to 1, and the same drag keeps moving it. Released earlier, the drop goes back. The
+    notch view fades out while the drop replaces it (`gooActive`). `TimelineView(.animation)` only exists while a drop is
+    drawn; afterwards `goo = nil` and the window is ordered out. "Reduce motion": no drop, a half-transparent bubble
+    follows the mouse, then a fade.
+  - **Bubble window**: same level, collection behavior and "hide from capture" as the notch (`isFloatingPanel` before
+    `level`), created on first detach (`defer`), clamped to the visible frames (menu bar and Dock excluded). Position
+    stored per display label (`NotchScreenPicker.labels`) as an offset from the display origin, plus the last display;
+    a display that disappears sends the bubble back to the notch's display. Within 44 pt of the notch bottom it is
+    magnetized; released there it merges back (reverse drop). Hidden with the notch ("Hide the notch", full screen
+    "hidden").
+  - **Revolver** (`Revolver`, pure): one chamber per enabled tab in the user's order, active tab at the top (fixed
+    mark), `turn` counts detents without bounds so the spring always turns the short way. Scroll: 1 detent per wheel
+    line or per 28 pt of trackpad, momentum ignored (`RevolverScroll`); circular drag on the chambers: one detent per
+    angle step crossed, across ±π (`RevolverDrag`); click on a chamber turns it to the top; the hub or the top chamber
+    opens. A drag elsewhere moves the bubble, a double click on the rim reattaches. Scroll wheel and right click come
+    from an `NSHostingView` subclass (no scroll wheel API in SwiftUI before macOS 14). VoiceOver: one adjustable
+    element (swipe up/down turns), default action opens, a named action reattaches.
+  - **Bubble panel**: the same `ExpandedPanel` in a rounded shape; the window grows to the panel (top at the bubble's
+    top, clamped to the screen) and shrinks back after the transition. Closes like the notch panel: mouse leaving
+    after the close delay, click outside, Esc.
 - **Shape size** is reported through `NotchSizeKey` with a `max` reduce (a plain `nextValue()` let a sibling's
   default value win, leaving the hover zone at zero). The expanded panel stays under 460 pt.
 - **Window level**: `isFloatingPanel = true` must be set *before* `level`: that setter resets the level to
@@ -428,7 +535,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **Localization**: the French strings are the keys, English lives in `Resources/en.lproj`; any user-visible
   `String` goes through `L()`; `LocalizationTests` checks coverage.
 - **Code signature**: release builds are signed with a self-signed certificate (CN `Claude Notch Self-Signed`,
-  extended key usage `codeSigning`, 10 years), not ad hoc. The designated requirement of an ad hoc signature is
+  extended key usage `codeSigning`, 10 years; the name is kept after the rename to Oriel, it is shown nowhere), not ad hoc. The designated requirement of an ad hoc signature is
   the build's `cdhash`, which changes with every build, so macOS (TCC) sees each update as a new app and asks
   again for calendar, Bluetooth, Automation and protected folders. With the certificate the requirement is
   `identifier "<bundle id>" and certificate leaf = H"<SHA-1 of the certificate>"`, the same for every build
@@ -461,17 +568,30 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   release`, set by the release workflow) checks for updates; local builds and `scripts/install.sh` never do.
   The signal is a GitHub release (`/releases/latest`, drafts and pre-releases ignored), not a commit.
   Checks run 60 s after launch, then every 6 h (low-frequency timers with tolerance, ~0 % CPU).
-- **Signed updates**: a DMG is installed only if its Ed25519 signature (`ClaudeNotch-<v>.dmg.sig`, base64 of
+- **Signed updates**: a DMG is installed only if its Ed25519 signature (`Oriel-<v>.dmg.sig`, base64 of
   the signature of every byte of the DMG) matches the public key in `Updater.swift`. The CI signs with the
   `UPDATE_SIGNING_KEY` secret and checks the result against that public key, so a wrong secret fails the release
   instead of shipping an update nobody can install. The private key also lives in the maintainer's keychain;
-  losing it breaks automatic updates for every existing installation.
-- **Install**: `hdiutil attach` on a private mount point, the volume's `ClaudeNotch.app` must have our bundle
+  losing it breaks automatic updates for every existing installation. Each release carries two signed images of
+  the same app: `Oriel-<v>.dmg` (volume "Oriel", with `Oriel.app`) and `ClaudeNotch-<v>.dmg` (with `ClaudeNotch.app`),
+  because the Updater of 1.1.0 to 1.9.0 only looks for the old file name and the old bundle name. Keep the second
+  one as long as such versions can still be installed (see [RENAME.md](RENAME.md)).
+- **Install**: `hdiutil attach` on a private mount point, the volume's `Oriel.app` must have our bundle
   identifier and the announced version, `ditto` into a hidden folder next to the installed app (same volume),
-  detach, then two renames (current → `.ClaudeNotch-old.app`, new → current path) with a rollback if the second
-  fails: never a half-replaced app. Only from `/Applications` or `~/Applications` with a writable folder;
+  detach, then two renames (current → a hidden `-old.app` backup next to it, new → current path) with a rollback if
+  the second fails: never a half-replaced app. Only from `/Applications` or `~/Applications` with a writable folder;
   otherwise the menu links to the release page. `hdiutil` prints a deprecation notice on recent macOS; it stays
   because the app supports macOS 13.
+- **Rename `ClaudeNotch.app` → `Oriel.app`**: the Updater of 1.1.0 to 1.9.0 replaces `ClaudeNotch.app`, so the
+  new version first runs under that name. At launch it renames its own bundle to `Oriel.app` in place (a rename,
+  nothing is copied), points the LaunchAgent to the new path and relaunches from `Oriel.app` once it has quit
+  (one instance only). Neighbouring cases: an older `ClaudeNotch.app` next to an `Oriel.app` (same identifier,
+  lower or equal version) is quit and moved to the Trash, and the LaunchAgent is repointed; a newer
+  `ClaudeNotch.app` takes the place of the `Oriel.app`; an `Oriel.app` from another publisher is left alone and the
+  app keeps its `ClaudeNotch.app` folder. The repository rename relies on GitHub's 301 on `/releases/latest`, which
+  URLSession follows. Covered by `UpdaterTests.testLegacyUpdaterInstallsTheRenamedApp` and
+  `testLatestReleaseFollowsRepositoryRename`. What is kept (bundle identifier, certificate, executable name, data
+  folder, hook scripts…) and why: [RENAME.md](RENAME.md).
 - **When to install**: at launch, as soon as a version is found; later, only when no session is working or
   waiting (`SessionStore.hasBusySessions`), retried every 10 min. With the preference off, the version is only
   announced in the menu.
@@ -515,6 +635,30 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **The shelf keeps bookmarks, not copies**: `URL.bookmarkData` in `shelf.json` (0600) finds a moved file again and
   marks a missing one. Dragging items out offers copy or alias, never a move; the optional "remove after drag"
   only drops the reference from the shelf.
+
+- **Agenda: a live index tab, with one planned wake-up and no polling.** Once Calendar access is granted (asked only on a
+  click, never at launch) and the ears are on, the module runs collapsed too (`keepsRunningWhenCollapsed`). It listens to
+  `EKEventStoreChanged`, the day change, `NSSystemClockDidChange` and waking from sleep (a re-read each), and plans ONE
+  wake-up through `ModuleScheduler`: `AgendaMath.nextWake` returns the nearest of start − 15 min, start − 5 min, start,
+  end of any timed event, plus the next minute change while a countdown is shown (so one wake-up per minute during the
+  15-minute window, none the rest of the time). A wake-up reads the clock again and plans the next one; a re-read
+  replaces it. A re-read in flight swallows the changes that arrive meanwhile and costs one more read (an iCloud sync
+  sends dozens of notifications). The module could stop when nothing is left today, but then nothing could see an
+  event added later: it stays on the notification, not on a timer.
+  - **What shows** (`AgendaMath.focus`, pure): a timed event that ends in the future and lasts at most 12 hours (a trip
+    is not an appointment). From 15 min before: soon (calendar icon, grey), from 5 min: imminent (amber, camera when the
+    event has a link, `ModuleEars.alert` so it stays unfolded in *Retracted*, priority 6 above the timer), running
+    (green, `now`), then nothing. Imminent beats running (a double booking), the earliest wins a tie. The state colour
+    is `ModuleEars.accentHex`, which overrides the module's discreet accent.
+  - **Meeting link** (`MeetingLink.find`, pure): the event text is third-party input. Only `https` on the service's own
+    domain (Zoom `/j/` and `/my/`, Meet code `abc-defg-hij`, Teams `meetup-join` and `meet`, Webex, FaceTime `join`) is
+    kept, found in the URL field, then the location, then the notes (50 000 characters read at most, 2 048 per link). No
+    account in the address, no port, no `http`; `facetime:` only from the URL field. `AgendaModule.join` re-checks with
+    `MeetingLink.isOpenable` before `NSWorkspace.open`, and nothing opens without a click on **Join**.
+  - **Shared calendar code**: `CalendarSource`, `EventKitCalendar` and `MediaEvent` (now with `location` and `meeting`; the
+    notes are not kept) moved to `Modules/CalendarSource.swift`; the Player tab still reads its own week on demand.
+  - Tests: `AgendaTests` (links and look-alikes, thresholds, the whole countdown, a fake calendar changing, clock and
+    scheduler by hand) and `AgendaSnapshotTests` (`agenda-*.png`, `settings-agenda.png`).
 
 ## Conventions
 

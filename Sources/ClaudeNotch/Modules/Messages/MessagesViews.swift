@@ -26,7 +26,7 @@ struct MessagesPanel: View {
                 ModuleEmptyState(
                     symbol: "lock.shield", tint: Palette.amber,
                     title: L("Accès complet au disque requis", table: "Messages"),
-                    detail: L("Messages garde ses conversations dans un fichier protégé. Autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Accès complet au disque, puis relance l'app. Tout reste sur ton Mac.", table: "Messages"),
+                    detail: L("Messages garde ses conversations dans un fichier protégé. Autorise Oriel dans Réglages Système › Confidentialité et sécurité › Accès complet au disque, puis relance l'app. Tout reste sur ton Mac.", table: "Messages"),
                     action: ModuleAction(title: L("Ouvrir les Réglages", table: "Messages"), symbol: "gearshape", style: .prominent) {
                         module.openPrivacy(.fullDiskAccess)
                     })
@@ -41,7 +41,7 @@ struct MessagesPanel: View {
                 ModuleEmptyState(
                     symbol: "exclamationmark.triangle", tint: Palette.amber,
                     title: L("Format de Messages non reconnu", table: "Messages"),
-                    detail: L("Cette version de macOS range les conversations autrement : Claude Notch ne peut pas les lire pour l'instant.", table: "Messages"))
+                    detail: L("Cette version de macOS range les conversations autrement : Oriel ne peut pas les lire pour l'instant.", table: "Messages"))
                     .padding(.vertical, 14)
             case .ready:
                 ready
@@ -245,7 +245,7 @@ private struct MessageReplyBar: View {
 
     static func message(_ failure: AppleScriptFailure) -> String {
         switch failure {
-        case .notAuthorized: return L("Autorisation refusée : Claude Notch ne peut pas piloter Messages.", table: "Messages")
+        case .notAuthorized: return L("Autorisation refusée : Oriel ne peut pas piloter Messages.", table: "Messages")
         case .timedOut: return L("Messages ne répond pas.", table: "Messages")
         case .failed: return L("L'envoi a échoué.", table: "Messages")
         }

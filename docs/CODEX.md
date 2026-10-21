@@ -7,7 +7,7 @@ Short feasibility notes behind the **Codex** tab. Everything below was checked o
 ## Conclusion
 
 Codex ships **hooks** (the same idea as Claude Code's), which is the official, supported way to follow a session and
-to answer an approval. Claude Notch uses them, and nothing else:
+to answer an approval. Oriel uses them, and nothing else:
 
 | Need | Source | Status |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ to answer an approval. Claude Notch uses them, and nothing else:
 - **Hooks** live in `~/.codex/hooks.json` (or inline `[hooks]` in `config.toml`, or per project). Several sources
   run together, so ours never replaces the user's. `[features] hooks = false` turns them all off.
 - **Trust**: a new or changed hook is skipped until the user reviews it with `/hooks` in Codex. Codex then writes
-  `hooks.state."<file>:<event>:<group>:<hook>".trusted_hash` in `config.toml`. Claude Notch does not write this: the
+  `hooks.state."<file>:<event>:<group>:<hook>".trusted_hash` in `config.toml`. Oriel does not write this: the
   review stays the user's. `hooks/list` (app-server) reports `trustStatus` (`untrusted`, `trusted`, `modified`).
 - **Payload** (stdin JSON): `session_id`, `cwd`, `hook_event_name`, `model`, `permission_mode`, `transcript_path`
   (null here), plus `turn_id`, `prompt` (`UserPromptSubmit`), `tool_name` / `tool_input` / `tool_use_id`
@@ -74,18 +74,28 @@ stdio as a child process, on the default `~/.codex`. Measured with that very bin
   `session_id`) that opens the conversation. Not clicked live, so as not to move the user's window.
 - **Speed.** `hooks/list` answers in 0.1 to 0.5 s on a warm `CODEX_HOME`, 8 to 15 s on a brand-new one.
 
-## What Claude Notch does with it
+## What Oriel does with it
 
 - **State, read only.** `hooks.json` and `config.toml` (never written) give an estimate: not installed, installed, and
   per hook whether `config.toml` has a `trusted_hash` for its key. Then `codex app-server` is started for a moment
   (the app's own binary first, else the `codex` command; minimal environment, `CODEX_HOME` set) and `hooks/list` tells
   the truth (`modified` included). This runs by itself only while approval is pending (at most every 30 s); once the hooks
-  are active no Codex process is started unless you press **Check**. The tab says: *hooks not installed* → *to approve in Codex* → *active*. Any hook event
+  are active no Codex process is started for the hooks unless you press **Check** (the quota gauge below starts its own, short
+  one while the panel is open). The tab says: *hooks not installed* → *to approve in Codex* → *active*. Any hook event
   received also proves they run. While approval is pending and a view is shown, two `stat` calls every 2.5 s notice an
   approval made elsewhere (`/hooks`, the app), so the tab updates by itself; nothing runs when it is not pending.
 - **Approve, only on a click.** **Approve in Codex** (tab or Settings) starts `codex app-server`, lists the hooks, and
   sends `config/batchWrite` for the hooks whose command is our script *and* whose file is this `hooks.json`, nothing else,
   then lists again. Codex writes `config.toml` itself; the app never does.
+- **Quota gauge** (Settings › Codex › Show quota, on by default). `account/rateLimits/read` returns `rateLimits.primary` and
+  `secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` in seconds), `planType` and `credits`; the schema comes from
+  `codex app-server generate-json-schema`. Measured with the app's Codex 0.162 and the `codex` command 0.154 on a ChatGPT
+  sign-in: `primary` 300 min (5 h), `secondary` 10 080 min (7 days), the same figures from both, answered in 1.2 s,
+  one extra notification (`remoteControl/status/changed`) and no token in the answer. Codex reads it with its own sign-in;
+  the app starts `codex app-server` (same binary, minimal environment) and sends this one request. Only while the panel is
+  open: at once if the last figure is older than a minute, then every 5 minutes, one timer, stopped when the panel closes. An
+  error (API key, no sign-in, no Codex) keeps the last figure and waits 15 minutes. The `account/rateLimits/updated`
+  notification only reaches a client that owns a thread, so it is not used.
 
 ## What was not used, and why
 
@@ -109,8 +119,13 @@ stdio as a child process, on the default `~/.codex`. Measured with that very bin
 Settings › Codex › **Install Codex hooks** copies `codex-notch-hook.sh` to `~/.codex/hooks/` and adds one entry per
 event to `~/.codex/hooks.json`, after a timestamped backup (`hooks.json.claude-notch-YYYYMMDD-HHMMSS.bak`). It keeps
 the user's own hooks and key order, writes nothing when nothing changes, refuses an invalid file, and never touches
-`config.toml` or its `notify`. **Remove the hooks** (or Uninstall Claude Notch) takes only its entries away. Then
+`config.toml` or its `notify`. **Remove the hooks** (or Uninstall Oriel) takes only its entries away. Then
 **Approve in Codex** (or **Review hooks** in the ChatGPT app, or `/hooks` in a terminal), and start a new conversation.
+
+The app is now called Oriel (formerly Claude Notch), but the Codex entries keep their former name on purpose: the script
+`codex-notch-hook.sh` and the `statusMessage` "Claude Notch" that Codex shows while the notch holds a request. Codex
+drops its approval as soon as an entry changes, so they will change only with the next mandatory change of the Codex
+hooks. A refusal from the notch reaches Codex as "Denied from Oriel." (see [RENAME.md](RENAME.md)).
 
 Not covered: a hook turned off by hand in Codex (`enabled = false` in `hooks.state`) still counts as active, and no
 free-text answer or Codex question is possible (see above).
@@ -125,7 +140,7 @@ ChatGPT 0.162), pas supposées.
 ## Conclusion
 
 Codex a des **hooks** (même principe que ceux de Claude Code) : c'est la voie officielle pour suivre une session et
-répondre à une approbation. Claude Notch n'utilise qu'eux.
+répondre à une approbation. Oriel n'utilise qu'eux.
 
 - **Marche** : sessions en cours, travaille / terminé, dernier message ; autoriser ou refuser une commande ou un patch
   (hook `PermissionRequest` synchrone) ; ramener l'app hôte devant (app ChatGPT : ouvrir la conversation par
@@ -137,7 +152,7 @@ répondre à une approbation. Claude Notch n'utilise qu'eux.
 ## Points mesurés
 
 - Hooks dans `~/.codex/hooks.json` ; ils s'ajoutent à ceux de l'utilisateur. Un hook neuf ou modifié est **ignoré tant
-  que l'utilisateur ne l'a pas validé** avec `/hooks` dans Codex : Claude Notch n'écrit pas cette validation.
+  que l'utilisateur ne l'a pas validé** avec `/hooks` dans Codex : Oriel n'écrit pas cette validation.
 - Le hook tourne **avant** l'invite de Codex et **elle l'attend** : contrairement à Claude Code, le terminal n'affiche
   pas son dialogue en parallèle. La notch tient donc la demande 4 s si sa carte n'a jamais été vue, 60 s sinon, puis
   rend la main (sans décision) ; « Dans le terminal » la rend tout de suite. Timeout du hook : 75 s.
@@ -172,18 +187,28 @@ L'app Codex fait maintenant partie de **ChatGPT** (`/Applications/ChatGPT.app`, 
   `session_id` du hook) qui ouvre la conversation. Non cliqué en vrai, pour ne pas bouger la fenêtre de l'utilisateur.
 - **Vitesse.** `hooks/list` répond en 0,1 à 0,5 s sur un `CODEX_HOME` déjà utilisé, 8 à 15 s sur un neuf.
 
-## Ce que fait Claude Notch
+## Ce que fait Oriel
 
 - **État, en lecture seule.** `hooks.json` et `config.toml` (jamais écrit) donnent une estimation : non posés, posés, et
   pour chaque hook, présence d'un `trusted_hash` à sa clé. Puis `codex app-server` est lancé un instant (le binaire de
   l'app d'abord, sinon la commande `codex` ; environnement minimal, `CODEX_HOME` posé) et `hooks/list` dit la vérité
   (`modified` compris), tout seul seulement tant que l'approbation attend (au plus toutes les 30 s) ; une fois les hooks actifs,
-  aucun processus Codex n'est lancé sans que tu appuies sur **Vérifier**. L'onglet dit : *hooks non posés* → *à approuver dans Codex* → *actifs*. Un événement de hook reçu
+  aucun processus Codex n'est lancé pour les hooks sans que tu appuies sur **Vérifier** (la jauge de quota, plus bas, lance le
+  sien, bref, tant que le panneau est ouvert). L'onglet dit : *hooks non posés* → *à approuver dans Codex* → *actifs*. Un événement de hook reçu
   prouve aussi qu'ils tournent. Tant que l'approbation attend et qu'une vue est affichée, deux `stat` toutes les 2,5 s
   repèrent une approbation faite ailleurs (`/hooks`, l'app) : l'onglet se met à jour tout seul ; rien ne tourne hors attente.
 - **Approuver, sur un clic seulement.** **Approuver dans Codex** (onglet ou réglages) lance `codex app-server`, liste les
   hooks, envoie `config/batchWrite` pour ceux dont la commande est notre script *et* dont le fichier est ce `hooks.json`,
   rien d'autre, puis relit. Codex écrit `config.toml` lui-même ; l'app jamais.
+- **Jauge de quota** (Réglages › Codex › Afficher le quota, activé par défaut). `account/rateLimits/read` renvoie
+  `rateLimits.primary` et `secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` en secondes), `planType` et `credits` ;
+  le schéma vient de `codex app-server generate-json-schema`. Mesuré avec le Codex de l'app 0.162 et la commande `codex` 0.154
+  sur un compte ChatGPT : `primary` 300 min (5 h), `secondary` 10 080 min (7 jours), les mêmes chiffres des deux, réponse
+  en 1,2 s, une notification en plus (`remoteControl/status/changed`) et aucun jeton dans la réponse. Codex la lit avec sa propre
+  connexion ; l'app lance `codex app-server` (même binaire, environnement minimal) et n'envoie que cette requête. Seulement
+  panneau ouvert : tout de suite si le dernier chiffre a plus d'une minute, puis toutes les 5 minutes, un seul minuteur, arrêté
+  à la fermeture. Une erreur (clé d'API, pas de connexion, pas de Codex) garde le dernier chiffre et attend 15 minutes. La
+  notification `account/rateLimits/updated` n'arrive qu'à un client qui possède un fil : elle n'est pas utilisée.
 
 ## Pas utilisé
 
@@ -200,7 +225,13 @@ L'app Codex fait maintenant partie de **ChatGPT** (`/Applications/ChatGPT.app`, 
 Réglages › Codex › **Installer les hooks Codex** : copie du script dans `~/.codex/hooks/`, une entrée par événement dans
 `~/.codex/hooks.json`, après une sauvegarde horodatée ; tes hooks et l'ordre des clés restent ; rien n'est écrit si rien
 ne change ; un fichier invalide est refusé ; ton `notify` n'est jamais touché ; `config.toml` n'est jamais écrit par l'installateur. **Retirer les hooks**
-(ou désinstaller Claude Notch) n'enlève que nos entrées. Ensuite, **Approuver dans Codex** (ou **Review hooks** dans l'app
+(ou désinstaller Oriel) n'enlève que nos entrées. Ensuite, **Approuver dans Codex** (ou **Review hooks** dans l'app
 ChatGPT, ou `/hooks` dans un terminal), puis ouvre une nouvelle conversation.
+
+L'app s'appelle maintenant Oriel (anciennement Claude Notch), mais les entrées Codex gardent leur ancien nom, exprès :
+le script `codex-notch-hook.sh` et le `statusMessage` « Claude Notch » que Codex affiche pendant qu'une demande est
+tenue par la notch. Codex annule son approbation dès qu'une entrée change : elles ne changeront qu'avec le prochain
+changement obligatoire des hooks Codex. Un refus depuis la notch arrive chez Codex sous la forme « Denied from Oriel. »
+(voir [RENAME.md](RENAME.md)).
 
 Non couvert : un hook désactivé à la main dans Codex (`enabled = false` dans `hooks.state`) compte encore comme actif.

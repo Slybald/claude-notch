@@ -283,8 +283,8 @@ final class SystemPowerMode: PowerModeBackend {
         let shell = rule.map { LowPowerAuthorization.pmsetAndInstallShellCommand(lowPower: on, ruleContents: $0) }
             ?? LowPowerAuthorization.pmsetShellCommand(lowPower: on)
         let prompt = rule == nil
-            ? L("Claude Notch veut changer l'économie d'énergie.", table: "QuickSettings")
-            : L("Claude Notch veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage.",
+            ? L("Oriel veut changer l'économie d'énergie.", table: "QuickSettings")
+            : L("Oriel veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage.",
                 table: "QuickSettings")
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             if useRule {
@@ -421,7 +421,7 @@ final class SystemCaffeine: CaffeineBackend {
         let type = keepDisplayOn ? kIOPMAssertionTypePreventUserIdleDisplaySleep : kIOPMAssertionTypePreventUserIdleSystemSleep
         var created = IOPMAssertionID(0)
         let status = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                 "Claude Notch : caféine" as CFString, &created)
+                                                 "Oriel : caféine" as CFString, &created)
         guard status == kIOReturnSuccess else { return false }
         assertion = created
         return true

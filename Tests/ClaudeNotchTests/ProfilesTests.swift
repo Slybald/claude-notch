@@ -21,7 +21,7 @@ final class ProfilesTests: XCTestCase {
     // MARK: - Définition des profils
 
     func testEachProfileHasItsOwnNonEmptyTabsWithoutDuplicates() {
-        let known = Set(Self.idsWithCodex)
+        let known = Set(Self.idsWithCodex + ["agenda"])
         var seen = Set<[String]>()
         for profile in NotchProfile.allCases {
             XCTAssertFalse(profile.tabs.isEmpty, "\(profile)")
@@ -35,7 +35,7 @@ final class ProfilesTests: XCTestCase {
 
     func testProfilesAsDocumented() {
         XCTAssertEqual(NotchProfile.developer.tabs, ["claude", "codex", "clipboard", "timer", "notes"])
-        XCTAssertEqual(NotchProfile.student.tabs, ["media", "timer", "notes", "quicksettings"])
+        XCTAssertEqual(NotchProfile.student.tabs, ["agenda", "media", "timer", "notes", "quicksettings"])
         XCTAssertEqual(NotchProfile.creative.tabs, ["media", "shelf", "clipboard"])
         XCTAssertEqual(NotchProfile.minimal.tabs, ["media", "quicksettings"])
         XCTAssertEqual(NotchProfile.allCases.map { $0.openTrigger }, [.hover, .click, .hover, .click])

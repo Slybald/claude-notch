@@ -162,6 +162,7 @@ final class Preferences: ObservableObject {
         static let haptics = "hover.haptics"
         static let toggleHotKey = "keyboard.togglePanel"
         static let hideHotKey = "keyboard.toggleHidden"
+        static let commandHotKey = "keyboard.commandBar"
         static let fullScreen = "fullScreen.behavior"
         static let screen = "display.screen"
         static let tabOrder = "tabs.order"
@@ -185,13 +186,20 @@ final class Preferences: ObservableObject {
         static let replyFromNotch = "claude.replyFromNotch"
         static let replyPromptDismissed = "claude.replyPromptDismissed"
         static let approveByKeyboard = "claude.approveByKeyboard"
+        static let allowsDetach = "bubble.allowDetach"
+        static let bubbleReturnsOnRelaunch = "bubble.returnOnRelaunch"
+        /// État de la bulle (pas des réglages) : détachée, dernier écran, position par écran.
+        static let bubbleDetached = "bubble.detached"
+        static let bubbleScreen = "bubble.screen"
+        static let bubblePositions = "bubble.positions"
 
         /// Réglages de la notch remis à zéro par « Rétablir les réglages par défaut » : ni les onglets, ni les
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
         static let notchSettings = [
             alwaysVisible, visibility, hiddenUntil, openTrigger, closeOnClickOutside, openDelay, closeDelay, haptics,
-            toggleHotKey, hideHotKey, fullScreen, screen, accent, panelSize, customWidth, background, customBackground,
-            tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
+            toggleHotKey, hideHotKey, commandHotKey, fullScreen, screen, accent, panelSize, customWidth, background,
+            customBackground, tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
+            allowsDetach, bubbleReturnsOnRelaunch,
         ]
     }
 
@@ -248,6 +256,7 @@ final class Preferences: ObservableObject {
             defaults.set(toggleHotKey.rawValue, forKey: Key.toggleHotKey)
             // Une combinaison ne sert qu'à une chose.
             if toggleHotKey != .none, hideHotKey == toggleHotKey { hideHotKey = .none }
+            if toggleHotKey != .none, commandHotKey == toggleHotKey { commandHotKey = .none }
         }
     }
 
@@ -256,6 +265,16 @@ final class Preferences: ObservableObject {
         didSet {
             defaults.set(hideHotKey.rawValue, forKey: Key.hideHotKey)
             if hideHotKey != .none, toggleHotKey == hideHotKey { toggleHotKey = .none }
+            if hideHotKey != .none, commandHotKey == hideHotKey { commandHotKey = .none }
+        }
+    }
+
+    /// Raccourci global : ouvrir la barre de commande (aucun par défaut).
+    @Published var commandHotKey: HotKeyChoice {
+        didSet {
+            defaults.set(commandHotKey.rawValue, forKey: Key.commandHotKey)
+            if commandHotKey != .none, toggleHotKey == commandHotKey { toggleHotKey = .none }
+            if commandHotKey != .none, hideHotKey == commandHotKey { hideHotKey = .none }
         }
     }
 
@@ -271,6 +290,30 @@ final class Preferences: ObservableObject {
     /// Fenêtre de la notch exclue des captures et du partage d'écran (`NSWindow.sharingType = .none`).
     @Published var hideFromCapture: Bool {
         didSet { defaults.set(hideFromCapture, forKey: Key.hideFromCapture) }
+    }
+
+    /// Poignée de l'angle du panneau et « Détacher la notch » : la notch devient une bulle à poser n'importe où.
+    @Published var allowsDetach: Bool {
+        didSet { defaults.set(allowsDetach, forKey: Key.allowsDetach) }
+    }
+
+    /// Au lancement, la bulle revient dans la notch au lieu de reprendre sa place.
+    @Published var bubbleReturnsOnRelaunch: Bool {
+        didSet { defaults.set(bubbleReturnsOnRelaunch, forKey: Key.bubbleReturnsOnRelaunch) }
+    }
+
+    @Published var bubbleDetached: Bool {
+        didSet { defaults.set(bubbleDetached, forKey: Key.bubbleDetached) }
+    }
+
+    /// Dernier écran de la bulle (nom de `NotchScreenPicker.labels`).
+    @Published var bubbleScreen: String? {
+        didSet { defaults.set(bubbleScreen, forKey: Key.bubbleScreen) }
+    }
+
+    /// Position de la bulle par écran : décalage [x, y] depuis l'origine de l'écran.
+    @Published var bubblePositions: [String: [Double]] {
+        didSet { defaults.set(bubblePositions, forKey: Key.bubblePositions) }
     }
 
     // MARK: Onglets
@@ -409,9 +452,16 @@ final class Preferences: ObservableObject {
         toggleHotKey = toggle
         let hide = choice(Key.hideHotKey, HotKeyChoice.none)
         hideHotKey = hide == toggle ? .none : hide
+        let command = choice(Key.commandHotKey, HotKeyChoice.none)
+        commandHotKey = command == toggle || command == hide ? .none : command
         fullScreenBehavior = choice(Key.fullScreen, FullScreenBehavior.compact)
         screenChoice = defaults.string(forKey: Key.screen).flatMap { $0.isEmpty ? nil : $0 } ?? ScreenChoice.builtin
         hideFromCapture = defaults.object(forKey: Key.hideFromCapture) as? Bool ?? false
+        allowsDetach = defaults.object(forKey: Key.allowsDetach) as? Bool ?? true
+        bubbleReturnsOnRelaunch = defaults.bool(forKey: Key.bubbleReturnsOnRelaunch)
+        bubbleDetached = defaults.bool(forKey: Key.bubbleDetached)
+        bubbleScreen = defaults.string(forKey: Key.bubbleScreen)
+        bubblePositions = defaults.dictionary(forKey: Key.bubblePositions) as? [String: [Double]] ?? [:]
         tabOrder = defaults.stringArray(forKey: Key.tabOrder) ?? []
         tabEnabled = defaults.dictionary(forKey: Key.tabEnabled) as? [String: Bool] ?? [:]
         defaultTab = defaults.string(forKey: Key.defaultTab) ?? Self.lastTabChoice
@@ -539,9 +589,12 @@ final class Preferences: ObservableObject {
         hapticFeedback = fresh.hapticFeedback
         toggleHotKey = fresh.toggleHotKey
         hideHotKey = fresh.hideHotKey
+        commandHotKey = fresh.commandHotKey
         fullScreenBehavior = fresh.fullScreenBehavior
         screenChoice = fresh.screenChoice
         hideFromCapture = fresh.hideFromCapture
+        allowsDetach = fresh.allowsDetach
+        bubbleReturnsOnRelaunch = fresh.bubbleReturnsOnRelaunch
         accentHex = fresh.accentHex
         panelSize = fresh.panelSize
         customPanelWidth = fresh.customPanelWidth

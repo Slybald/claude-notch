@@ -37,8 +37,11 @@ struct HookInstaller {
     /// Attente `asyncRewake` d'un message : 24 h.
     static let inboxTimeout = "86400"
     /// Lus par Claude avec le message (même texte que hooks_config.py).
-    static let rewakeMessage = "Message from the user, sent from Claude Notch:"
-    static let rewakeSummary = "Message from Claude Notch"
+    static let rewakeMessage = "Message from the user, sent from Oriel:"
+    static let rewakeSummary = "Message from Oriel"
+    /// Textes d'avant le renommage : une session ouverte avant la mise à jour garde ses hooks d'alors.
+    static let legacyRewakeMessage = "Message from the user, sent from Claude Notch:"
+    static let legacyRewakeSummary = "Message from Claude Notch"
 
     enum Status: Equatable {
         case notInstalled
@@ -361,8 +364,8 @@ struct HookInstaller {
         }
     }
 
-    /// Sauvegarde puis écriture atomique, seulement si quelque chose change.
-    private func save(_ settings: OrderedJSON, replacing original: OrderedJSON) throws -> Outcome {
+    /// Sauvegarde puis écriture atomique, seulement si quelque chose change (aussi pour `StatusLineInstaller`).
+    func save(_ settings: OrderedJSON, replacing original: OrderedJSON) throws -> Outcome {
         guard settings != original else { return Outcome(settingsChanged: false, backup: nil) }
         var data = settings.serialized()
         data.append(0x0A)

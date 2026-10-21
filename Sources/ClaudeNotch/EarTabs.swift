@@ -141,15 +141,17 @@ enum EarTabs {
         case "messages": return "4ADE80"
         case "mail": return "60A5FA"
         case "quicksettings": return "C084FC"
+        case "agenda": return "D4D4D8"
         case EarTab.moreId: return "A1A1AA"
         default: return "A1A1AA"
         }
     }
 
-    /// Hauteur d'un intercalaire au repos : un cran de moins que le précédent en s'éloignant de la notch (escalier).
+    /// Hauteur d'un intercalaire au repos : celui qui touche la notch a exactement sa hauteur (aucune marche entre elles),
+    /// puis un cran de moins que le précédent en s'éloignant (escalier).
     static func height(rank: Int, notchHeight: CGFloat) -> CGFloat {
         let step: CGFloat = notchHeight >= 30 ? 3 : 2
-        return notchHeight - step * CGFloat(rank + 1)
+        return notchHeight - step * CGFloat(rank)
     }
 }
 
