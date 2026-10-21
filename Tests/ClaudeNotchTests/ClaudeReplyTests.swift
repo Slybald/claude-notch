@@ -356,6 +356,61 @@ final class ClaudeReplyTests: XCTestCase {
         XCTAssertTrue(replies.headless.isEmpty)
     }
 
+    /// Onglet Code de Claude Desktop (flux stream-json sans `-p`, identifiant de session Desktop) : tenu à la fin d'un
+    /// tour, jamais au démarrage (il bloquerait le premier prompt, mesuré sur Claude Code 2.1.304).
+    func testDesktopSessionIsHeldAtStopOnly() {
+        replies.processArguments = { _ in ["claude", "--output-format", "stream-json", "--input-format", "stream-json"] }
+        let start = Box<String>()
+        replies.wait(sessionId: "d1", pid: getpid(), desktop: true, atStop: false) { start.replies.append($0) }
+        XCTAssertEqual(start.replies.count, 1)
+        XCTAssertNil(start.replies[0], "SessionStart : rendu tout de suite")
+        XCTAssertTrue(replies.headless.isEmpty, "on peut lui écrire")
+
+        // Avant le premier Stop, le message attend en file ; le Stop le remet aussitôt.
+        XCTAssertEqual(replies.send("Commence par les tests", to: "d1"), .queued)
+        let first = Box<String>()
+        replies.wait(sessionId: "d1", pid: getpid(), desktop: true, atStop: true) { first.replies.append($0) }
+        XCTAssertEqual(first.replies.count, 1)
+        XCTAssertEqual(first.replies[0], "Commence par les tests")
+
+        let held = Box<String>()
+        replies.wait(sessionId: "d1", pid: getpid(), desktop: true, atStop: true) { held.replies.append($0) }
+        XCTAssertTrue(held.replies.isEmpty, "Stop : l'attente est tenue")
+        XCTAssertEqual(replies.waiting, ["d1"])
+        XCTAssertEqual(replies.send("Puis le README", to: "d1"), .delivered)
+        XCTAssertEqual(held.replies.last ?? nil, "Puis le README")
+        XCTAssertTrue(replies.waiting.isEmpty)
+    }
+
+    /// `claude -p`, SDK ou IDE sans identifiant Desktop : jamais tenus (le processus ne sortirait plus).
+    func testOtherHeadlessSessionsAreNeverHeldAtStop() {
+        replies.processArguments = { _ in ["claude", "--input-format", "stream-json"] }
+        let sdk = Box<String>()
+        replies.wait(sessionId: "sdk", pid: getpid(), desktop: false, atStop: true) { sdk.replies.append($0) }
+        XCTAssertEqual(sdk.replies.count, 1)
+        XCTAssertNil(sdk.replies[0])
+        XCTAssertEqual(replies.headless, ["sdk"])
+        XCTAssertNil(replies.send("Bonjour", to: "sdk"))
+
+        replies.processArguments = { _ in ["claude", "-p", "--input-format", "stream-json"] }
+        let print = Box<String>()
+        replies.wait(sessionId: "p1", pid: getpid(), desktop: true, atStop: true) { print.replies.append($0) }
+        XCTAssertEqual(print.replies.count, 1)
+        XCTAssertNil(print.replies[0], "-p : un seul tour, le processus attend la fin des hooks")
+        XCTAssertEqual(replies.headless, ["sdk", "p1"])
+        XCTAssertTrue(replies.waiting.isEmpty)
+    }
+
+    /// Un ancien script (sans identifiant Desktop) a marqué la session « sans terminal » ; le nouveau la libère.
+    func testDesktopSessionLeavesHeadlessOnceItIsHeld() {
+        replies.processArguments = { _ in ["claude", "--input-format", "stream-json"] }
+        replies.wait(sessionId: "d1", pid: getpid(), desktop: false, atStop: true) { _ in }
+        XCTAssertEqual(replies.headless, ["d1"])
+        replies.wait(sessionId: "d1", pid: getpid(), desktop: true, atStop: true) { _ in }
+        XCTAssertTrue(replies.headless.isEmpty)
+        XCTAssertEqual(replies.waiting, ["d1"])
+    }
+
     // MARK: - Carte
 
     /// Outils MCP, Skill, Agent : la carte montre tout ce qui part, pas seulement le nom de l'outil.

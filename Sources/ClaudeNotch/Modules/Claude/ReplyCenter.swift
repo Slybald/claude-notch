@@ -10,7 +10,8 @@ import Foundation
 ///   notch, ~590 s sinon. Le dialogue du terminal reste utilisable pendant ce temps : la première réponse gagne.
 /// - `/inbox` (hooks SessionStart et Stop en `asyncRewake`) : une seule attente par session. Un message envoyé
 ///   depuis la notch lui est remis et réveille Claude ; sans attente, il reste en file (FIFO) jusqu'à la suivante.
-///   Session sans terminal (`claude -p`, SDK, onglet Code de Claude Desktop) : rendue tout de suite, pas de message.
+///   Session sans terminal (`claude -p`, SDK) : rendue tout de suite, pas de message. Onglet Code de Claude
+///   Desktop : tenue à la fin d'un tour (`Stop`), rendue tout de suite au démarrage (voir `wait`).
 ///
 /// Une décision n'existe qu'en réponse à la requête d'un hook, après un clic : jamais de « toujours autoriser »,
 /// jamais d'autorisation par défaut. Réglage désactivé : tout est rendu tout de suite. Main thread uniquement.
@@ -116,6 +117,8 @@ final class ReplyCenter: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     /// Horloge des échéances (injectable pour les tests).
     var clock: () -> Date = { Date() }
+    /// argv d'un processus Claude (injectable pour les tests).
+    var processArguments: (pid_t) -> [String] = { ProcessInspector.arguments($0) }
 
     init(prefs: Preferences) {
         self.prefs = prefs
@@ -256,13 +259,28 @@ final class ReplyCenter: ObservableObject {
 
     /// Attente d'un hook `asyncRewake` : `reply` reçoit le message, ou nil (204) si l'attente est remplacée,
     /// si Claude est mort ou si le réglage est coupé. Un message en file part tout de suite.
-    func wait(sessionId: String, pid: pid_t?, id: UUID = UUID(), reply: @escaping (String?) -> Void) {
+    ///
+    /// Sans terminal, Claude attend la fin de ce hook avant de lire le prompt (mesuré, 2.1.304) : tenu sur
+    /// `SessionStart` il bloquerait la session (21 s pour 20 s tenues), et sur `claude -p` il bloquerait la sortie.
+    /// Seule exception, l'onglet Code de Claude Desktop (`desktop` : identifiant de session Desktop, flux stream-json,
+    /// session qui reste ouverte) à la fin d'un tour (`atStop`). Le résultat du tour est déjà parti, le prompt suivant
+    /// n'attend pas, et un message réveille Claude (nouveau tour ~3 s plus tard, ou lu après l'outil en cours).
+    /// À la fermeture, SIGTERM sort aussitôt ; fermer stdin laisse au plus ~30 s.
+    func wait(sessionId: String, pid: pid_t?, id: UUID = UUID(), desktop: Bool = false, atStop: Bool = false,
+              reply: @escaping (String?) -> Void) {
         guard isEnabled, pid.map({ ProcessInspector.isAlive($0) }) ?? true else { return reply(nil) }
-        // Sans terminal, Claude attend la fin de ce hook avant de lire le prompt (mesuré, 2.1.304) : le tenir
-        // bloquerait la session.
-        if let pid, Self.isHeadless(ProcessInspector.arguments(pid)) {
-            headless.insert(sessionId)
-            return reply(nil)
+        if let pid {
+            let arguments = processArguments(pid)
+            if Self.isHeadless(arguments) {
+                if desktop, !Self.isPrint(arguments) {
+                    // Pas de terminal mais une session Desktop : on peut lui écrire, sauf au démarrage.
+                    guard atStop else { return reply(nil) }
+                    headless.remove(sessionId)
+                } else {
+                    headless.insert(sessionId)
+                    return reply(nil)
+                }
+            }
         }
         // Une seule attente par session : la nouvelle remplace l'ancienne.
         waiters.removeValue(forKey: sessionId)?.reply(nil)
@@ -471,10 +489,14 @@ final class ReplyCenter: ObservableObject {
     /// Claude lancé sans terminal : `-p`/`--print`, ou entrée/sortie en flux (SDK, IDE, onglet Code de Claude
     /// Desktop, qui passe `--input-format stream-json` sans `-p`).
     static func isHeadless(_ arguments: [String]) -> Bool {
-        arguments.dropFirst().prefix { $0 != "--" }.contains { argument in
-            argument == "-p" || argument == "--print"
-                || ["--input-format", "--output-format"].contains { argument == $0 || argument.hasPrefix($0 + "=") }
+        isPrint(arguments) || arguments.dropFirst().prefix { $0 != "--" }.contains { argument in
+            ["--input-format", "--output-format"].contains { argument == $0 || argument.hasPrefix($0 + "=") }
         }
+    }
+
+    /// `claude -p` : un seul tour, le processus sort quand les hooks ont fini.
+    static func isPrint(_ arguments: [String]) -> Bool {
+        arguments.dropFirst().prefix { $0 != "--" }.contains { $0 == "-p" || $0 == "--print" }
     }
 
     /// Plan lisible sans rendu Markdown : titres et gras retirés, lignes vides regroupées, longueur bornée.
