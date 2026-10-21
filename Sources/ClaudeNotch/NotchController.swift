@@ -90,6 +90,7 @@ final class NotchController {
     private let monitor: ClaudeMonitor
     private let prefs: Preferences
     private let claude: ClaudeModule
+    let codex: CodexModule
     private let settings: SettingsWindow
 
     private var screenFrame = CGRect.zero
@@ -124,7 +125,8 @@ final class NotchController {
         self.monitor = monitor
         self.prefs = prefs
         claude = ClaudeModule(store: store, monitor: monitor, tools: tools, prefs: prefs)
-        registry = ModuleRegistry(modules: ModuleRegistry.standardModules(claude: claude), prefs: prefs)
+        codex = CodexModule()
+        registry = ModuleRegistry(modules: ModuleRegistry.standardModules(claude: claude, codex: codex), prefs: prefs)
         settings = SettingsWindow(prefs: prefs, registry: registry)
 
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize),
@@ -170,6 +172,12 @@ final class NotchController {
             openSettings: { [weak self] in self?.openSettings() }
         )
         claude.actions = actions
+        codex.openHost = { [weak self] bundleId in
+            if let bundleId { Self.bringToFront(bundleId: bundleId) }
+            self?.suppressUntilExit = true
+            self?.collapse()
+        }
+        codex.openSettings = { [weak self] in self?.openSettings() }
         let root = NotchRootView(model: model, store: store, registry: registry, prefs: prefs, actions: actions)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.sizingOptions = []

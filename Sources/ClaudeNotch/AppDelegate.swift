@@ -82,6 +82,8 @@ final class AppCore {
     func start() {
         // Premier lancement : l'onglet Claude n'est activé d'office que si Claude Code est sur ce Mac.
         prefs.decideClaudeTab(claudeCodePresent: { HookInstaller.claudeCodeOnThisMac })
+        // Même règle pour Codex : l'onglet n'est activé d'office que si Codex est sur ce Mac.
+        prefs.decideCodexTab(codexPresent: { CodexHookInstaller.codexOnThisMac })
         // Relancer l'app vaut réactivation (seuls les masquages à durée survivent au relancement).
         if prefs.hiddenUntil == .distantFuture { prefs.showAgain() }
         // Créée avant le serveur (rien n'est encore affiché) : ses onglets disent si les hooks sont écoutés.
@@ -95,7 +97,14 @@ final class AppCore {
             NSLog("ClaudeNotch : serveur de hooks indisponible (%@), arrêt.", String(describing: error))
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
+        server.codex = notch.codex
         self.server = server
+        // Onglet Codex : même principe, indépendant de celui de Claude.
+        notch.registry.$enabled
+            .map { $0.contains { $0.id == ModuleRegistry.codexId } }
+            .removeDuplicates()
+            .sink { [weak self] isOn in self?.setCodexTracking(isOn) }
+            .store(in: &cancellables)
         // Onglet Claude : appliqué tout de suite, puis à chaud à chaque changement.
         notch.registry.$enabled
             .map { $0.contains { $0.id == ModuleRegistry.claudeId } }
@@ -130,6 +139,13 @@ final class AppCore {
             store.stop()
             ReplyCenter.shared.releaseAll()
         }
+    }
+
+    /// Onglet Codex activé : hooks écoutés et sessions suivies. Désactivé : routes `/codex/*` à 204, sessions oubliées,
+    /// demandes tenues rendues à Codex.
+    private func setCodexTracking(_ isOn: Bool) {
+        server?.isCodexPaused = !isOn
+        notch?.codex.setTracking(isOn)
     }
 
     var isClaudeEnabled: Bool { notch?.registry.isClaudeEnabled ?? false }
@@ -174,6 +190,7 @@ final class AppCore {
         state["ears"] = store.earsText
         state["sessionTimer"] = store.isTicking
         state["notch"] = notch?.debugInfo
+        state["codex"] = notch?.codex.debugInfo
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged
         tools["permissionsLogged"] = activityLog.permissionsLogged

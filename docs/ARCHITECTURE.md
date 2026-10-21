@@ -12,6 +12,8 @@ organised and why some choices were made, so they are not undone by accident.
   compact mode, settings window, reply cards in `ClaudeSnapshotTests`). Known artifact: under the notch's
   `clipShape`, SF Symbols come out white in these renders (`layer.render` and `cacheDisplay` alike); a
   window-server capture of the same view shows them tinted, as on screen.
+- Real Codex check (skipped by default, uses a little quota): `CLAUDE_NOTCH_CODEX_LIVE=1 swift test --filter CodexLiveTests`
+  drives `codex app-server` through the real installer, hook script and server in a throwaway `CODEX_HOME`.
 - Memory and CPU of the notch view: `CLAUDE_NOTCH_FOOTPRINT=1 swift test --filter FootprintTests`.
 - `scripts/build.sh` (universal app in `build/`, ad hoc signed unless `SIGN_KEYCHAIN` and `SIGN_IDENTITY` are
   set; `VERSION=x.y.z` sets the version, `RELEASE_CHANNEL=1` marks a release build), `scripts/make-dmg.sh`
@@ -29,7 +31,8 @@ organised and why some choices were made, so they are not undone by accident.
 
 - `HookServer`: minimal HTTP server on 127.0.0.1:47823. It resolves the process context *before* replying,
   while the hook process is still alive. Exact `Host`, no `Origin`, token (`HookAccess`) on every route but
-  `/health`; `/permission` and `/inbox` are long requests handed to `ReplyCenter`. `HookEvent`: tolerant JSON
+  `/health`; `/permission` and `/inbox` are long requests handed to `ReplyCenter`; `/codex/hook` and `/codex/permission` do the
+  same for Codex (`CodexRelay`). `HookEvent`: tolerant JSON
   reading, every field optional.
 - `ProcessInspector`: walks the ancestors of the hook's `$PPID` to find the Claude process, the host app
   (outermost `.app` bundle) and the source (CLI or Desktop). `ClaudeMonitor`: is Claude Desktop running,
@@ -47,6 +50,10 @@ organised and why some choices were made, so they are not undone by accident.
     and `/inbox` (one waiter per session, FIFO queue of messages); `ReplyViews` draws the cards;
     `ConversationViews` draws the conversation of a session (last lines, message field, or "Answer in *app*" +
     **Open**) and the card that proposes to turn replies on.
+  - `Codex/` (`codex`): `CodexModule` (tab, ears, settings, `CodexRelay` for the server), `CodexStore` (per-session state
+    machine fed by Codex's hooks, one `kqueue` per Codex process, one-shot deadlines, no periodic timer),
+    `CodexApprovals` (the held `PermissionRequest` requests), `CodexHookInstaller` (`~/.codex/hooks.json`),
+    `CodexProcess` (Codex process and host app from the hook's `$PPID`), `CodexViews`. See [CODEX.md](CODEX.md).
   - `Media/` (`media`): `MediaModule` (life cycle, settings), `NowPlaying` (state rebuilt from the
     `mediaremote-adapter` JSON lines; `MediaRemoteAdapter` runs the helper and restarts it with a growing delay),
     `MediaCalendar` (EventKit and the Calendar opener), `MediaViews`.
@@ -110,7 +117,8 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **Tab bar**: icons in the header row, below the menu bar band, at a fixed width: the active tab is marked by a
   capsule that slides (`matchedGeometryEffect`) and its title is shown beside the bar, so no tab shifts under the
   pointer. Click, or hover for 0.2 s (passing over a tab does not switch). The panel opens on the last tab or the
-  default one (settings), except when Claude needs the user and the Claude tab is on: then on Claude. A tab that
+  default one (settings), except when Claude needs the user and the Claude tab is on: then on Claude (or on Codex when only Codex waits for an
+  approval and its tab is on). A tab that
   is no longer enabled falls back to the first enabled one.
   - **Edit mode** (`NotchViewModel.isEditingTabs`, rules in `TabEditing`, pure): a 0.5 s long press on the bar (or
     the "Edit Tabs" accessibility action). Icons wiggle, can be dragged (the others move aside with the spring),
@@ -131,7 +139,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     after the exit transition. Off with "Reduce motion" (fade only). The views exist only in edit mode, panel open.
   - Tests play the gestures with mouse events sent to the expanded notch in an offscreen window (long press,
     click, drag, "−", Done, click outside the bar) and render `tabs-*.png` with `CLAUDE_NOTCH_SNAPSHOT_DIR`.
-- **Ears** (collapsed notch; Claude only while its tab is on): Claude waiting for you > Claude working > Claude
+- **Ears** (collapsed notch; Claude only while its tab is on; Codex is an ordinary module here, see "Codex" below): Claude waiting for you > Claude working > Claude
   just finished (5 s) > the module ears with the highest priority (timer 5, player 1, caffeine -10; tab order
   breaks ties) > nothing. Only running modules count. "Show the ears" off: the collapsed notch is exactly the
   notch. Module ears also keep the notch window on screen.
@@ -272,6 +280,31 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     (`waiting`, `queued`, `headless`, `none`).
 - **CLI, same version** (interactive `claude` in a pty): `PermissionRequest` is called for Bash and AskUserQuestion,
   the terminal dialog stays up ("Allowed by PermissionRequest hook" when the hook answers first).
+- **Codex** (measured on Codex CLI 0.154, details in [CODEX.md](CODEX.md)): the tab follows Codex through its own
+  hooks (`~/.codex/hooks.json`), never `notify` or `config.toml`, never the compressed rollout files.
+  - **Same optional rules as Claude**: `CodexHookInstaller.codexPresent` (`~/.codex`, `$CODEX_HOME`, `Codex.app`, a
+    `codex` command), never real under XCTest; `Preferences.decideCodexTab` decides once at launch (enabled only if
+    Codex is found); `isEnabledByDefault` is false; the setup assistant offers the card only when detected or already
+    on. Tab off (`AppCore.setCodexTracking`): `HookServer.isCodexPaused` (the `/codex/*` routes answer 204 without
+    inspecting a process), `CodexStore` stopped (sessions forgotten, watchers and timer cancelled), held approvals given
+    back. The module runs while collapsed only while something happens (`keepsRunningWhenCollapsed` =
+    `store.hasActivity`), so its ears join the existing rotation (priority 9 waiting, 6 working or done).
+  - **Hooks**: one async relay per event (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`,
+    `Interrupt`, `SessionEnd`; the last two are capped at 3 s by Codex) and the synchronous `PermissionRequest` entry
+    (`codex-notch-hook.sh permission`, timeout 75 s). Same token, proof and `Host`/`Origin` rules as Claude's hooks
+    (routes `/codex/hook`, `/codex/permission`; the header is `X-Codex-PPID`). The hook's `$PPID` is the `codex`
+    process (CLI or the app's engine): `CodexProcess` walks up for the host app, `CodexStore` watches the pid.
+  - **Trust**: Codex skips a hook that the user has not reviewed (`/hooks`), recorded as
+    `hooks.state."<file>:<event>:<group>:<hook>".trusted_hash` in `config.toml`. We never write it. `config.toml` is only
+    read (`ConfigNotes`: hooks off, inline hooks, `notify` present, reviewed) and is never modified.
+  - **Approvals**: Codex runs `PermissionRequest` *before* its own prompt and the prompt waits for it (measured: a 6 s hook
+    delayed the prompt by 6 s), unlike Claude Code. So `CodexApprovals` holds 4 s if the card was never shown, 60 s once
+    it was (`engagedDelay`, under the 75 s hook timeout), then answers "no decision"; "In the terminal" gives the hand
+    back at once. Output: `hookSpecificOutput.decision.behavior` `allow` or `deny` + `message`, nothing else. A decision
+    only exists as the answer to a hook's request, after a click; no "always allow". `codex exec` forces
+    `approval: never` and never fires the hook.
+  - **Not possible**: a free message to a running session (a held `Stop` hook would freeze the terminal; `codex queue`
+    needs the experimental shared daemon), and Codex's own questions (no hook).
 - **Reply design**: one long connection per request; the app answers on the first of: the user's decision; the
   `PostToolUse` (same tool and input), `Stop`, `UserPromptSubmit` or `SessionEnd` of the session; the connection
   closing; the deadline (4 s if the card was never on screen, 590 s once it was, under the hook's 600 s). No

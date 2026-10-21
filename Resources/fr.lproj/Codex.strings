@@ -1,0 +1,62 @@
+/* Claude Notch : textes français du module Codex. La clé est le texte du code. */
+
+
+/* Outils et états */
+"Terminal" = "Terminal";
+"Modification de fichiers" = "Modification de fichiers";
+"Attend ton approbation" = "Attend ton approbation";
+
+/* Approbations */
+"Trop tard : déjà réglé ailleurs" = "Trop tard : déjà réglé ailleurs";
+"Autorisé depuis la notch" = "Autorisé depuis la notch";
+"Refusé depuis la notch" = "Refusé depuis la notch";
+"À toi dans le terminal" = "À toi dans le terminal";
+"Déjà réglé dans la session" = "Déjà réglé dans la session";
+"Délai dépassé : réponds dans le terminal" = "Délai dépassé : réponds dans le terminal";
+"Réponds dans %@" = "Réponds dans %@";
+"Autoriser %@ ?" = "Autoriser %@ ?";
+"Texte coupé : lis-le en entier dans la session" = "Texte coupé : lis-le en entier dans la session";
+"Sans clic sous %d s, Codex te le redemande dans le terminal." = "Sans clic sous %d s, Codex te le redemande dans le terminal.";
+"Dans le terminal" = "Dans le terminal";
+"Refuser" = "Refuser";
+"Autoriser" = "Autoriser";
+
+/* Onglet */
+"Aucune session Codex" = "Aucune session Codex";
+"Pose les hooks Codex dans les réglages pour suivre tes sessions." = "Pose les hooks Codex dans les réglages pour suivre tes sessions.";
+"Ouvrir les réglages" = "Ouvrir les réglages";
+"Dans Codex, tape /hooks pour valider les hooks de Claude Notch." = "Dans Codex, tape /hooks pour valider les hooks de Claude Notch.";
+"Lance `codex` dans un terminal ou ouvre l'app Codex." = "Lance `codex` dans un terminal ou ouvre l'app Codex.";
+
+/* Réglages */
+"Approbations" = "Approbations";
+"Approuver depuis la notch" = "Approuver depuis la notch";
+"Les demandes d'approbation de Codex s'affichent dans la notch ; un clic décide." = "Les demandes d'approbation de Codex s'affichent dans la notch ; un clic décide.";
+"Codex attend ce hook avant de poser sa question : sans clic sous %d s, ou avec « Dans le terminal », il te la pose dans le terminal. Jamais de « toujours autoriser »." = "Codex attend ce hook avant de poser sa question : sans clic sous %d s, ou avec « Dans le terminal », il te la pose dans le terminal. Jamais de « toujours autoriser ».";
+"Hooks Codex" = "Hooks Codex";
+"Les hooks sont coupés dans config.toml ([features] hooks = false)." = "Les hooks sont coupés dans config.toml ([features] hooks = false).";
+"À valider dans Codex : tape /hooks, puis fais confiance aux hooks de Claude Notch." = "À valider dans Codex : tape /hooks, puis fais confiance aux hooks de Claude Notch.";
+"Dernier événement" = "Dernier événement";
+"Retirer les hooks" = "Retirer les hooks";
+"Réinstaller les hooks" = "Réinstaller les hooks";
+"Mettre à jour les hooks" = "Mettre à jour les hooks";
+"Installer les hooks Codex" = "Installer les hooks Codex";
+"hooks.json illisible : %@" = "hooks.json illisible : %@";
+"Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1)." = "Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1).";
+"Seul ~/.codex/hooks.json est écrit (sauvegarde horodatée) : config.toml et ton notify ne sont pas touchés." = "Seul ~/.codex/hooks.json est écrit (sauvegarde horodatée) : config.toml et ton notify ne sont pas touchés.";
+"config.toml contient aussi des hooks : Codex charge les deux fichiers." = "config.toml contient aussi des hooks : Codex charge les deux fichiers.";
+
+/* Pose et retrait des hooks */
+"Hooks posés. Sauvegarde : %@" = "Hooks posés. Sauvegarde : %@";
+"Hooks posés." = "Hooks posés.";
+"Hooks retirés." = "Hooks retirés.";
+"Rien à retirer." = "Rien à retirer.";
+"hooks.json invalide (%@) : rien n'a été modifié." = "hooks.json invalide (%@) : rien n'a été modifié.";
+"hooks.json n'est pas un objet JSON : rien n'a été modifié." = "hooks.json n'est pas un objet JSON : rien n'a été modifié.";
+"La clé « hooks » de hooks.json n'est pas un objet : rien n'a été modifié." = "La clé « hooks » de hooks.json n'est pas un objet : rien n'a été modifié.";
+"hooks.%@ n'est pas une liste : rien n'a été modifié." = "hooks.%@ n'est pas une liste : rien n'a été modifié.";
+"Script de hook introuvable dans l'app (Contents/Resources/%@) : rien n'a été modifié." = "Script de hook introuvable dans l'app (Contents/Resources/%@) : rien n'a été modifié.";
+"Lecture de %@ impossible (%@)." = "Lecture de %@ impossible (%@).";
+"Copie du script de hook impossible (%@) : hooks.json n'a pas été modifié." = "Copie du script de hook impossible (%@) : hooks.json n'a pas été modifié.";
+"Écriture de %@ impossible (%@)." = "Écriture de %@ impossible (%@).";
+"Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json (sauvegarde horodatée à côté)." = "Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json (sauvegarde horodatée à côté).";

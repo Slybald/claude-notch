@@ -62,6 +62,8 @@ if [ "${RELEASE_CHANNEL:-}" = 1 ]; then
 fi
 cp "$ROOT/hooks/claude-notch-hook.sh" "$APP/Contents/Resources/claude-notch-hook.sh"
 chmod 755 "$APP/Contents/Resources/claude-notch-hook.sh"
+cp "$ROOT/hooks/codex-notch-hook.sh" "$APP/Contents/Resources/codex-notch-hook.sh"
+chmod 755 "$APP/Contents/Resources/codex-notch-hook.sh"
 
 # Lecture en cours : mediaremote-adapter (Vendor/mediaremote-adapter, BSD-3-Clause, commit noté dans COMMIT).
 # Depuis macOS 15.4, MediaRemote ne répond qu'aux binaires d'Apple : /usr/bin/perl lance le script, qui charge

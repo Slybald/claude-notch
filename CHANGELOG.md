@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Codex tab** (optional). Follows the sessions of OpenAI's Codex (CLI and app) with Codex's own hooks: which ones run,
+  whether Codex is working, waiting for an approval or done, its last message and the elapsed time. Like the Claude
+  tab, it is on at first launch only if Codex is found on the Mac, the setup assistant offers it only then, and it
+  does nothing in the background when it is off. Its ears take turns with the others in the collapsed notch, and the
+  full-screen compact mode lists the sessions.
+- **Approve from the notch** (Settings › Codex, off by default): allow or deny a command or a patch, or hand the
+  question back to the terminal. Codex waits for the notch before asking in the terminal, so the hold is short (4 seconds
+  if the card never appeared, 60 seconds otherwise); nothing is ever approved by default.
+- **Settings › Codex › Install Codex hooks** adds the hooks to `~/.codex/hooks.json` (timestamped backup, your hooks
+  and key order kept, nothing written if nothing changes, an invalid file is refused) and **Remove the hooks** takes only
+  ours away; Uninstall Claude Notch removes them too. `config.toml` and its `notify` are never touched. Codex runs a new
+  hook only after you trust it with `/hooks`; the settings say so.
+- `docs/CODEX.md`: what is possible with Codex and why (hooks, `notify`, session files, app-server, approvals), measured on
+  Codex 0.154.
+
+### Not possible
+
+- Writing a message to a running Codex session and answering Codex's own questions: Codex offers no safe way (no hook).
+
 ## [1.6.0] - 2026-10-21
 
 ### Added

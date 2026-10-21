@@ -25,6 +25,7 @@ struct SetupTab: Identifiable, Equatable {
     static func usage(of id: String) -> String {
         switch id {
         case ModuleRegistry.claudeId: return L("Tes sessions Claude Code : état, tâches et permissions.")
+        case ModuleRegistry.codexId: return L("Tes sessions Codex : état et approbations.")
         case "media": return L("La musique en cours et ton calendrier de la semaine.")
         case "quicksettings": return L("Wi-Fi, Bluetooth, concentration, économie d'énergie, batterie.")
         case "shelf": return L("Dépose des fichiers sur la notch, reprends-les plus tard.")
@@ -80,10 +81,14 @@ struct SetupChoices: Equatable {
 
     /// `isEnabled` : l'état actuel des onglets (au premier lancement, leur activation par défaut, avec Claude décidé
     /// par la détection). Au moins un onglet reste coché, comme dans Réglages › Onglets et dans la notch.
-    init(order: [String], claudeDetected: Bool, isEnabled: (String) -> Bool, openTrigger: OpenTrigger,
+    init(order: [String], claudeDetected: Bool, codexDetected: Bool = false, isEnabled: (String) -> Bool, openTrigger: OpenTrigger,
          toggleHotKey: HotKeyChoice, launchAtLogin: Bool, installHooks: Bool) {
         let claudeOffered = claudeDetected || isEnabled(ModuleRegistry.claudeId)
-        offered = order.filter { $0 != ModuleRegistry.claudeId || claudeOffered }
+        // Codex comme Claude : proposé seulement s'il est détecté, ou si son onglet est déjà activé.
+        let codexOffered = codexDetected || isEnabled(ModuleRegistry.codexId)
+        offered = order.filter {
+            ($0 != ModuleRegistry.claudeId || claudeOffered) && ($0 != ModuleRegistry.codexId || codexOffered)
+        }
         var on = Set(offered.filter(isEnabled))
         if on.isEmpty, let first = offered.first { on = [first] }
         tabs = on
@@ -165,8 +170,8 @@ final class SetupAssistantModel: ObservableObject {
 
     /// `firstRun` : « Lancer à l'ouverture de session » est coché d'office (hors Applications, il ne l'est pas) ;
     /// relancé, l'assistant part des réglages actuels. `installHooks` rend le message d'erreur, nil si tout va bien.
-    init(registry: ModuleRegistry, prefs: Preferences, claudeDetected: Bool, hookStatus: HookInstaller.Status,
-         firstRun: Bool, inApplications: Bool, step: Step = .welcome, installHooks: @escaping () -> String?,
+    init(registry: ModuleRegistry, prefs: Preferences, claudeDetected: Bool, codexDetected: Bool = false,
+         hookStatus: HookInstaller.Status, firstRun: Bool, inApplications: Bool, step: Step = .welcome, installHooks: @escaping () -> String?,
          applyLaunchAtLogin: @escaping (Bool) -> Void, close: @escaping () -> Void) {
         self.registry = registry
         self.prefs = prefs
@@ -176,7 +181,7 @@ final class SetupAssistantModel: ObservableObject {
         self.close = close
         self.step = step
         var choices = SetupChoices(
-            order: registry.ordered.map { $0.id }, claudeDetected: claudeDetected,
+            order: registry.ordered.map { $0.id }, claudeDetected: claudeDetected, codexDetected: codexDetected,
             isEnabled: { registry.isEnabled($0) }, openTrigger: prefs.openTrigger, toggleHotKey: prefs.toggleHotKey,
             launchAtLogin: inApplications && (firstRun || prefs.launchAtLogin), installHooks: false)
         let offer = SetupHooksOffer(claudeOffered: choices.claudeOffered, status: hookStatus)

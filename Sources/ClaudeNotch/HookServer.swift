@@ -20,6 +20,8 @@ final class HookServer {
     var onFailure: ((Error) -> Void)?
     /// Diagnostic en lecture seule pour `GET /state` (appelé sur le main thread).
     var stateProvider: (() -> [String: Any])?
+    /// Suivi des sessions Codex (routes `/codex/hook` et `/codex/permission`). À poser avant `start()`.
+    weak var codex: CodexRelay?
 
     let port: UInt16
     let access: HookAccess
@@ -30,6 +32,7 @@ final class HookServer {
     /// Connexions ouvertes (sur `queue`) : `stop()` les ferme, comme l'arrêt de l'app, pour que les hooks tenus le voient.
     private var connections: [ObjectIdentifier: NWConnection] = [:]
     private let paused = OSAllocatedUnfairLock(initialState: false)
+    private let codexPaused = OSAllocatedUnfairLock(initialState: true)
 
     /// Onglet Claude désactivé : le port reste ouvert (rien ne tourne au repos), mais les événements sont ignorés
     /// sans remonter les processus, et `/permission` et `/inbox` répondent 204 tout de suite (le terminal garde la
@@ -37,6 +40,12 @@ final class HookServer {
     var isPaused: Bool {
         get { paused.withLock { $0 } }
         set { paused.withLock { $0 = newValue } }
+    }
+
+    /// Onglet Codex désactivé (ou pas encore démarré) : les routes `/codex/*` répondent 204 sans rien analyser.
+    var isCodexPaused: Bool {
+        get { codexPaused.withLock { $0 } }
+        set { codexPaused.withLock { $0 = newValue } }
     }
 
     init(port: UInt16 = HookServer.defaultPort, access: HookAccess = HookAccess(), replies: ReplyCenter = .shared,
@@ -140,7 +149,14 @@ final class HookServer {
         if isPaused, request.method == "POST", ["/hook", "/permission", "/inbox"].contains(request.path) {
             return reply(204, "No Content", on: connection)
         }
+        if isCodexPaused, request.method == "POST", ["/codex/hook", "/codex/permission"].contains(request.path) {
+            return reply(204, "No Content", on: connection)
+        }
         switch (request.method, request.path) {
+        case ("POST", "/codex/hook"):
+            relayCodex(request, on: connection)
+        case ("POST", "/codex/permission"):
+            holdCodex(request, on: connection)
         case ("POST", "/hook"):
             relay(request, on: connection)
         case ("POST", "/permission"):
@@ -172,6 +188,35 @@ final class HookServer {
         handler(event, context)
         let replies = self.replies
         DispatchQueue.main.async { replies.observe(event) }
+    }
+
+    /// Événement de hook Codex (asynchrone) : même règle que `relay`, le contexte est résolu avant de répondre.
+    private func relayCodex(_ request: HTTPRequest, on connection: NWConnection) {
+        let context = CodexProcess.context(for: HookHeaders(request.headers))
+        reply(204, "No Content", on: connection)
+        guard let event = HookEvent(data: request.body, headers: HookHeaders(request.headers)) else { return }
+        codex?.codexEvent(event, context: context)
+    }
+
+    /// Hook PermissionRequest de Codex, synchrone : la connexion reste ouverte jusqu'à la décision (200 + sortie du hook)
+    /// ou son abandon (204, le terminal pose sa question). Codex attend le hook avant d'afficher son invite.
+    private func holdCodex(_ request: HTTPRequest, on connection: NWConnection) {
+        let headers = HookHeaders(request.headers)
+        guard let relay = codex, let event = HookEvent(data: request.body, headers: headers) else {
+            return reply(204, "No Content", on: connection)
+        }
+        let context = CodexProcess.context(for: headers)
+        let id = UUID()
+        let respond: (Data?) -> Void = { [weak self] output in
+            guard let self else { return connection.cancel() }
+            if let output {
+                self.reply(200, "OK", body: output, proof: true, on: connection)
+            } else {
+                self.reply(204, "No Content", on: connection)
+            }
+        }
+        relay.codexHold(event, context: context, id: id, reply: respond)
+        watchClosure(of: connection) { [weak relay] in relay?.codexConnectionClosed(id) }
     }
 
     /// Hook PermissionRequest synchrone : la connexion reste ouverte jusqu'à la réponse de `ReplyCenter`

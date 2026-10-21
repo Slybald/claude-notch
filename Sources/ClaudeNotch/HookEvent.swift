@@ -21,7 +21,7 @@ struct HookHeaders {
             guard let raw = headers[key]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
             return raw
         }
-        ppid = value("x-claude-ppid").flatMap { pid_t($0) }
+        ppid = (value("x-claude-ppid") ?? value("x-codex-ppid")).flatMap { pid_t($0) }
         termProgram = value("x-term-program")
         bundleId = value("x-bundle-id")
         entrypoint = value("x-entrypoint")

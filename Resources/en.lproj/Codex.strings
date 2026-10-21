@@ -1,0 +1,62 @@
+/* Claude Notch: English texts of the Codex module. The key is the French text used in the code. */
+
+
+/* Outils et états */
+"Terminal" = "Terminal";
+"Modification de fichiers" = "File changes";
+"Attend ton approbation" = "Needs your approval";
+
+/* Approbations */
+"Trop tard : déjà réglé ailleurs" = "Too late: already handled elsewhere";
+"Autorisé depuis la notch" = "Allowed from the notch";
+"Refusé depuis la notch" = "Denied from the notch";
+"À toi dans le terminal" = "Over to you in the terminal";
+"Déjà réglé dans la session" = "Already handled in the session";
+"Délai dépassé : réponds dans le terminal" = "Timed out: answer in the terminal";
+"Réponds dans %@" = "Answer in %@";
+"Autoriser %@ ?" = "Allow %@?";
+"Texte coupé : lis-le en entier dans la session" = "Text cut off: read it in full in the session";
+"Sans clic sous %d s, Codex te le redemande dans le terminal." = "No click within %d s: Codex asks you again in the terminal.";
+"Dans le terminal" = "In the terminal";
+"Refuser" = "Deny";
+"Autoriser" = "Allow";
+
+/* Onglet */
+"Aucune session Codex" = "No Codex sessions";
+"Pose les hooks Codex dans les réglages pour suivre tes sessions." = "Install the Codex hooks in Settings to track your sessions.";
+"Ouvrir les réglages" = "Open Settings";
+"Dans Codex, tape /hooks pour valider les hooks de Claude Notch." = "In Codex, type /hooks to approve the Claude Notch hooks.";
+"Lance `codex` dans un terminal ou ouvre l'app Codex." = "Run `codex` in a terminal or open the Codex app.";
+
+/* Réglages */
+"Approbations" = "Approvals";
+"Approuver depuis la notch" = "Approve from the notch";
+"Les demandes d'approbation de Codex s'affichent dans la notch ; un clic décide." = "Codex approval requests show up in the notch; a click decides.";
+"Codex attend ce hook avant de poser sa question : sans clic sous %d s, ou avec « Dans le terminal », il te la pose dans le terminal. Jamais de « toujours autoriser »." = "Codex waits for this hook before asking its own question: with no click within %d s, or with \"In the terminal\", it asks you in the terminal. Never \"always allow\".";
+"Hooks Codex" = "Codex hooks";
+"Les hooks sont coupés dans config.toml ([features] hooks = false)." = "Hooks are turned off in config.toml ([features] hooks = false).";
+"À valider dans Codex : tape /hooks, puis fais confiance aux hooks de Claude Notch." = "To approve in Codex: type /hooks, then trust the Claude Notch hooks.";
+"Dernier événement" = "Last event";
+"Retirer les hooks" = "Remove hooks";
+"Réinstaller les hooks" = "Reinstall hooks";
+"Mettre à jour les hooks" = "Update hooks";
+"Installer les hooks Codex" = "Install Codex hooks";
+"hooks.json illisible : %@" = "Unreadable hooks.json: %@";
+"Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1)." = "The hooks relay every Codex event to the app, locally (127.0.0.1).";
+"Seul ~/.codex/hooks.json est écrit (sauvegarde horodatée) : config.toml et ton notify ne sont pas touchés." = "Only ~/.codex/hooks.json is written (timestamped backup): config.toml and your notify are not touched.";
+"config.toml contient aussi des hooks : Codex charge les deux fichiers." = "config.toml also contains hooks: Codex loads both files.";
+
+/* Pose et retrait des hooks */
+"Hooks posés. Sauvegarde : %@" = "Hooks installed. Backup: %@";
+"Hooks posés." = "Hooks installed.";
+"Hooks retirés." = "Hooks removed.";
+"Rien à retirer." = "Nothing to remove.";
+"hooks.json invalide (%@) : rien n'a été modifié." = "Invalid hooks.json (%@): nothing was changed.";
+"hooks.json n'est pas un objet JSON : rien n'a été modifié." = "hooks.json is not a JSON object: nothing was changed.";
+"La clé « hooks » de hooks.json n'est pas un objet : rien n'a été modifié." = "The \"hooks\" key in hooks.json is not an object: nothing was changed.";
+"hooks.%@ n'est pas une liste : rien n'a été modifié." = "hooks.%@ is not a list: nothing was changed.";
+"Script de hook introuvable dans l'app (Contents/Resources/%@) : rien n'a été modifié." = "Hook script not found in the app (Contents/Resources/%@): nothing was changed.";
+"Lecture de %@ impossible (%@)." = "Cannot read %@ (%@).";
+"Copie du script de hook impossible (%@) : hooks.json n'a pas été modifié." = "Cannot copy the hook script (%@): hooks.json was not changed.";
+"Écriture de %@ impossible (%@)." = "Cannot write %@ (%@).";
+"Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json (sauvegarde horodatée à côté)." = "The Codex hooks will also be removed from ~/.codex/hooks.json (timestamped backup next to it).";

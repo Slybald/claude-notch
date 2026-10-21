@@ -13,8 +13,8 @@ enum NotchProfile: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Identifiant du futur onglet Codex (pas encore dans l'app : un profil ignore ce que l'app n'a pas).
-    static let codexId = "codex"
+    /// Identifiant de l'onglet Codex (`CodexModule`) ; un profil ignore ce que l'app n'a pas.
+    static let codexId = ModuleRegistry.codexId
     /// Onglets d'assistant : proposés seulement si l'outil est sur le Mac, ou si l'onglet est déjà activé.
     static let agentTabs: Set<String> = [ModuleRegistry.claudeId, codexId]
 
@@ -75,9 +75,12 @@ enum NotchProfile: String, CaseIterable, Identifiable {
     }
 
     /// Assistants trouvés sur ce Mac (lu quand la feuille de changement de profil s'ouvre, jamais en arrière-plan).
-    /// Quand le module Codex sera dans l'app, y ajouter `codexId` si `CodexHookInstaller.codexOnThisMac`.
+    /// Jamais réel sous XCTest (les deux détections le garantissent).
     static func agentsOnThisMac() -> Set<String> {
-        HookInstaller.claudeCodeOnThisMac ? [ModuleRegistry.claudeId] : []
+        var found: Set<String> = []
+        if HookInstaller.claudeCodeOnThisMac { found.insert(ModuleRegistry.claudeId) }
+        if CodexHookInstaller.codexOnThisMac { found.insert(codexId) }
+        return found
     }
 
     /// Le profil dont les onglets sont ceux qui sont activés (l'ordre ne compte pas), sinon nil : « Personnalisé ».
