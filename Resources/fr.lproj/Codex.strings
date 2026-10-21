@@ -25,8 +25,6 @@
 "Aucune session Codex" = "Aucune session Codex";
 "Pose les hooks Codex dans les réglages pour suivre tes sessions." = "Pose les hooks Codex dans les réglages pour suivre tes sessions.";
 "Ouvrir les réglages" = "Ouvrir les réglages";
-"Dans Codex, tape /hooks pour valider les hooks de Claude Notch." = "Dans Codex, tape /hooks pour valider les hooks de Claude Notch.";
-"Lance `codex` dans un terminal ou ouvre l'app Codex." = "Lance `codex` dans un terminal ou ouvre l'app Codex.";
 
 /* Réglages */
 "Approbations" = "Approbations";
@@ -35,7 +33,6 @@
 "Codex attend ce hook avant de poser sa question : sans clic sous %d s, ou avec « Dans le terminal », il te la pose dans le terminal. Jamais de « toujours autoriser »." = "Codex attend ce hook avant de poser sa question : sans clic sous %d s, ou avec « Dans le terminal », il te la pose dans le terminal. Jamais de « toujours autoriser ».";
 "Hooks Codex" = "Hooks Codex";
 "Les hooks sont coupés dans config.toml ([features] hooks = false)." = "Les hooks sont coupés dans config.toml ([features] hooks = false).";
-"À valider dans Codex : tape /hooks, puis fais confiance aux hooks de Claude Notch." = "À valider dans Codex : tape /hooks, puis fais confiance aux hooks de Claude Notch.";
 "Dernier événement" = "Dernier événement";
 "Retirer les hooks" = "Retirer les hooks";
 "Réinstaller les hooks" = "Réinstaller les hooks";
@@ -43,7 +40,6 @@
 "Installer les hooks Codex" = "Installer les hooks Codex";
 "hooks.json illisible : %@" = "hooks.json illisible : %@";
 "Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1)." = "Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1).";
-"Seul ~/.codex/hooks.json est écrit (sauvegarde horodatée) : config.toml et ton notify ne sont pas touchés." = "Seul ~/.codex/hooks.json est écrit (sauvegarde horodatée) : config.toml et ton notify ne sont pas touchés.";
 "config.toml contient aussi des hooks : Codex charge les deux fichiers." = "config.toml contient aussi des hooks : Codex charge les deux fichiers.";
 
 /* Pose et retrait des hooks */
@@ -60,3 +56,39 @@
 "Copie du script de hook impossible (%@) : hooks.json n'a pas été modifié." = "Copie du script de hook impossible (%@) : hooks.json n'a pas été modifié.";
 "Écriture de %@ impossible (%@)." = "Écriture de %@ impossible (%@).";
 "Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json (sauvegarde horodatée à côté)." = "Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json (sauvegarde horodatée à côté).";
+
+/* Parcours d'approbation (onglet) */
+"Hooks Codex non posés" = "Hooks Codex non posés";
+"Hooks Codex à mettre à jour" = "Hooks Codex à mettre à jour";
+"Mets-les à jour dans les réglages, puis approuve-les dans Codex." = "Mets-les à jour dans les réglages, puis approuve-les dans Codex.";
+"Hooks coupés dans Codex" = "Hooks coupés dans Codex";
+"config.toml contient [features] hooks = false : Codex n'exécute aucun hook." = "config.toml contient [features] hooks = false : Codex n'exécute aucun hook.";
+"hooks.json illisible" = "hooks.json illisible";
+"Corrige-le ou ouvre les réglages pour voir pourquoi." = "Corrige-le ou ouvre les réglages pour voir pourquoi.";
+"À approuver dans Codex" = "À approuver dans Codex";
+"Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex)." = "Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex).";
+"Approuver dans Codex" = "Approuver dans Codex";
+"Ouvre une nouvelle conversation dans l'app ChatGPT ou lance codex dans un terminal. Les conversations déjà ouvertes ne sont pas suivies." = "Ouvre une nouvelle conversation dans l'app ChatGPT ou lance codex dans un terminal. Les conversations déjà ouvertes ne sont pas suivies.";
+
+/* Parcours d'approbation (réglages) */
+"Actifs" = "Actifs";
+"En attente d'approbation dans Codex" = "En attente d'approbation dans Codex";
+"Coupés dans config.toml" = "Coupés dans config.toml";
+"Codex ignore ces hooks tant qu'ils ne sont pas approuvés." = "Codex ignore ces hooks tant qu'ils ne sont pas approuvés.";
+"1. Clique sur « Approuver dans Codex »." = "1. Clique sur « Approuver dans Codex ».";
+"2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex) : les conversations déjà ouvertes ne sont pas suivies." = "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex) : les conversations déjà ouvertes ne sont pas suivies.";
+"Vérifier" = "Vérifier";
+"Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché." = "Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché.";
+"« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml (la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : « Review hooks » dans l'app, /hooks dans le terminal." = "« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml (la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : « Review hooks » dans l'app, /hooks dans le terminal.";
+
+/* Demandes à Codex */
+"Codex est introuvable sur ce Mac (ni l'app, ni la commande codex)." = "Codex est introuvable sur ce Mac (ni l'app, ni la commande codex).";
+"Impossible de lancer Codex (%@)." = "Impossible de lancer Codex (%@).";
+"Codex n'a pas répondu à temps." = "Codex n'a pas répondu à temps.";
+"Codex a refusé la demande (%@)." = "Codex a refusé la demande (%@).";
+"Un réglage plus prioritaire (administrateur, projet) impose l'état de ces hooks." = "Un réglage plus prioritaire (administrateur, projet) impose l'état de ces hooks.";
+"réponse inattendue" = "réponse inattendue";
+"Codex s'est arrêté" = "Codex s'est arrêté";
+"Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé)." = "Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé).";
+"Hooks approuvés. Ouvre une nouvelle conversation Codex pour les voir à l'œuvre." = "Hooks approuvés. Ouvre une nouvelle conversation Codex pour les voir à l'œuvre.";
+"Codex n'a pas approuvé %d hooks." = "Codex n'a pas approuvé %d hooks.";

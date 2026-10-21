@@ -12,7 +12,7 @@ final class CodexSnapshotTests: XCTestCase {
 
     private static let iterm = CodexContext(pid: nil, start: nil, hostName: "iTerm2", hostBundleId: "com.googlecode.iterm2")
     private static let editor = CodexContext(pid: nil, start: nil, hostName: "VS Code", hostBundleId: "com.microsoft.VSCode")
-    private static let app = CodexContext(pid: nil, start: nil, hostName: "Codex", hostBundleId: "com.openai.codex")
+    private static let app = CodexContext(pid: nil, start: nil, hostName: "ChatGPT", hostBundleId: "com.openai.codex")
 
     /// Notch dépliée sur l'onglet Codex, avec son propre module et des réglages jetables.
     private final class Scene {
@@ -47,10 +47,8 @@ final class CodexSnapshotTests: XCTestCase {
             model.selectedTab = "codex"
             if hooks != .none { try installer.install() }
             if hooks == .reviewed {
-                try """
-                [hooks.state."\(installer.hooksURL.path):stop:0:0"]
-                trusted_hash = "sha256:00"
-                """.write(to: installer.configURL, atomically: true, encoding: .utf8)
+                try installer.hookKeys().map { "[hooks.state.\(CodexAppServer.tomlQuoted($0))]\ntrusted_hash = \"sha256:00\"\n" }
+                    .joined(separator: "\n").write(to: installer.configURL, atomically: true, encoding: .utf8)
             }
             setup.refresh()
             testCase.addTeardownBlock { [codex] in codex.setTracking(false) }
@@ -151,7 +149,11 @@ final class CodexSnapshotTests: XCTestCase {
         let installed = try Scene(self, hooks: .installed)
         try render(SettingsView(prefs: installed.prefs, registry: installed.registry, updater: Updater(),
                                 selection: .module("codex")),
-                   name: "codex-settings", to: outputDir, size: SettingsWindow.size, background: nil)
+                   name: "codex-settings-to-approve", to: outputDir, size: SettingsWindow.size, background: nil)
+        let active = try Scene(self, hooks: .reviewed)
+        try render(SettingsView(prefs: active.prefs, registry: active.registry, updater: Updater(),
+                                selection: .module("codex")),
+                   name: "codex-settings-active", to: outputDir, size: SettingsWindow.size, background: nil)
         let bare = try Scene(self, hooks: .none)
         try render(SettingsView(prefs: bare.prefs, registry: bare.registry, updater: Updater(), selection: .module("codex")),
                    name: "codex-settings-no-hooks", to: outputDir, size: SettingsWindow.size, background: nil)
