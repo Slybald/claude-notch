@@ -24,8 +24,11 @@ struct ExternalEarDetail: View {
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if let name = ear.appName {
-                    ModuleCapsuleButton(title: String(format: L("Ouvrir %@", table: "API"), name),
-                                        symbol: "arrow.up.forward.app") { api.openApp(of: ear) }
+                    // Le nom seul : la flèche dit « ouvrir », la place manque dans la carte.
+                    let open = String(format: L("Ouvrir %@", table: "API"), name)
+                    ModuleCapsuleButton(title: name, symbol: "arrow.up.forward.app") { api.openApp(of: ear) }
+                        .help(open)
+                        .accessibilityLabel(open)
                 }
                 ModuleIconButton(symbol: "xmark", label: L("Retirer", table: "API"), box: 20, size: 10) {
                     api.remove(ear.id)
@@ -89,7 +92,7 @@ struct LocalAPISettings: View {
                 } label: {
                     Text(verbatim: "~/.local/bin/notch").font(.system(size: 12, design: .monospaced))
                 }
-                Text(verbatim: String(format: "notch show --title \"%@\" --icon checkmark.circle.fill --color green",
+                Text(verbatim: String(format: "notch show --title \"%@\" --ttl 30\nnotch run -- make test",
                                       L("Build fini", table: "API")))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
