@@ -6,3 +6,4 @@
 "NSBluetoothAlwaysUsageDescription" = "Claude Notch uses Bluetooth to show the status of your connected devices, only if you turn this feature on.";
 "NSCalendarsFullAccessUsageDescription" = "Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.";
 "NSCalendarsUsageDescription" = "Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.";
+"NSContactsUsageDescription" = "Claude Notch reads your contacts to show their names in the Messages tab, only if you turn this feature on.";

@@ -12,7 +12,7 @@ final class LocalizationTests: XCTestCase {
     private static let usageKeys = ["NSDesktopFolderUsageDescription", "NSDocumentsFolderUsageDescription",
                                     "NSDownloadsFolderUsageDescription", "NSCalendarsFullAccessUsageDescription",
                                     "NSCalendarsUsageDescription", "NSAppleEventsUsageDescription",
-                                    "NSBluetoothAlwaysUsageDescription"]
+                                    "NSBluetoothAlwaysUsageDescription", "NSContactsUsageDescription"]
 
     /// Tables des textes de l'interface : Localizable et une par module (tout .strings sauf InfoPlist).
     private static func tables(_ language: String = "en") throws -> [String] {
@@ -42,7 +42,7 @@ final class LocalizationTests: XCTestCase {
     /// Une table par module, les mêmes en anglais et en français.
     func testModuleTablesExist() throws {
         let tables = try Self.tables()
-        for table in ["Localizable", "Media", "QuickSettings", "Shelf", "Clipboard", "Timer", "Notes"] {
+        for table in ["Localizable", "Media", "QuickSettings", "Shelf", "Clipboard", "Timer", "Notes", "Messages", "Mail"] {
             XCTAssertTrue(tables.contains(table), table)
         }
         XCTAssertEqual(try Self.tables("fr"), tables)
