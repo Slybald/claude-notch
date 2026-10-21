@@ -40,6 +40,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   (`codex://threads/<id>`) instead of only bringing the app to the front. Measured with the app's own Codex 0.162;
   `docs/CODEX.md` and the README describe the approval of the hooks.
 
+### Changed
+
+- **Mail tab: your latest received emails instead of only the unread ones.** It now lists the latest 3 to 5 emails of
+  the inbox (Settings › Mail, 5 by default), read or not: sender, subject, the start of the text on one or two
+  lines, relative time and a dot when unread. The badge on the collapsed notch is still the unread count. Click a row
+  to open it in Mail.
+- The list is read by position (`messages 1 thru N of inbox`) instead of filtering the whole inbox. Measured on a real
+  inbox of 5,316 emails, the old unread filter did not answer within 30 seconds ("Mail is not responding"); the new
+  read takes about 5 seconds the first time and 1.5 seconds after.
+- With "Show senders, subjects and the start of messages" off, the list is not even read, only the counters.
+
+### Added
+
+- **Reply from the notch.** Hover an email and click **Reply**: a field opens under it (Return sends, Esc closes).
+  The answer goes to the sender only, with Mail's own "Re: …" subject and quoted text. It is sent **only** when you
+  click **Send** or press Return, never on its own. **Continue in Mail** opens Mail's reply window with your text
+  already typed. "Sent" confirms; errors say what to do (Mail closed → a button to open it, never launched on its own;
+  permission denied → Settings; no confirmation from Mail → check before trying again). Your text is kept after an error.
+
 ## [1.7.0] - 2026-10-21
 
 ### Added

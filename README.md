@@ -85,8 +85,11 @@ needs you.
 - **Messages** (off by default): your recent iMessage and SMS conversations, an unread badge on the collapsed notch
   and a quick reply. It reads the Messages database on your Mac, which needs Full Disk Access; nothing is stored or
   sent anywhere. Details and limits in [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
-- **Mail** (off by default): the unread count of Apple Mail and the latest unread messages (sender, subject). Click
-  one to open it in Mail. Claude Notch never launches Mail: it only reads it while it is open.
+- **Mail** (off by default): the unread count of Apple Mail and your latest 3 to 5 received emails (sender, subject,
+  the start of the text, time, a dot when unread). Click one to open it in Mail; hover it and click **Reply** to
+  write an answer right in the notch. The reply is sent only when you click **Send** (or press Return), and **Continue
+  in Mail** opens Mail's own reply window with your text already typed. Claude Notch never launches Mail: it only
+  reads it while it is open.
 
 ## Reply from the notch
 
@@ -298,7 +301,7 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
   the tab says so and links to System Settings.
 - **Contacts** (Messages tab): to show contact names instead of numbers. Asked when you click **Allow** in the tab.
 - **Automation: Messages** (Apple Events): to send a quick reply. macOS asks the first time you send.
-- **Automation: Mail** (Apple Events): to read the unread count and the latest messages. Asked when you click
+- **Automation: Mail** (Apple Events): to read the latest emails and to send the reply you write. Asked when you click
   **Allow** in the Mail tab.
 - **Desktop, Documents, Downloads**: only for the optional companion tools (see [Tools section](#tools-section)).
 - Wi-Fi: the network name is not read, so Location is not requested. If macOS refuses to change the Wi-Fi state,
@@ -573,8 +576,11 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
   notch repliée et une réponse rapide. Il lit la base de Messages sur ton Mac, ce qui exige l'Accès complet au
   disque ; rien n'est enregistré ni envoyé ailleurs. Détails et limites dans
   [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
-- **Mail** (désactivé par défaut) : le nombre de messages non lus d'Apple Mail et les derniers (expéditeur, objet).
-  Un clic en ouvre un dans Mail. Claude Notch ne lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
+- **Mail** (désactivé par défaut) : le nombre de messages non lus d'Apple Mail et tes 3 à 5 derniers mails reçus
+  (expéditeur, objet, début du texte, heure, pastille s'il n'est pas lu). Un clic en ouvre un dans Mail ; au survol,
+  **Répondre** ouvre un champ pour écrire la réponse dans la notch. Elle ne part que sur ton clic sur **Envoyer** (ou
+  Entrée) ; **Continuer dans Mail** ouvre la fenêtre de réponse de Mail avec ton texte déjà tapé. Claude Notch ne
+  lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
 
 ### Répondre depuis la notch
 
@@ -799,8 +805,8 @@ lancement.
 - **Contacts** (onglet Messages) : pour afficher les noms des contacts au lieu des numéros. Demandé quand tu cliques
   sur **Autoriser** dans l'onglet.
 - **Automatisation : Messages** (Apple Events) : pour envoyer une réponse rapide. macOS le demande au premier envoi.
-- **Automatisation : Mail** (Apple Events) : pour lire le nombre de non-lus et les derniers messages. Demandé quand
-  tu cliques sur **Autoriser** dans l'onglet Mail.
+- **Automatisation : Mail** (Apple Events) : pour lire les derniers mails et envoyer la réponse que tu écris. Demandé
+  quand tu cliques sur **Autoriser** dans l'onglet Mail.
 - **Bureau, Documents, Téléchargements** : seulement pour les outils compagnons facultatifs (voir
   [Section outils](#section-outils)).
 - Wi-Fi : le nom du réseau n'est pas lu, donc la localisation n'est pas demandée. Si macOS refuse de changer l'état

@@ -73,8 +73,9 @@ organised and why some choices were made, so they are not undone by accident.
   - `Messages/` (`messages`, off by default): `MessagesModule` (state, badge, quick reply), `MessagesBackends`
     (read-only `chat.db` through `SQLite3`, Contacts, FSEvents watcher, AppleScript sender: all behind protocols),
     `MessagesModels` (typedstream decoder for `attributedBody`, dates, contact book), `MessagesViews`.
-  - `Mail/` (`mail`, off by default): `MailModule` (state, 2-minute counter poll while Mail runs), `MailModels` (the
-    AppleScript and the parser of its answer), `MailViews`. `AppleEvents.swift` is shared by both: Automation status
+  - `Mail/` (`mail`, off by default): `MailModule` (state, 2-minute counter poll while Mail runs, the 3 to 5 latest
+    received emails, the reply in progress), `MailModels` (the read and reply AppleScripts and the parser of their
+    answers), `MailViews` (list, hover "Reply" button, reply bar). `AppleEvents.swift` is shared by both: Automation status
     without a prompt, `osascript` runner with a time limit, System Settings privacy links. See
     [MESSAGES-MAIL.md](MESSAGES-MAIL.md).
 - `Preferences`: every setting (UserDefaults, observable, values clamped). `SettingsWindow`: the settings
@@ -187,7 +188,8 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   tab is opened. They only run collapsed (`keepsRunningWhenCollapsed`) once a first read worked (`<id>.armed`):
   Messages listens to FSEvents on `chat.db` / `chat.db-wal` (no timer), Mail polls a counter script every 2 minutes
   only while Mail runs and never launches it (`application id … is not running` guard, checked). Message text and
-  AppleScript arguments never go through string interpolation. Under XCTest the default accesses are inert
+  AppleScript arguments never go through string interpolation. A Mail reply leaves only through
+  `MailModule.sendReply()` (click on Send or Return in the field), never on open, refresh or close. Under XCTest the default accesses are inert
   (`ModuleEnvironment.isTesting`): tests never read real messages or run `osascript` (except the closed-Mail guard).
 - **Localization per table**: `L("…", table: "Media")` or `Text("…", tableName: "Media")`; without a table,
   `Localizable`. `LocalizationTests` checks every table: each key used in the code is translated in its table, no
