@@ -53,7 +53,7 @@ final class OptionalClaudeTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         XCTAssertFalse(notch.registry.isClaudeEnabled)
         XCTAssertEqual(tabs(), [])
-        XCTAssertEqual(notch.measure().width, 185 + 12, accuracy: 1, "replié : exactement la notch")
+        XCTAssertEqual(notch.measure().width, 185, accuracy: 1, "replié : exactement la notch")
     }
 }
 

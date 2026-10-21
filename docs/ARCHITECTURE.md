@@ -158,8 +158,15 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   the notch. Module ears also keep the notch window on screen. This replaced the 1.2.2 rotation (Claude and the other
   ears took turns every 4 s, with its `Timer`, `EarsRotation` and `appearance.alternateEars`): it was a misreading of
   "index tabs", which are side by side, not one after another.
+  - **Geometry** (`EarTabsGeometryTests`, measured on the rendered silhouette against the physical notch): the collapsed
+    shape on a real notch has no top flares (`topRadius` 0), so it is exactly `notchRect` (185 × 32 pt on the 14" built-in
+    display: screen width − the two auxiliary areas) and `contentSize` equals the notch; the 6 pt flares are kept only on
+    the virtual notch and once expanded. The tab against the notch has exactly its height (no step), its rank-0 `overlap`
+    runs down to the notch's bottom so no gap is left in the notch's rounded bottom corners, and the deployed card's inner
+    corner radius never starts above the notch's bottom.
   - **Look** (`EarTabViews.swift`): each tab is its own shape (rounded outer bottom corner) drawn in the notch's black,
-    one step shorter than the previous one going outwards (a staircase, `EarTabs.height`), with a discreet accent per
+    the first as tall as the notch, then one step shorter than the previous one going outwards (a staircase,
+    `EarTabs.height`), with a discreet accent per
     activity (`EarTabs.accentHex`: Claude takes the accent of the settings). Setting `appearance.earTabs`
     (`EarTabsMode`): **visible** (default: icon and a very short text, `4:59`, `1·6`, equalizer bars, always readable at a
     glance, same footprint as the old ears for the usual Claude + player case) or **retracted** (8 pt sliver until

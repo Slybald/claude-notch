@@ -16,6 +16,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   passed with `curl -H @file`), exact `Host` and no `Origin` (no web page can call it), strict schema, rate limit; no
   code, command or URL from a tab, only a button that opens a named app. A script's tab always says which program sent
   it and can never pass for a Claude or Codex request. Settings › Scripts lists the last clients.
+- **Fans in Quick Settings.** A Fans card shows both fan speeds and the hottest CPU and GPU temperatures, read only
+  while the tab is shown. **Fixed speed** sets the fans to a speed of your choice with a slider, never below the Mac's
+  minimum nor above its maximum; **Give control back to macOS** is always visible while it is active, and the
+  collapsed notch shows the speed in an index tab. Absent on Macs without fans; read-only on Intel Macs.
+- The first fixed speed installs, after one administrator password, a small helper
+  (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows only this
+  helper, with only `auto` or `hold`. The helper checks every request against the bounds read from the Mac.
+- Safety: macOS gets control back when the app quits or crashes, freezes for 30 s, on sleep or session change, above
+  105 °C, or when macOS itself takes a fan back. "Remove the authorization" (Settings › Quick Settings) and
+  uninstalling remove the helper and its rule. Details and measurements: [docs/FANS.md](docs/FANS.md).
+
+### Fixed
+
+- **Index tabs now line up with the real notch.** The tab against the notch was 3 pt shorter than it, so the notch showed
+  as a small lip under the tabs with a step on each side and a gap in its rounded bottom corners; and the collapsed shape
+  drew 6 pt flares on each side of the notch, so on a side without a tab it stuck out of the notch (the shape measured
+  197 pt for a 185 pt notch). The central part is now exactly the notch (same width and height), the first tab on each side
+  is as tall as the notch and continues it without a step or a gap, in every state (always visible, retracted, unfolded,
+  virtual notch). Tests measure the rendered silhouette against the notch for several notch sizes.
 
 ## [1.9.0] - 2026-10-21
 
@@ -32,16 +51,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   - one request at a time: once it is settled, the next one starts its one second again, so a repeated press never
     settles two requests; questions and plans still need the mouse;
   - same deciders as a click: nothing is ever "always allowed", the timeouts and "first answer wins" are unchanged.
-- **Fans in Quick Settings.** A Fans card shows both fan speeds and the hottest CPU and GPU temperatures, read only
-  while the tab is shown. **Fixed speed** sets the fans to a speed of your choice with a slider, never below the Mac's
-  minimum nor above its maximum; **Give control back to macOS** is always visible while it is active, and the
-  collapsed notch shows the speed in an index tab. Absent on Macs without fans; read-only on Intel Macs.
-- The first fixed speed installs, after one administrator password, a small helper
-  (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows only this
-  helper, with only `auto` or `hold`. The helper checks every request against the bounds read from the Mac.
-- Safety: macOS gets control back when the app quits or crashes, freezes for 30 s, on sleep or session change, above
-  105 °C, or when macOS itself takes a fan back. "Remove the authorization" (Settings › Quick Settings) and
-  uninstalling remove the helper and its rule. Details and measurements: [docs/FANS.md](docs/FANS.md).
 
 ## [1.8.0] - 2026-10-21
 

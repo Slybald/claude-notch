@@ -83,7 +83,9 @@ struct NotchRootView: View {
     private var fill: Color {
         expanded || (prefs.tintCollapsed && !model.hasNotch) ? prefs.panelColor : .black
     }
-    private var topRadius: CGFloat { expanded ? 12 : 6 }
+    /// Replié sur une vraie encoche : aucun évasement, la forme est exactement l'encoche (sinon 6 pt de noir de plus de
+    /// chaque côté, visibles du côté sans intercalaire, et une forme mesurée 12 pt plus large que l'encoche).
+    private var topRadius: CGFloat { expanded ? 12 : (model.hasNotch ? 0 : 6) }
     private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : 9 }
     /// Repliée : la notch seule ; les intercalaires se posent contre elle (`EarTabsView`).
     private var bodyWidth: CGFloat {
