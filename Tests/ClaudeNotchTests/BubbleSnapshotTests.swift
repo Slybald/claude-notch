@@ -72,12 +72,9 @@ final class BubbleSnapshotTests: XCTestCase {
         var snap = GooState(panel: panel, notch: notch, handle: handle, drop: drop(120))
         snap.mode = .snap(start: start)
         stages.append(("bubble-goo-5-snap", snap.shapes(at: start.addingTimeInterval(Goo.snapDuration * 0.25))))
-        let dock = CGPoint(x: notch.midX, y: notch.maxY + BubbleGeometry.radius + 8)
-        for (name, t) in [("6", 0.25), ("7", 0.55), ("8", 0.85)] {
-            var merge = GooState(panel: notch, notch: notch, handle: dock, drop: dock)
-            merge.mode = .merge(start: start, from: dock)
-            stages.append(("bubble-goo-\(name)-merge", merge.shapes(at: start.addingTimeInterval(Goo.mergeDuration * t))))
-        }
+        var overlap = snap
+        overlap.mode = .snap(start: start)
+        stages.append(("bubble-goo-6-snap-overlap", overlap.shapes(at: start.addingTimeInterval(0.02))))
         for (name, shapes) in stages {
             let view = ZStack(alignment: .topLeading) {
                 // Bande de la barre des menus, pour situer la notch.
@@ -87,6 +84,61 @@ final class BubbleSnapshotTests: XCTestCase {
             .frame(width: size.width, height: size.height, alignment: .topLeading)
             try TimerNotesSnapshot.render(view, name, dir, size: size, background: Self.wallpaper)
         }
+    }
+
+    /// Retour aimanté : approche (la bulle se tend et se hérisse, la notch pointe vers elle), contact, aspiration,
+    /// rebond de la notch ; détente quand on la lâche dans le champ. Puis une notch teintée (dégradé du col).
+    func testRenderFerroStages() throws {
+        guard let dir = TimerNotesSnapshot.outputDirectory else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
+        let screenNotch = CGRect(x: 663.5, y: 950, width: 185, height: 32)
+        let field = Ferro.fieldFrame(notch: screenNotch)
+        let local = GooCoordinates(field)
+        let notch = local.rect(screenNotch)
+        let start = Date()
+        func scene(_ state: FerroState, _ date: Date, fill: Color = .black) -> some View {
+            let shapes = state.shapes(at: date)
+            return ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.25).frame(height: 37)
+                NotchShape(topRadius: 0, bottomRadius: 9).fill(Color.black)
+                    .frame(width: notch.width, height: notch.height)
+                    .position(x: notch.midX, y: notch.midY)
+                FerroCanvas(shapes: shapes, notch: notch, notchColor: .black, fill: fill)
+                if !shapes.outline.isEmpty {
+                    RevolverBubble(tabs: tabs(6), turn: 0, activity: [], claudeEars: nil, fill: fill,
+                                   nearNotch: state.strength > 0.5, outline: BubbleRootView.outline(shapes),
+                                   contentScale: shapes.contentScale, contentOpacity: Double(shapes.contentOpacity))
+                        .position(shapes.center)
+                }
+            }
+            .frame(width: field.width, height: field.height, alignment: .topLeading)
+        }
+        func approach(_ gap: CGFloat, dx: CGFloat = 40) -> FerroState {
+            let wanted = CGPoint(x: screenNotch.midX + dx, y: screenNotch.minY - BubbleGeometry.radius - gap)
+            let pulled = Ferro.attract(wanted, notch: screenNotch)
+            return FerroState(notch: notch, center: local.point(pulled.center), strength: pulled.strength)
+        }
+        var stages: [(String, FerroState, Date)] = []
+        for (name, gap) in [("1", 140.0), ("2", 95.0), ("3", 60.0), ("4", 34.0)] as [(String, CGFloat)] {
+            stages.append(("bubble-ferro-\(name)-approach", approach(gap), start))
+        }
+        let captured = approach(30)
+        for (name, t) in [("5", 0.2), ("6", 0.5), ("7", 0.8), ("8", 0.97), ("9", 1.08), ("10", 1.45)] {
+            var state = captured
+            state.mode = .aspirate(start: start, from: captured.center)
+            stages.append(("bubble-ferro-\(name)-aspirate", state, start.addingTimeInterval(t * Ferro.aspirateDuration)))
+        }
+        var relax = approach(50)
+        relax.mode = .relax(start: start, from: relax.strength)
+        stages.append(("bubble-ferro-11-relax", relax, start.addingTimeInterval(0.24)))
+        for (name, state, date) in stages {
+            try TimerNotesSnapshot.render(scene(state, date), name, dir, size: field.size, background: Self.wallpaper)
+        }
+        let tinted = Color(red: 0.12, green: 0.16, blue: 0.32)
+        var aspirating = captured
+        aspirating.mode = .aspirate(start: start, from: captured.center)
+        try TimerNotesSnapshot.render(scene(aspirating, start.addingTimeInterval(0.4 * Ferro.aspirateDuration),
+                                            fill: tinted),
+                                      "bubble-ferro-12-tinted", dir, size: field.size, background: Self.wallpaper)
     }
 
     /// Barillet de 4 à 10 onglets ; activités (anneau, pastille, points sur les chambres) ; aimantée par la notch.
@@ -132,6 +184,7 @@ final class BubbleSnapshotTests: XCTestCase {
         notch.model.bubble = .bubblePanel
         var actions = NotchActions()
         actions.reattach = {}
+        actions.backToRevolver = {}
         func root() -> BubbleRootView {
             BubbleRootView(model: notch.model, bubble: bubble, store: notch.store, registry: notch.registry,
                            prefs: notch.prefs, actions: actions, input: BubbleInput())

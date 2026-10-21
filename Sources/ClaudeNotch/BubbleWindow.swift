@@ -68,6 +68,15 @@ final class BubbleController {
     private(set) var center = CGPoint.zero
     /// Hauteur du dernier panneau mesuré (fenêtre ajustée dès l'ouverture).
     private var panelHeight: CGFloat?
+    /// Décollé mais notch pas encore repliée : elle se replie sous la goutte au lâcher (`finishDetach`), pas dans
+    /// l'image du décollage (17 ms de SwiftUI, mesurés par `BubbleFrameBenchTests`).
+    private var notchPending = false
+    /// Fin du rebond de la goutte qui rentre dans la notch.
+    private var snapEnd = Date.distantPast
+    /// Fenêtre agrandie au champ de la notch (retour aimanté) ; nil ailleurs.
+    private var fieldFrame: CGRect?
+    /// Fin de la détente : la fenêtre reprend la taille de la bulle.
+    private var relaxWork: DispatchWorkItem?
 
     /// Rectangle de la notch et fenêtre de la notch (la goutte passe sous elle), fournis par `NotchController`.
     var notchRect: () -> CGRect = { .zero }
@@ -130,6 +139,7 @@ final class BubbleController {
         var actions = actions
         actions.detach = nil
         actions.reattach = { [weak self] in self?.reattach() }
+        actions.backToRevolver = { [weak self] in self?.back() }
         let input = BubbleInput(
             open: { [weak self] in self?.open() },
             rotate: { [weak self] in self?.rotate(by: $0) },
@@ -137,7 +147,8 @@ final class BubbleController {
             moveBegan: { [weak self] in self?.moveBegan() },
             moved: { [weak self] in self?.moved() },
             moveEnded: { [weak self] in self?.moveEnded() },
-            panelSized: { [weak self] in self?.panelSized($0) }
+            panelSized: { [weak self] in self?.panelSized($0) },
+            back: { [weak self] in self?.back() }
         )
         let root = BubbleRootView(model: model, bubble: bubble, store: store, registry: registry, prefs: prefs,
                                   actions: actions, input: input)
@@ -149,6 +160,10 @@ final class BubbleController {
         hosting.contextMenu = { [weak self] in self?.contextMenu() }
         window.contentView = hosting
         syncTurn()
+        // Vues de la bulle et fenêtre de la goutte construites au lancement, pas au premier décollage (55 ms et
+        // 18 ms mesurés là).
+        hosting.layoutSubtreeIfNeeded()
+        _ = makeGooWindow()
     }
 
     var debugInfo: [String: Any] {
@@ -160,8 +175,8 @@ final class BubbleController {
         return info
     }
 
-    /// La souris est prise par la bulle (déplacement, décollage) : la notch ne réagit pas à son passage.
-    var isInteracting: Bool { isMoving || model.bubble == .detaching }
+    /// La souris est prise par la bulle (déplacement, décollage, aspiration) : la notch ne réagit pas à son passage.
+    var isInteracting: Bool { isMoving || model.bubble == .detaching || model.bubble == .reattaching }
     /// La bulle suit la souris (glisser en cours).
     var isMoving: Bool { moveOffset != nil }
 
@@ -195,6 +210,8 @@ final class BubbleController {
     func screensChanged() {
         guard model.bubble == .bubble || model.bubble == .bubblePanel else { return }
         if model.bubble == .bubblePanel { close() }
+        finishDetach()
+        clearField()
         let frames = NSScreen.screens.map(\.frame)
         if !frames.contains(where: { NotchScreenPicker.contains($0, center) }), let place = restoredCenter() {
             center = place
@@ -211,8 +228,10 @@ final class BubbleController {
         isSuppressed = suppressed
         if suppressed {
             cancelMove()
+            finishDetach()
             if model.bubble == .bubblePanel { close() }
             if model.bubble == .detaching { cancelPull() }
+            if model.bubble == .bubble { leaveField() }
             window.orderOut(nil)
         } else if model.bubble == .bubble || model.bubble == .bubblePanel {
             window.orderFrontRegardless()
@@ -236,6 +255,12 @@ final class BubbleController {
         if window.isKeyWindow { NotchKeyboard.release(force: true) }
         window.orderOut(nil)
         window.alphaValue = 1
+        window.ignoresMouseEvents = false
+        clearField()
+        if notchPending {
+            notchPending = false
+            collapseNotch()
+        }
         endGoo(after: 0)
         apply(.reset)
         if wasOpen { registry.setPanelOpen(false) }
@@ -248,9 +273,14 @@ final class BubbleController {
         let next = model.bubble.next(event)
         guard next != model.bubble else { return }
         model.bubble = next
-        // Rangé seulement aux états stables : une animation coupée par un arrêt de l'app retombe sur l'un d'eux.
-        let detached = next == .bubble || next == .bubblePanel
-        if next == .attached || detached, prefs.bubbleDetached != detached { prefs.bubbleDetached = detached }
+        // Décollage : rangé au lâcher (`finishDetach`), pas dans l'image du décollage.
+        if !notchPending { persistPhase() }
+    }
+
+    /// Rangé seulement aux états stables : une animation coupée par un arrêt de l'app retombe sur l'un d'eux.
+    private func persistPhase() {
+        let detached = model.bubble == .bubble || model.bubble == .bubblePanel
+        if model.bubble == .attached || detached, prefs.bubbleDetached != detached { prefs.bubbleDetached = detached }
     }
 
     private func haptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
@@ -279,6 +309,18 @@ final class BubbleController {
                      drop: local.point(handle))
         }
         model.gooActive = true
+        prepareBubble(at: handle)
+    }
+
+    /// Bulle préparée pendant le glisser : fenêtre affichée transparente, sans souris, pour que sa première image soit
+    /// dessinée avant le décollage. Au décollage, il ne reste qu'à la rendre opaque.
+    private func prepareBubble(at point: CGPoint) {
+        guard !isSuppressed else { return }
+        center = point
+        fitWindowToBubble()
+        window.alphaValue = 0
+        window.ignoresMouseEvents = true
+        window.orderFrontRegardless()
     }
 
     /// Souris glissée après l'appui : la goutte s'étire ; au seuil, elle se décolle et devient la bulle, que le même
@@ -292,7 +334,7 @@ final class BubbleController {
                 center = mouse
                 moveWindow()
             } else {
-                goo.state?.drop = GooCoordinates(gooFrame).point(mouse)
+                goo.liveDrop = GooCoordinates(gooFrame).point(mouse)
             }
             if hypot(mouse.x - pull.handle.x, mouse.y - pull.handle.y) >= BubbleGeometry.detachDistance {
                 detach(at: mouse, dragging: true)
@@ -337,6 +379,7 @@ final class BubbleController {
                      drop: local.point(handle), mode: .autoPull(start: Date(), to: local.point(end)))
         }
         if panel != nil { model.gooActive = true }
+        prepareBubble(at: end)
         DispatchQueue.main.asyncAfter(deadline: .now() + Goo.autoPullDuration) { [weak self] in
             guard let self, self.model.bubble == .detaching else { return }
             self.detach(at: end, dragging: false)
@@ -344,8 +387,10 @@ final class BubbleController {
         }
     }
 
-    /// Au seuil : la goutte devient la bulle (même taille, puis rebond), le col se résorbe, la notch se replie.
+    /// Au seuil : la goutte devient la bulle (même taille, puis ressort doux), le col se résorbe. Rien d'autre dans
+    /// cette image : la bulle est déjà dessinée (`prepareBubble`), la notch se replie au lâcher (`finishDetach`).
     private func detach(at point: CGPoint, dragging: Bool) {
+        notchPending = !model.reduceMotion
         apply(.release(detached: true))
         center = BubbleGeometry.clamp(point, visibleFrames: NSScreen.screens.map(\.visibleFrame))
         if dragging {
@@ -353,31 +398,53 @@ final class BubbleController {
             NSCursor.closedHand.push()
         }
         pull = nil
-        collapseNotch()
         haptic(.levelChange)
         bubble.ghost = false
         if model.reduceMotion {
+            collapseNotch()
             showBubble()
             return
         }
-        goo.state?.drop = GooCoordinates(gooFrame).point(point)
+        // La goutte reste un instant sous la bulle et la suit (`moved`), puis le corps rentre dans la notch.
+        let drop = GooCoordinates(gooFrame).point(center)
+        goo.liveDrop = drop
+        goo.state?.drop = drop
         goo.state?.mode = .snap(start: Date())
+        snapEnd = Date().addingTimeInterval(Goo.snapDuration)
         bubble.scale = 0.72
         showBubble()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.48)) { bubble.scale = 1 }
-        endGoo(after: Goo.snapDuration)
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.7)) { bubble.scale = 1 }
+        restGoo(after: Goo.snapDuration)
+    }
+
+    /// Après le décollage, au lâcher (ou à la fin du glissement du menu) : la notch se replie, cachée sous la goutte
+    /// qui a fini de rentrer, puis réapparaît ; le réglage est rangé.
+    private func finishDetach() {
+        guard notchPending else { return }
+        notchPending = false
+        let generation = gooGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, snapEnd.timeIntervalSinceNow)) { [weak self] in
+            guard let self else { return }
+            self.collapseNotch()
+            self.persistPhase()
+            if self.gooGeneration == generation { self.endGoo(after: 0) }
+        }
     }
 
     /// Relâché avant le seuil : la goutte rentre, le panneau revient.
     private func cancelPull() {
         pull = nil
         apply(.release(detached: false))
+        window.orderOut(nil)
+        window.alphaValue = 1
+        window.ignoresMouseEvents = false
         if model.reduceMotion {
             bubble.ghost = false
-            window.orderOut(nil)
             return
         }
         guard var state = goo.state else { return endGoo(after: 0) }
+        if let live = goo.liveDrop { state.drop = live }
+        goo.liveDrop = nil
         state.mode = .cancel(start: Date(), from: state.drop, progress: state.progress)
         goo.state = state
         endGoo(after: Goo.cancelDuration)
@@ -395,6 +462,7 @@ final class BubbleController {
         (panel.contentView as? NSHostingView<GooView>)?.rootView = GooView(goo: goo, color: prefs.panelColor)
         panel.setFrame(frame, display: false)
         gooFrame = frame
+        goo.liveDrop = nil
         goo.state = state(GooCoordinates(frame))
         if let notch = notchWindow(), notch.isVisible {
             panel.order(.below, relativeTo: notch.windowNumber)
@@ -430,6 +498,16 @@ final class BubbleController {
         return panel
     }
 
+    /// Décollage fini : le corps reste dessiné dans la notch, sans être redessiné à chaque image, jusqu'à `finishDetach`.
+    private func restGoo(after delay: TimeInterval) {
+        let generation = gooGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.gooGeneration == generation, self.goo.state != nil else { return }
+            self.goo.liveDrop = nil
+            self.goo.state?.mode = .rest
+        }
+    }
+
     /// La notch réapparaît (fondu de 0,15 s par-dessus la goutte), puis la goutte s'efface : plus rien n'est dessiné.
     private func endGoo(after delay: TimeInterval) {
         let generation = gooGeneration
@@ -439,6 +517,7 @@ final class BubbleController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
                 guard let self, self.gooGeneration == generation else { return }
                 self.gooWindow?.orderOut(nil)
+                self.goo.liveDrop = nil
                 self.goo.state = nil
             }
         }
@@ -449,6 +528,7 @@ final class BubbleController {
     private func showBubble() {
         finishShrink()
         window.alphaValue = 1
+        window.ignoresMouseEvents = false
         fitWindowToBubble()
         if !isSuppressed { window.orderFrontRegardless() }
     }
@@ -468,16 +548,16 @@ final class BubbleController {
         window.setFrameOrigin(CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2))
     }
 
-    /// Glisse la bulle vers `target` (fin du détachement par le menu) et range la position.
+    /// Glisse la bulle vers `target` (fin du détachement par le menu), range la position, puis replie la notch.
     private func glide(to target: CGPoint) {
         center = target
         let size = Self.bubbleWindowSize
-        NSAnimationContext.runAnimationGroup { context in
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.35
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrame(NSRect(x: target.x - size.width / 2, y: target.y - size.height / 2,
                                               width: size.width, height: size.height), display: true)
-        }
+        }, completionHandler: { [weak self] in self?.finishDetach() })
         savePosition()
     }
 
@@ -489,32 +569,90 @@ final class BubbleController {
         NSCursor.closedHand.push()
     }
 
-    /// La bulle suit la souris, dans les écrans visibles ; près de la notch, elle est aimantée.
+    /// La bulle suit la souris, dans les écrans visibles. Près de la notch, elle est attirée de plus en plus fort et se
+    /// hérisse comme du ferrofluide (la fenêtre, agrandie une fois au champ de la notch, ne bouge plus : la bulle s'y
+    /// déplace) ; tout près, la notch l'aspire sans attendre le lâcher.
     func moved() {
         guard let moveOffset, model.bubble == .bubble else { return }
         let mouse = mouseLocation()
         let wanted = BubbleGeometry.clamp(CGPoint(x: mouse.x - moveOffset.x, y: mouse.y - moveOffset.y),
                                           visibleFrames: NSScreen.screens.map(\.visibleFrame))
         let notch = notchRect()
-        let near = BubbleGeometry.isNearNotch(center: wanted, notch: notch)
-        if near != bubble.nearNotch {
-            bubble.nearNotch = near
-            if near { haptic(.alignment) }
+        if model.reduceMotion {
+            setNearNotch(BubbleGeometry.isNearNotch(center: wanted, notch: notch))
+            center = BubbleGeometry.magnetized(center: wanted, notch: notch)
+            return moveWindow()
         }
-        center = BubbleGeometry.magnetized(center: wanted, notch: notch)
-        moveWindow()
+        let pulled = Ferro.attract(wanted, notch: notch)
+        setNearNotch(pulled.gap < BubbleGeometry.magnetGap)
+        center = pulled.center
+        if notchPending { goo.liveDrop = GooCoordinates(gooFrame).point(center) }
+        if pulled.gap <= Ferro.captureGap { return reattach() }
+        guard pulled.strength > 0 else {
+            leaveField()
+            return moveWindow()
+        }
+        let local = enterField()
+        relaxWork?.cancel()
+        relaxWork = nil
+        bubble.ferro?.center = local.point(center)
+        bubble.ferro?.strength = pulled.strength
+        bubble.ferro?.mode = .approach
+        bubble.layout(center: local.point(center), window: local.frame.size)
     }
 
-    /// Lâchée près de la notch : elle s'y rattache ; ailleurs, sa position est rangée pour cet écran.
+    private func setNearNotch(_ near: Bool) {
+        guard near != bubble.nearNotch else { return }
+        bubble.nearNotch = near
+        if near { haptic(.alignment) }
+    }
+
+    /// Lâchée près de la notch : elle y est aspirée ; dans le champ de la notch, elle se détend et redevient ronde ;
+    /// sa position est rangée pour cet écran.
     func moveEnded() {
         guard moveOffset != nil else { return }
         moveOffset = nil
         NSCursor.pop()
-        if bubble.nearNotch {
-            reattach()
-        } else {
-            savePosition()
-        }
+        if bubble.nearNotch { return reattach() }
+        finishDetach()
+        savePosition()
+        guard let strength = bubble.ferro?.strength, fieldFrame != nil else { return }
+        bubble.ferro?.mode = .relax(start: Date(), from: strength)
+        let work = DispatchWorkItem { [weak self] in self?.leaveField() }
+        relaxWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Ferro.relaxDuration, execute: work)
+    }
+
+    // MARK: - Champ de la notch (retour aimanté)
+
+    /// Fenêtre agrandie au champ de la notch, une seule fois : la bulle s'y déplace ensuite sans que la fenêtre bouge,
+    /// et la pointe de la notch y est dessinée avec elle (même image, rien ne décroche).
+    private func enterField() -> GooCoordinates {
+        if let fieldFrame { return GooCoordinates(fieldFrame) }
+        let notch = notchRect()
+        let frame = Ferro.fieldFrame(notch: notch)
+        fieldFrame = frame
+        let local = GooCoordinates(frame)
+        bubble.ferro = FerroState(notch: local.rect(notch), center: local.point(center))
+        bubble.layout(center: local.point(center), window: frame.size)
+        window.disableScreenUpdatesUntilFlush()
+        window.setFrame(frame, display: false)
+        return local
+    }
+
+    /// Hors du champ : la fenêtre reprend la taille de la bulle, autour d'elle.
+    private func leaveField() {
+        guard fieldFrame != nil else { return }
+        clearField()
+        fitWindowToBubble()
+    }
+
+    /// Champ oublié sans toucher à la fenêtre (elle est cachée, ou un autre cadre va la remplacer).
+    private func clearField() {
+        relaxWork?.cancel()
+        relaxWork = nil
+        fieldFrame = nil
+        if bubble.ferro != nil { bubble.ferro = nil }
     }
 
     /// Glisser de la bulle interrompu (panneau ouvert, rattachement, notch masquée) : la souris est rendue.
@@ -573,6 +711,8 @@ final class BubbleController {
         }
         guard model.bubble == .bubble else { return }
         cancelMove()
+        finishDetach()
+        clearField()
         if !registry.enabled.contains(where: { $0.id == model.selectedTab }), let first = registry.enabled.first {
             model.selectedTab = first.id
         }
@@ -670,15 +810,18 @@ final class BubbleController {
         DispatchQueue.main.asyncAfter(deadline: .now() + prefs.closeDelay, execute: work)
     }
 
-    /// Clic hors du panneau ouvert, comme pour la notch : il le referme s'il attend un clic à l'extérieur (réglage,
-    /// ouverture au clavier) ; en mode édition, on sort seulement du mode.
+    /// Clic hors du panneau ouvert : retour au barillet (en mode édition, on sort seulement du mode). Toujours, quel
+    /// que soit « Fermer au clic à l'extérieur » : sinon, sans quitter le panneau des yeux, rien ne ramenait au barillet.
     func mouseDown(at point: CGPoint) {
         guard model.bubble == .bubblePanel, !isMenuTracking(), !panelRect.contains(point) else { return }
-        if model.isEditingTabs {
-            model.isEditingTabs = false
-        } else if prefs.closeOnClickOutside || openedByKeyboard {
-            close()
-        }
+        back()
+    }
+
+    /// Retour d'un niveau dans le panneau de la bulle (bouton retour, Échap, pincement, clic à l'extérieur) : sortie du
+    /// mode édition, sinon le panneau se referme en barillet (barre de commande comprise).
+    func back() {
+        guard model.bubble == .bubblePanel else { return }
+        if model.isEditingTabs { model.isEditingTabs = false } else { close() }
     }
 
     /// Panneau de la bulle qui a le clavier : Échap le referme (ou sort du mode édition) ; ouvert au raccourci, ← → et
@@ -688,7 +831,7 @@ final class BubbleController {
               let command = NotchKeyCommand.parse(keyCode: event.keyCode, modifiers: event.modifierFlags,
                                                   editingText: window.firstResponder is NSText) else { return false }
         if command == .close {
-            if model.isEditingTabs { model.isEditingTabs = false } else { close() }
+            back()
             return true
         }
         guard openedByKeyboard else { return false }
@@ -701,7 +844,7 @@ final class BubbleController {
 
     // MARK: - Rattachement
 
-    /// Retour dans la notch : la bulle glisse sous la notch si elle est loin, puis la goutte y remonte.
+    /// Retour dans la notch : la bulle glisse jusque sous la notch si elle est loin, puis la notch l'aspire.
     func reattach() {
         guard model.bubble == .bubble || model.bubble == .bubblePanel else { return }
         let wasOpen = model.bubble == .bubblePanel
@@ -711,20 +854,28 @@ final class BubbleController {
         if window.isKeyWindow { NotchKeyboard.release(force: true) }
         model.isEditingTabs = false
         model.isCommandBarOpen = false
+        // Une notch encore dépliée sous la goutte (décollée puis ramenée d'un même geste) se replie d'abord.
+        finishDetach()
         apply(.reattach)
         if wasOpen { registry.setPanelOpen(false) }
         cancelShrink()
-        bubble.nearNotch = false
-        fitWindowToBubble()
+        setNearNotch(false)
         if model.reduceMotion {
+            clearField()
+            fitWindowToBubble()
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.2
                 window.animator().alphaValue = 0
             }, completionHandler: { [weak self] in self?.finishAttach() })
             return
         }
-        let dock = BubbleGeometry.dockPoint(notch: notchRect())
-        guard hypot(center.x - dock.x, center.y - dock.y) > 4 else { return merge() }
+        let notch = notchRect()
+        if fieldFrame != nil || BubbleGeometry.gap(center: center, notch: notch) < Ferro.reach {
+            if wasOpen { fitWindowToBubble() }
+            return aspirate()
+        }
+        fitWindowToBubble()
+        let dock = BubbleGeometry.dockPoint(notch: notch)
         center = dock
         let size = Self.bubbleWindowSize
         NSAnimationContext.runAnimationGroup({ context in
@@ -732,34 +883,31 @@ final class BubbleController {
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             window.animator().setFrame(NSRect(x: dock.x - size.width / 2, y: dock.y - size.height / 2,
                                               width: size.width, height: size.height), display: true)
-        }, completionHandler: { [weak self] in self?.merge() })
+        }, completionHandler: { [weak self] in self?.aspirate() })
     }
 
-    /// La goutte remonte dans la notch (effet inverse du décollage).
-    private func merge() {
+    /// La notch aspire la bulle : elle s'étire, rétrécit et s'y fond, puis le bas de la notch rebondit.
+    private func aspirate() {
         guard model.bubble == .reattaching else { return }
-        let notch = notchRect()
-        let reach = BubbleGeometry.radius + 30
-        showGoo(covering: notch.insetBy(dx: -40, dy: 0).union(CGRect(x: center.x - reach, y: center.y - reach,
-                                                                     width: 2 * reach, height: 2 * reach))) { local in
-            GooState(panel: local.body(notch), notch: local.body(notch), handle: local.point(center),
-                     drop: local.point(center), mode: .merge(start: Date(), from: local.point(center)))
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            window.animator().alphaValue = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Goo.mergeDuration) { [weak self] in
-            self?.finishAttach()
+        let local = enterField()
+        relaxWork?.cancel()
+        relaxWork = nil
+        bubble.ferro?.mode = .aspirate(start: Date(), from: local.point(center))
+        window.ignoresMouseEvents = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + Ferro.aspirateDuration) { [weak self] in
             self?.haptic(.levelChange)
         }
-        endGoo(after: Goo.mergeDuration)
+        DispatchQueue.main.asyncAfter(deadline: .now() + FerroState.aspirateTotal) { [weak self] in
+            self?.finishAttach()
+        }
     }
 
     private func finishAttach() {
         guard model.bubble == .reattaching else { return }
         window.orderOut(nil)
         window.alphaValue = 1
+        window.ignoresMouseEvents = false
+        clearField()
         apply(.merged)
         didAttach()
     }
@@ -785,6 +933,10 @@ struct GooCoordinates {
     init(_ frame: CGRect) { self.frame = frame }
 
     func point(_ point: CGPoint) -> CGPoint { CGPoint(x: point.x - frame.minX, y: frame.maxY - point.y) }
+
+    func rect(_ rect: CGRect) -> CGRect {
+        CGRect(x: rect.minX - frame.minX, y: frame.maxY - rect.maxY, width: rect.width, height: rect.height)
+    }
 
     /// Forme collée en haut de l'écran : prolongée jusqu'au-dessus de la fenêtre, le flou n'en ronge pas le haut.
     func body(_ rect: CGRect) -> CGRect {

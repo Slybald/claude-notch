@@ -1,3 +1,4 @@
+import Combine
 import CoreGraphics
 import XCTest
 @testable import ClaudeNotch
@@ -307,14 +308,21 @@ final class BubbleTests: XCTestCase {
         let far = GooState(panel: panel, notch: notch, handle: handle, drop: CGPoint(x: 700, y: 400)).shapes(at: Date())
         XCTAssertLessThan(far.body.width, shapes.body.width)
 
-        // Décollé : plus de goutte, le corps rentre dans la notch.
+        // Décollé : la goutte reste un instant sous la bulle qui la remplace (rien ne clignote si la fenêtre de la bulle
+        // arrive une image plus tard), puis disparaît ; le corps rentre dans la notch et y repose.
         let start = Date()
         var snap = state
         snap.mode = .snap(start: start)
-        XCTAssertEqual(snap.shapes(at: start).drop.radius, 0)
+        XCTAssertEqual(snap.shapes(at: start).drop.radius, Goo.dropRadius(progress: 1), accuracy: 0.001)
+        let gone = start.addingTimeInterval(Goo.snapDuration * Double(Goo.snapOverlap) + 0.001)
+        XCTAssertEqual(snap.shapes(at: gone).drop.radius, 0)
+        XCTAssertLessThan(Goo.snapDuration * Double(Goo.snapOverlap), 0.06, "trois images au plus à 60 i/s")
         let done = snap.shapes(at: start.addingTimeInterval(Goo.snapDuration))
         assertEqual(done.body, notch)
         XCTAssertTrue(done.neck.allSatisfy { $0.radius == 0 })
+        var rest = state
+        rest.mode = .rest
+        XCTAssertEqual(rest.shapes(at: start), done, "au repos : la fin du décollage, dessin fixe")
 
         // Abandonné : la goutte revient à la poignée et disparaît, le corps redevient le panneau.
         var cancel = state
@@ -322,15 +330,6 @@ final class BubbleTests: XCTestCase {
         let back = cancel.shapes(at: start.addingTimeInterval(Goo.cancelDuration))
         XCTAssertEqual(back.drop.radius, 0, accuracy: 0.001)
         XCTAssertEqual(back.body, panel)
-
-        // Rattachement : la goutte monte dans la notch et s'y fond.
-        var merge = state
-        merge.mode = .merge(start: start, from: CGPoint(x: 370, y: 200))
-        let first = merge.shapes(at: start)
-        XCTAssertEqual(first.drop.radius, BubbleGeometry.radius, accuracy: 0.001)
-        let last = merge.shapes(at: start.addingTimeInterval(Goo.mergeDuration))
-        XCTAssertEqual(last.drop.radius, 0, accuracy: 0.001)
-        XCTAssertEqual(last.body.width, notch.width, accuracy: 0.001)
 
         // Détachement par le menu : la goutte va seule jusqu'au seuil.
         var auto = state
@@ -341,6 +340,170 @@ final class BubbleTests: XCTestCase {
         XCTAssertEqual(arrived.drop.center.y, handle.y + BubbleGeometry.detachDistance, accuracy: 0.001)
         XCTAssertEqual(arrived.drop.center.x, handle.x, accuracy: 0.001)
         XCTAssertEqual(arrived.drop.radius, Goo.dropRadius(progress: 1), accuracy: 0.001)
+    }
+
+    /// La goutte suit la souris sans être publiée : la vue la lit à chaque image (une seule image par rafraîchissement).
+    func testGooReadsTheLiveDrop() {
+        let goo = GooModel()
+        XCTAssertNil(goo.shapes(at: Date()))
+        goo.state = GooState(panel: CGRect(x: 0, y: -20, width: 400, height: 300),
+                             notch: CGRect(x: 100, y: -20, width: 185, height: 52), handle: CGPoint(x: 380, y: 270),
+                             drop: CGPoint(x: 380, y: 270))
+        var published = 0
+        let watch = goo.objectWillChange.sink { published += 1 }
+        goo.liveDrop = CGPoint(x: 420, y: 330)
+        XCTAssertEqual(published, 0)
+        XCTAssertEqual(goo.shapes(at: Date())?.drop.center, CGPoint(x: 420, y: 330))
+        watch.cancel()
+    }
+
+    // MARK: - Retour aimanté (ferrofluide)
+
+    /// Comme un aimant : rien au-delà de la portée, 1 à l'aspiration, de plus en plus fort en approchant.
+    func testMagnetStrengthGrowsAsTheGapShrinks() {
+        XCTAssertEqual(Ferro.strength(gap: Ferro.reach), 0)
+        XCTAssertEqual(Ferro.strength(gap: Ferro.reach + 100), 0)
+        XCTAssertEqual(Ferro.strength(gap: Ferro.captureGap), 1)
+        XCTAssertEqual(Ferro.strength(gap: 0), 1)
+        var previous: CGFloat = -1, previousStep: CGFloat = 0
+        for gap in stride(from: Ferro.reach, through: Ferro.captureGap, by: -2) {
+            let s = Ferro.strength(gap: gap)
+            XCTAssertGreaterThan(s, previous - 1e-9, "croissante quand l'écart diminue")
+            if previous >= 0 { XCTAssertGreaterThanOrEqual(s - previous, previousStep - 1e-9, "et de plus en plus vite") }
+            if previous >= 0 { previousStep = s - previous }
+            previous = s
+        }
+    }
+
+    /// La bulle suit la souris, tirée vers le bas de la notch d'autant plus qu'elle en est près, jamais au-delà.
+    func testAttractionPullsTowardTheNotch() {
+        let far = CGPoint(x: Self.notch.midX + 400, y: 500)
+        let farPull = Ferro.attract(far, notch: Self.notch)
+        XCTAssertEqual(farPull.center, far, "hors de portée : la souris seule")
+        XCTAssertEqual(farPull.strength, 0)
+
+        var lastPull: CGFloat = 0
+        for gap in [140.0, 100, 70, 45, 30] as [CGFloat] {
+            let center = CGPoint(x: Self.notch.midX + 20, y: Self.notch.minY - BubbleGeometry.radius - gap)
+            let pulled = Ferro.attract(center, notch: Self.notch)
+            let pull = hypot(pulled.center.x - center.x, pulled.center.y - center.y)
+            XCTAssertGreaterThan(pull, lastPull, "écart \(gap)")
+            XCTAssertGreaterThan(pulled.center.y, center.y, "vers la notch (en haut)")
+            XCTAssertLessThan(pulled.gap, BubbleGeometry.gap(center: center, notch: Self.notch))
+            XCTAssertGreaterThanOrEqual(pulled.gap, -0.001, "jamais dans la notch")
+            lastPull = pull
+        }
+        XCTAssertLessThanOrEqual(lastPull, Ferro.maxPull + 0.001)
+        // Collée sous la notch, le plus haut que l'écran visible permette : assez près pour être aspirée.
+        let highest = BubbleGeometry.clamp(BubbleGeometry.dockPoint(notch: Self.notch),
+                                           visibleFrames: [Self.builtin.visibleFrame])
+        XCTAssertLessThanOrEqual(Ferro.attract(highest, notch: Self.notch).gap, Ferro.captureGap)
+    }
+
+    /// Lâchée dans le champ, elle se détend : un peu d'oscillation (elle s'aplatit), puis ronde.
+    func testRelaxSettlesBackToRound() {
+        XCTAssertEqual(Ferro.relax(from: 0.8, t: 0), 0.8, accuracy: 0.001)
+        let samples = stride(from: 0.0, through: Ferro.relaxDuration, by: 0.01).map { Ferro.relax(from: 0.8, t: $0) }
+        XCTAssertLessThan(samples.min() ?? 0, 0, "dépasse un peu : la bulle s'aplatit avant de redevenir ronde")
+        XCTAssertGreaterThan(samples.min() ?? 0, -0.2, "un petit rebond, pas une seconde déformation")
+        XCTAssertEqual(Ferro.relax(from: 0.8, t: Ferro.relaxDuration), 0)
+        XCTAssertLessThan(abs(Ferro.relax(from: 0.8, t: Ferro.relaxDuration - 0.01)), 0.02, "pas de saut à la fin")
+    }
+
+    /// Contour : rond sans attraction ; attirée, tendu et hérissé de pointes vers la notch seulement.
+    func testOutlineStretchesAndSpikesTowardTheNotch() {
+        let r = BubbleGeometry.radius
+        for delta in stride(from: 0.0, to: 2 * Double.pi, by: 0.3) {
+            XCTAssertEqual(Ferro.outlineRadius(CGFloat(delta), radius: r, bulge: 0, spikes: 0, phase: 0), r,
+                           accuracy: 0.001)
+        }
+        let front = Ferro.outlineRadius(0, radius: r, bulge: 0.16, spikes: Ferro.spikeHeight, phase: 0)
+        let back = Ferro.outlineRadius(.pi, radius: r, bulge: 0.16, spikes: Ferro.spikeHeight, phase: 0)
+        XCTAssertGreaterThan(front, r + Ferro.spikeHeight * 0.8, "pointe du milieu vers la notch")
+        XCTAssertEqual(back, r, accuracy: 0.001, "l'arrière reste rond")
+        // Entre deux pointes, le contour redescend : des pointes, pas une bosse.
+        let between = Ferro.outlineRadius(Ferro.spikeSpacing / 2, radius: r, bulge: 0.16, spikes: Ferro.spikeHeight,
+                                          phase: 0)
+        XCTAssertLessThan(between, front - Ferro.spikeHeight * 0.5)
+        // Le sommet de chaque pointe tombe sur un point du contour : les pointes ne scintillent pas en tournant.
+        let step = 2 * CGFloat.pi / CGFloat(Ferro.samples)
+        XCTAssertEqual((Ferro.spikeSpacing / step).rounded(), Ferro.spikeSpacing / step, accuracy: 1e-9)
+        let outline = Ferro.outline(center: CGPoint(x: 200, y: 300), radius: r, toward: -.pi / 2, bulge: 0.16,
+                                    spikes: Ferro.spikeHeight, phase: 0)
+        XCTAssertEqual(outline.count, Ferro.samples)
+        let top = outline.min { $0.y < $1.y }!
+        XCTAssertEqual(top.x, 200, accuracy: 0.5, "la pointe la plus haute est sur l'axe de la notch")
+        XCTAssertLessThan(top.y, 300 - r - Ferro.spikeHeight * 0.8)
+    }
+
+    /// Près de la notch, une pointe en descend vers la bulle ; elles se touchent avant l'aspiration.
+    func testConeReachesTheBubbleBeforeCapture() {
+        let notch = CGRect(x: 260, y: -20, width: 185, height: 52)
+        XCTAssertTrue(Ferro.cone(notch: notch, toward: CGPoint(x: 352, y: 200), length: 0, halfWidth: 34).isEmpty)
+        let gap: CGFloat = 26
+        let center = CGPoint(x: notch.midX, y: notch.maxY + BubbleGeometry.radius + gap)
+        let shapes = Ferro.approach(notch: notch, center: center, strength: Ferro.strength(gap: gap), phase: 0)
+        let coneTip = shapes.cone.max { $0.y < $1.y }!
+        let bubbleTip = shapes.outline.min { $0.y < $1.y }!
+        XCTAssertGreaterThan(coneTip.y, notch.maxY + 4, "la notch pointe vers la bulle")
+        XCTAssertLessThanOrEqual(bubbleTip.y, coneTip.y + 1, "les deux pointes se touchent")
+        // La pointe part du bas de la notch, sans en sortir sur les côtés.
+        XCTAssertGreaterThanOrEqual(shapes.cone.map(\.x).min()!, notch.minX)
+        XCTAssertLessThanOrEqual(shapes.cone.map(\.x).max()!, notch.maxX)
+    }
+
+    /// Aspiration : la bulle accélère vers la notch, rétrécit, le barillet s'efface, un col la relie à la notch ;
+    /// puis le bas de la notch gonfle et rebondit, et tout est fini à `aspirateTotal`.
+    func testAspirationMergesWithABounce() {
+        let notch = CGRect(x: 260, y: -20, width: 185, height: 52)
+        let from = CGPoint(x: 380, y: 140)
+        var state = FerroState(notch: notch, center: from)
+        let start = Date()
+        state.mode = .aspirate(start: start, from: from)
+        func at(_ t: Double) -> FerroShapes { state.shapes(at: start.addingTimeInterval(t * Ferro.aspirateDuration)) }
+        XCTAssertEqual(at(0).center, from)
+        XCTAssertEqual(at(0).radius, BubbleGeometry.radius, accuracy: 0.001)
+        XCTAssertFalse(at(0).bridge.isEmpty, "reliée à la notch dès le début")
+        // Accélère : moins de chemin dans la première moitié que dans la seconde.
+        let travel1 = from.y - at(0.5).center.y, travel2 = at(0.5).center.y - at(0.99).center.y
+        XCTAssertLessThan(travel1, travel2)
+        XCTAssertLessThan(at(0.5).radius, at(0.2).radius)
+        XCTAssertEqual(at(0.4).contentOpacity, 0, "le barillet s'est effacé")
+        XCTAssertGreaterThan(at(0.95).swell, 0, "la notch gonfle à l'arrivée")
+        XCTAssertTrue(at(1).outline.isEmpty, "avalée")
+        // Rebond : redescend sous zéro (caché), puis un second renflement plus petit.
+        let settle = stride(from: 1.0, through: 1 + Ferro.settleDuration / Ferro.aspirateDuration, by: 0.02)
+            .map { at($0).swell }
+        let firstZero = settle.firstIndex { $0 == 0 }!
+        let second = settle[firstZero...].max()!
+        XCTAssertGreaterThan(second, 0.3, "petit rebond")
+        XCTAssertLessThan(second, Ferro.swellHeight / 2)
+        let end = state.shapes(at: start.addingTimeInterval(FerroState.aspirateTotal))
+        XCTAssertEqual(end.swell, 0)
+        XCTAssertTrue(end.outline.isEmpty && end.cone.isEmpty && end.bridge.isEmpty)
+    }
+
+    /// Le champ couvre la notch et toute bulle attirée (gardée sous la barre des menus, puis tirée), marge comprise :
+    /// la fenêtre ne bouge plus. Au-dessus du haut de l'écran, rien n'est dessiné.
+    func testFieldCoversEveryAttractedBubble() {
+        let field = Ferro.fieldFrame(notch: Self.notch)
+        XCTAssertTrue(field.contains(Self.notch))
+        XCTAssertEqual(field.maxY, Self.builtin.frame.maxY, "collé en haut de l'écran")
+        let margin = BubbleGeometry.radius + BubbleGeometry.windowMargin
+        for angle in stride(from: 0.0, to: 2 * Double.pi, by: 0.1) {
+            for distance in [BubbleGeometry.radius + Ferro.reach - 0.5, BubbleGeometry.radius + 60] {
+                let wanted = BubbleGeometry.clamp(CGPoint(x: Self.notch.midX + distance * CGFloat(cos(angle)),
+                                                          y: Self.notch.minY + distance * CGFloat(sin(angle))),
+                                                  visibleFrames: [Self.builtin.visibleFrame])
+                let pulled = Ferro.attract(wanted, notch: Self.notch)
+                guard pulled.strength > 0 else { continue }
+                let center = pulled.center
+                XCTAssertGreaterThanOrEqual(center.x - margin, field.minX, "angle \(angle)")
+                XCTAssertLessThanOrEqual(center.x + margin, field.maxX, "angle \(angle)")
+                XCTAssertGreaterThanOrEqual(center.y - margin, field.minY, "angle \(angle)")
+                XCTAssertLessThanOrEqual(center.y + BubbleGeometry.radius, field.maxY, "angle \(angle)")
+            }
+        }
     }
 
     // MARK: - Contrôleur (sans fenêtre à l'écran)
@@ -395,6 +558,50 @@ final class BubbleTests: XCTestCase {
         controller.close()
         XCTAssertEqual(notch.model.bubble, .bubble)
         XCTAssertFalse(notch.model.isCommandBarOpen)
+        XCTAssertFalse(controller.window.isVisible)
+    }
+
+    /// Aucun état sans issue : de chaque phase, des gestes de l'utilisateur ramènent à la notch.
+    func testEveryPhaseHasAWayOut() {
+        let events: [BubblePhase.Event] = [.grab, .release(detached: false), .release(detached: true), .open, .close,
+                                           .reattach, .merged]
+        for phase in [BubblePhase.attached, .detaching, .bubble, .bubblePanel, .reattaching] {
+            var seen: Set<BubblePhase> = [phase], queue = [phase]
+            while let current = queue.popLast() {
+                for next in events.map(current.next) where !seen.contains(next) {
+                    seen.insert(next)
+                    queue.append(next)
+                }
+            }
+            XCTAssertTrue(seen.contains(.attached), "\(phase)")
+        }
+        XCTAssertEqual(BubblePhase.bubblePanel.next(.close), .bubble, "du panneau, retour au barillet")
+    }
+
+    /// Panneau ouvert depuis le barillet : le bouton retour (comme Échap, le pincement et le clic à l'extérieur) sort du
+    /// mode édition, puis referme le panneau en barillet. Le clic à l'extérieur le fait même sans « Fermer au clic à
+    /// l'extérieur ». La fenêtre n'est jamais affichée ici.
+    func testBackReturnsToTheRevolver() {
+        let notch = NotchHarness(self)
+        let controller = BubbleController(model: notch.model, prefs: notch.prefs, registry: notch.registry,
+                                          store: notch.store)
+        var actions = NotchActions()
+        actions.detach = {}
+        controller.start(actions: actions)
+        notch.model.bubble = .bubblePanel
+        notch.model.isEditingTabs = true
+        controller.back()
+        XCTAssertFalse(notch.model.isEditingTabs, "d'abord sortir du mode édition")
+        XCTAssertEqual(notch.model.bubble, .bubblePanel)
+        controller.back()
+        XCTAssertEqual(notch.model.bubble, .bubble, "puis le barillet")
+        controller.back()
+        XCTAssertEqual(notch.model.bubble, .bubble, "sans effet sur le barillet")
+
+        notch.prefs.closeOnClickOutside = false
+        notch.model.bubble = .bubblePanel
+        controller.mouseDown(at: CGPoint(x: -5000, y: -5000))
+        XCTAssertEqual(notch.model.bubble, .bubble)
         XCTAssertFalse(controller.window.isVisible)
     }
 

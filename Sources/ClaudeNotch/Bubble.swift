@@ -307,7 +307,6 @@ enum Goo {
     static let neckFloor: CGFloat = 5.5
     static let snapDuration: TimeInterval = 0.32
     static let cancelDuration: TimeInterval = 0.28
-    static let mergeDuration: TimeInterval = 0.48
     /// Détachement depuis le menu : la goutte parcourt le seuil seule.
     static let autoPullDuration: TimeInterval = 0.34
 
@@ -367,8 +366,12 @@ enum Goo {
         return 1 - exp(-6 * x) * cos(9 * x)
     }
 
-    /// Après le décollage (`t` de 0 à 1) : le col se résorbe, le corps rentre dans la notch ; la goutte est partie (la
-    /// fenêtre de la bulle la remplace).
+    /// Part du décollage où la goutte reste dessinée sous la bulle qui vient de la remplacer : si la fenêtre de la bulle
+    /// arrive une image plus tard, rien ne clignote (la goutte suit la bulle, cachée dessous).
+    static let snapOverlap: CGFloat = 0.15
+
+    /// Après le décollage (`t` de 0 à 1) : le col se résorbe, le corps rentre dans la notch ; la goutte s'efface sous la
+    /// bulle qui la remplace.
     static func snap(panel: CGRect, notch: CGRect, drop: CGPoint, t: CGFloat) -> GooShapes {
         var shapes = pull(panel: panel, notch: notch, drop: drop, progress: 1, neckScale: 0)
         let k = spring(t)
@@ -376,7 +379,7 @@ enum Goo {
         shapes.body = CGRect(x: from.minX + (notch.minX - from.minX) * k, y: from.minY + (notch.minY - from.minY) * k,
                              width: from.width + (notch.width - from.width) * k,
                              height: from.height + (notch.height - from.height) * k)
-        shapes.drop.radius = 0
+        if t >= snapOverlap { shapes.drop.radius = 0 }
         // Un reste du col pend sous le corps qui remonte, puis rentre dedans.
         let tail = max(0, 1 - t * 1.8)
         let anchor = anchor(body: shapes.body, inset: shapes.bodyRadius, toward: drop)
@@ -400,29 +403,6 @@ enum Goo {
         shapes.drop.radius *= 1 - e
         return shapes
     }
-
-    /// Rattachement (`t` de 0 à 1) : la goutte monte dans la notch, un col se reforme, le corps gonfle puis se calme.
-    static func merge(notch: CGRect, from drop: CGPoint, t: CGFloat) -> GooShapes {
-        let t = min(max(t, 0), 1)
-        let travel = t * t
-        let target = CGPoint(x: notch.midX, y: notch.maxY - 4)
-        let point = CGPoint(x: drop.x + (target.x - drop.x) * travel, y: drop.y + (target.y - drop.y) * travel)
-        let radius = BubbleGeometry.radius * pow(1 - t, 0.8)
-        let swell = sin(.pi * t) * 12
-        var grown = notch.insetBy(dx: -swell, dy: 0)
-        grown.size.height += swell
-        let anchor = Goo.anchor(body: grown, inset: 8, toward: point)
-        // Le col se forme quand la goutte approche, puis s'épaissit jusqu'à se fondre.
-        let p = max(0, 1 - t * 2.4)
-        let forming = min(1, t * 4)
-        let neck = (0..<neckCount).map { index -> GooShapes.Circle in
-            let s = CGFloat(index) / CGFloat(neckCount - 1)
-            let center = CGPoint(x: anchor.x + (point.x - anchor.x) * s, y: anchor.y + (point.y - anchor.y) * s)
-            return .init(center: center,
-                         radius: neckRadius(t: s, progress: p, start: 14 + swell, end: radius * 0.8) * forming)
-        }
-        return GooShapes(body: grown, bodyRadius: 10, drop: .init(center: point, radius: radius), neck: neck)
-    }
 }
 
 /// Animation en cours dans la fenêtre de la goutte (coordonnées de cette fenêtre, y vers le bas). Les formes sont
@@ -435,7 +415,8 @@ struct GooState: Equatable {
         case autoPull(start: Date, to: CGPoint)
         case snap(start: Date)
         case cancel(start: Date, from: CGPoint, progress: CGFloat)
-        case merge(start: Date, from: CGPoint)
+        /// Décollage fini : le corps repose dans la notch (dessin fixe) jusqu'à ce que la notch reprenne sa place.
+        case rest
     }
 
     var panel: CGRect
@@ -464,8 +445,258 @@ struct GooState: Equatable {
         case .cancel(let start, let from, let p):
             return Goo.cancel(panel: panel, notch: notch, handle: handle, from: from, progress: p,
                               t: elapsed(start, Goo.cancelDuration))
-        case .merge(let start, let from):
-            return Goo.merge(notch: notch, from: from, t: elapsed(start, Goo.mergeDuration))
+        case .rest:
+            return Goo.snap(panel: panel, notch: notch, drop: drop, t: 1)
+        }
+    }
+}
+
+// MARK: - Retour aimanté (ferrofluide)
+
+/// Retour dans la notch : la notch attire la bulle comme un aimant attire du ferrofluide. L'attraction croît quand
+/// l'écart diminue ; la bulle se tend vers la notch, se hérisse de pointes, puis la notch l'aspire et rebondit.
+/// Écran (y vers le haut) pour l'attraction ; formes dans la fenêtre de la bulle (y vers le bas).
+enum Ferro {
+    /// Écart (bord de la bulle, milieu du bas de la notch) où l'attraction commence.
+    static let reach: CGFloat = 150
+    /// Écart où la notch aspire la bulle, sans qu'on la lâche.
+    static let captureGap: CGFloat = 16
+    /// Déplacement de la bulle vers la notch à pleine attraction.
+    static let maxPull: CGFloat = 30
+    /// Pointes vers la notch : nombre, hauteur de celle du milieu à pleine attraction.
+    static let spikeCount = 7
+    static let spikeHeight: CGFloat = 26
+    /// Pas du contour (360 points) ; les pointes sont espacées et larges d'un nombre entier de pas : leur sommet tombe
+    /// toujours sur un point, elles ne scintillent pas en tournant.
+    static let samples = 360
+    static var spikeSpacing: CGFloat { 11 * 2 * .pi / CGFloat(samples) }
+    static var spikeWidth: CGFloat { 6 * 2 * .pi / CGFloat(samples) }
+    /// Pointe de la notch vers la bulle : demi-largeur de sa base, longueur à pleine attraction.
+    static let coneHalfWidth: CGFloat = 34
+    static let coneLength: CGFloat = 16
+    static let aspirateDuration: TimeInterval = 0.42
+    /// Rebond de la notch une fois la bulle avalée.
+    static let settleDuration: TimeInterval = 0.45
+    static let relaxDuration: TimeInterval = 0.6
+    /// Renflement du bas de la notch quand la bulle y entre.
+    static let swellHeight: CGFloat = 9
+
+    /// Champ de la notch (écran) : tant que la bulle y est attirée, sa fenêtre le couvre, notch comprise, et ne bouge
+    /// plus. Assez grand pour toute bulle à moins de `reach` de la notch, avec sa marge et ses pointes.
+    static func fieldFrame(notch: CGRect) -> CGRect {
+        let side = reach + BubbleGeometry.diameter + BubbleGeometry.windowMargin + maxPull
+        return CGRect(x: notch.midX - side, y: notch.minY - side, width: 2 * side, height: side + notch.height)
+            .integral
+    }
+
+    /// Attraction de 0 (au-delà de `reach`) à 1 (à `captureGap`), de plus en plus forte quand l'écart diminue.
+    static func strength(gap: CGFloat) -> CGFloat {
+        let x = min(max((reach - gap) / (reach - captureGap), 0), 1)
+        return x * x
+    }
+
+    /// La bulle suit la souris, tirée vers le milieu du bas de la notch d'autant plus qu'elle en est près (jamais
+    /// au-delà) ; l'écart rendu est celui de la bulle tirée.
+    static func attract(_ center: CGPoint, notch: CGRect) -> (center: CGPoint, strength: CGFloat, gap: CGFloat) {
+        let target = CGPoint(x: notch.midX, y: notch.minY)
+        let s = strength(gap: BubbleGeometry.gap(center: center, notch: notch))
+        let dx = target.x - center.x, dy = target.y - center.y
+        let length = max(hypot(dx, dy), 1)
+        let pull = min(maxPull * s, max(0, length - BubbleGeometry.radius))
+        let pulled = CGPoint(x: center.x + dx / length * pull, y: center.y + dy / length * pull)
+        return (pulled, s, BubbleGeometry.gap(center: pulled, notch: notch))
+    }
+
+    /// Détente après un lâcher hors de portée : de `s0` à 0 avec une petite oscillation (la bulle s'aplatit un peu du
+    /// côté de la notch, puis redevient ronde).
+    static func relax(from s0: CGFloat, t: TimeInterval) -> CGFloat {
+        guard t < relaxDuration else { return 0 }
+        let x = CGFloat(max(t, 0))
+        return s0 * exp(-7 * x) * cos(11 * x)
+    }
+
+    /// Rayon du contour à l'angle `delta` de la direction de la notch : cercle de rayon `radius`, tendu vers la notch
+    /// (`bulge` > 0) ou aplati (< 0), hérissé de pointes en cône (sommet vif, base tangente au cercle).
+    static func outlineRadius(_ delta: CGFloat, radius: CGFloat, bulge: CGFloat, spikes: CGFloat,
+                              phase: CGFloat) -> CGFloat {
+        let d = atan2(sin(delta), cos(delta))
+        let front = max(0, cos(d))
+        var r = radius * (1 + bulge * front * front - 0.35 * bulge * sin(d) * sin(d))
+        guard spikes > 0 else { return r }
+        let middle = CGFloat(spikeCount - 1) / 2
+        for k in 0..<spikeCount {
+            let offset = CGFloat(k) - middle
+            let u = abs(d - offset * spikeSpacing) / spikeWidth
+            guard u < 1 else { continue }
+            // Plus hautes au milieu ; chacune ondule un peu, décalée de ses voisines.
+            let height = spikes * (1 - 0.8 * abs(offset) / middle) * (1 + 0.18 * sin(phase + 1.9 * CGFloat(k)))
+            r += height * (1 - u) * (1 - u)
+        }
+        return r
+    }
+
+    /// Contour fermé de la bulle de centre `center`, orienté vers l'angle `toward` (y vers le bas).
+    static func outline(center: CGPoint, radius: CGFloat, toward: CGFloat, bulge: CGFloat, spikes: CGFloat,
+                        phase: CGFloat) -> [CGPoint] {
+        guard radius > 0.5 else { return [] }
+        return (0..<samples).map { index in
+            let delta = CGFloat(index) / CGFloat(samples) * 2 * .pi
+            let r = outlineRadius(delta, radius: radius, bulge: bulge, spikes: spikes, phase: phase)
+            return CGPoint(x: center.x + r * cos(toward + delta), y: center.y + r * sin(toward + delta))
+        }
+    }
+
+    /// Point du bas de la notch d'où part la pointe : sous la bulle, sans sortir de la notch.
+    static func coneBase(notch: CGRect, toward center: CGPoint) -> CGPoint {
+        let margin = coneHalfWidth + 10
+        return CGPoint(x: min(max(center.x, notch.minX + margin), max(notch.minX + margin, notch.maxX - margin)),
+                       y: notch.maxY)
+    }
+
+    /// Pointe qui descend du bas de la notch vers `center` : profil en cône (sommet vif, base tangente au bord). Le
+    /// polygone remonte de 6 pt dans la notch pour s'y fondre.
+    static func cone(notch: CGRect, toward center: CGPoint, length: CGFloat, halfWidth: CGFloat) -> [CGPoint] {
+        guard length > 0.5 else { return [] }
+        let base = coneBase(notch: notch, toward: center)
+        let dx = center.x - base.x, dy = center.y - base.y
+        let norm = max(hypot(dx, dy), 1)
+        let steps = 24
+        var points = [CGPoint(x: base.x - halfWidth, y: base.y - 6)]
+        for index in 0...steps {
+            let u = -1 + 2 * CGFloat(index) / CGFloat(steps)
+            let h = length * (1 - abs(u)) * (1 - abs(u))
+            points.append(CGPoint(x: base.x + u * halfWidth + dx / norm * h, y: base.y + dy / norm * h))
+        }
+        points.append(CGPoint(x: base.x + halfWidth, y: base.y - 6))
+        return points
+    }
+
+    /// Col entre le bas de la notch (base de demi-largeur `halfWidth` en `baseX`) et la bulle (`center`, `radius`) :
+    /// deux courbes qui partent à plat du bord de la notch et arrivent tangentes au cercle, de part et d'autre de
+    /// l'axe, à l'angle `spread` ; refermé par le centre de la bulle.
+    static func bridge(notch: CGRect, baseX: CGFloat, halfWidth: CGFloat, center: CGPoint, radius: CGFloat,
+                       spread: CGFloat) -> [CGPoint] {
+        guard radius > 1 else { return [] }
+        let baseY = notch.maxY
+        let toward = atan2(baseY - center.y, baseX - center.x)
+        func side(_ sign: CGFloat) -> [CGPoint] {
+            let start = CGPoint(x: baseX + sign * halfWidth, y: baseY)
+            // Point de tangence du même côté que `start`.
+            let candidates = [toward + spread, toward - spread].map {
+                (angle: $0, point: CGPoint(x: center.x + radius * cos($0), y: center.y + radius * sin($0)))
+            }
+            let end = candidates.min { hypot($0.point.x - start.x, $0.point.y - start.y)
+                < hypot($1.point.x - start.x, $1.point.y - start.y) }!
+            var tangent = CGPoint(x: -sin(end.angle), y: cos(end.angle))
+            if tangent.x * (start.x - end.point.x) + tangent.y * (start.y - end.point.y) < 0 {
+                tangent = CGPoint(x: -tangent.x, y: -tangent.y)
+            }
+            let reach = hypot(start.x - end.point.x, start.y - end.point.y)
+            let c1 = CGPoint(x: start.x - sign * halfWidth * 0.6, y: start.y)
+            let c2 = CGPoint(x: end.point.x + tangent.x * reach * 0.45, y: end.point.y + tangent.y * reach * 0.45)
+            return (0...20).map { index in
+                let t = CGFloat(index) / 20, m = 1 - t
+                let a = m * m * m, b = 3 * m * m * t, c = 3 * m * t * t, d = t * t * t
+                return CGPoint(x: a * start.x + b * c1.x + c * c2.x + d * end.point.x,
+                               y: a * start.y + b * c1.y + c * c2.y + d * end.point.y)
+            }
+        }
+        let left = side(-1), right = side(1)
+        return [CGPoint(x: baseX - halfWidth, y: baseY - 6)] + left + [center] + right.reversed()
+            + [CGPoint(x: baseX + halfWidth, y: baseY - 6)]
+    }
+
+    /// Bulle attirée (ou qui se détend) : contour, pointe de la notch.
+    static func approach(notch: CGRect, center: CGPoint, strength s: CGFloat, phase: CGFloat) -> FerroShapes {
+        let base = coneBase(notch: notch, toward: center)
+        let toward = atan2(base.y - center.y, base.x - center.x)
+        let positive = max(0, s)
+        let outline = outline(center: center, radius: BubbleGeometry.radius, toward: toward, bulge: 0.16 * s,
+                              spikes: spikeHeight * pow(positive, 1.3), phase: phase)
+        let cone = cone(notch: notch, toward: center, length: coneLength * positive * positive,
+                        halfWidth: coneHalfWidth * (0.6 + 0.4 * positive))
+        return FerroShapes(center: center, radius: BubbleGeometry.radius, outline: outline, cone: cone, bridge: [],
+                           swell: 0, contentScale: 1, contentOpacity: 1)
+    }
+
+    /// Aspiration (`t` de 0 à 1) depuis `from`, puis rebond de la notch (`t` au-delà de 1, en durées d'aspiration) :
+    /// la bulle accélère vers la notch en s'étirant, rétrécit, ses pointes rentrent ; un col épais la relie à la
+    /// notch, dont le bas gonfle puis rebondit.
+    static func aspirate(notch: CGRect, from: CGPoint, t: CGFloat, phase: CGFloat) -> FerroShapes {
+        let baseX = coneBase(notch: notch, toward: from).x
+        guard t < 1 else {
+            let settle = (t - 1) * CGFloat(aspirateDuration)
+            let swell = settle < CGFloat(settleDuration) ? swellHeight * exp(-6 * settle) * cos(16 * settle) : 0
+            return FerroShapes(center: CGPoint(x: baseX, y: notch.maxY), radius: 0, outline: [], cone: [], bridge: [],
+                               swell: max(0, swell), contentScale: 0, contentOpacity: 0)
+        }
+        let t = max(t, 0)
+        let travel = pow(t, 2.2)
+        let inside = CGPoint(x: baseX, y: notch.maxY - 10)
+        let center = CGPoint(x: from.x + (inside.x - from.x) * travel, y: from.y + (inside.y - from.y) * travel)
+        let radius = BubbleGeometry.radius * pow(1 - t, 0.75)
+        let toward = atan2(notch.maxY - center.y, baseX - center.x)
+        let outline = outline(center: center, radius: radius, toward: toward, bulge: 0.16 + 0.55 * t,
+                              spikes: spikeHeight * (1 - t) * (1 - t), phase: phase)
+        let bridge = bridge(notch: notch, baseX: baseX, halfWidth: 12 + 40 * t, center: center, radius: radius,
+                            spread: 0.5 + 0.6 * t)
+        let arriving = max(0, (t - 0.55) / 0.45)
+        return FerroShapes(center: center, radius: radius, outline: outline, cone: [], bridge: bridge,
+                           swell: swellHeight * arriving * arriving, contentScale: radius / BubbleGeometry.radius,
+                           contentOpacity: max(0, 1 - t / 0.35))
+    }
+}
+
+/// Formes du retour aimanté, dans la fenêtre de la bulle (y vers le bas).
+struct FerroShapes: Equatable {
+    /// Disque de la bulle (le barillet est dessiné dessus).
+    var center: CGPoint
+    var radius: CGFloat
+    /// Contour de la bulle, pointes comprises ; vide = plus de bulle.
+    var outline: [CGPoint]
+    /// Pointe de la notch vers la bulle (approche), col qui les relie (aspiration) ; vides = rien.
+    var cone: [CGPoint]
+    var bridge: [CGPoint]
+    /// Renflement du bas de la notch, en points.
+    var swell: CGFloat
+    /// Barillet : il rapetisse avec la bulle et s'efface au début de l'aspiration.
+    var contentScale: CGFloat
+    var contentOpacity: CGFloat
+}
+
+/// Retour aimanté en cours dans la fenêtre de la bulle (y vers le bas). Formes recalculées à chaque image d'après
+/// l'heure (pointes qui ondulent, détente, aspiration).
+struct FerroState: Equatable {
+    enum Mode: Equatable {
+        /// La bulle suit la souris, attirée (`strength`).
+        case approach
+        /// Lâchée hors de portée d'aspiration : elle se détend depuis `from`.
+        case relax(start: Date, from: CGFloat)
+        /// Aspirée par la notch depuis `from`.
+        case aspirate(start: Date, from: CGPoint)
+    }
+
+    /// Notch dans la fenêtre de la bulle ; son bas est `maxY`.
+    var notch: CGRect
+    var center: CGPoint
+    var strength: CGFloat = 0
+    var mode: Mode = .approach
+
+    /// Aspiration et rebond finis : la bulle peut disparaître.
+    static var aspirateTotal: TimeInterval { Ferro.aspirateDuration + Ferro.settleDuration }
+
+    func shapes(at date: Date) -> FerroShapes {
+        let phase = CGFloat(date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1000)) * 8
+        switch mode {
+        case .approach:
+            return Ferro.approach(notch: notch, center: center, strength: strength, phase: phase)
+        case .relax(let start, let s0):
+            return Ferro.approach(notch: notch, center: center,
+                                  strength: Ferro.relax(from: s0, t: date.timeIntervalSince(start)), phase: phase)
+        case .aspirate(let start, let from):
+            return Ferro.aspirate(notch: notch, from: from,
+                                  t: CGFloat(max(0, date.timeIntervalSince(start)) / Ferro.aspirateDuration),
+                                  phase: phase)
         }
     }
 }

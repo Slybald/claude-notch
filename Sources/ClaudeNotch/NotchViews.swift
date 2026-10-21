@@ -478,6 +478,7 @@ struct ExpandedPanel: View {
                 if registry.isClaudeEnabled { registry.module(ModuleRegistry.claudeId)?.makeTabIcon() }
                 Spacer(minLength: 8)
             } else {
+                if let back = actions.backToRevolver { BackToRevolverButton(action: back) }
                 NotchTabBar(registry: registry, selection: $selection, editing: $editingTabs, animation: tabAnimation,
                             reduceMotion: reduceMotion)
                 if editingTabs {
