@@ -89,14 +89,14 @@ final class SystemFans: FanBackend {
               let shell = FanAuthorization.installShellCommand(helperSource: helper.path, sha256: hash, ruleContents: rule) else {
             return completion(.failure(QuickSettingsFailure(.failed)))
         }
-        let prompt = L("Claude Notch veut installer son outil de pilotage des ventilateurs. Ton mot de passe ne sera plus demandé pour ce réglage.",
+        let prompt = L("Oriel veut installer son outil de pilotage des ventilateurs. Ton mot de passe ne sera plus demandé pour ce réglage.",
                        table: "QuickSettings")
         runAsAdministrator(shell, prompt: prompt, completion: completion)
     }
 
     func uninstall(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
         runAsAdministrator(FanAuthorization.removeShellCommand,
-                           prompt: L("Claude Notch veut retirer son outil de pilotage des ventilateurs.", table: "QuickSettings"),
+                           prompt: L("Oriel veut retirer son outil de pilotage des ventilateurs.", table: "QuickSettings"),
                            completion: completion)
     }
 

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Compile en release (binaire universel arm64 + x86_64) et assemble build/ClaudeNotch.app.
+# Compile en release (binaire universel arm64 + x86_64) et assemble build/Oriel.app (exécutable ClaudeNotch,
+# identifiant io.github.slybald.claudenotch : voir docs/RENAME.md).
 #
 # Signature : ad hoc par défaut (le cdhash change à chaque build, macOS redemande alors les autorisations).
 # SIGN_KEYCHAIN=<trousseau> SIGN_IDENTITY=<nom ou empreinte du certificat> scripts/build.sh → signature avec ce
@@ -48,7 +49,7 @@ for arch in arm64 x86_64; do
     fi
 done
 
-APP="$ROOT/build/ClaudeNotch.app"
+APP="$ROOT/build/Oriel.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ClaudeNotch"
@@ -76,6 +77,8 @@ cp "$FANCTL" "$APP/Contents/Helpers/fanctl"
 for arch in arm64 x86_64; do
     lipo "$FANCTL" -verify_arch "$arch" || { echo "Architecture $arch absente de $FANCTL" >&2; exit 1; }
 done
+cp "$ROOT/hooks/claude-notch-statusline.sh" "$APP/Contents/Resources/claude-notch-statusline.sh"
+chmod 755 "$APP/Contents/Resources/claude-notch-statusline.sh"
 
 # Lecture en cours : mediaremote-adapter (Vendor/mediaremote-adapter, BSD-3-Clause, commit noté dans COMMIT).
 # Depuis macOS 15.4, MediaRemote ne répond qu'aux binaires d'Apple : /usr/bin/perl lance le script, qui charge

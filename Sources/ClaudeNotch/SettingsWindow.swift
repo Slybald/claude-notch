@@ -21,7 +21,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                                   styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                                   backing: .buffered, defer: false)
             window.contentView = NSHostingView(rootView: view)
-            window.title = L("Réglages de Claude Notch")
+            window.title = L("Réglages d'Oriel")
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false
@@ -65,7 +65,7 @@ enum MainMenu {
         settings.target = target
         appMenu.addItem(settings)
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: L("Quitter Claude Notch"), action: #selector(NSApplication.terminate(_:)),
+        appMenu.addItem(withTitle: L("Quitter Oriel"), action: #selector(NSApplication.terminate(_:)),
                         keyEquivalent: "q")
 
         let editMenu = NSMenu(title: L("Édition"))
@@ -257,8 +257,11 @@ private struct GeneralSettings: View {
             Section("Raccourcis") {
                 hotKeyPicker(L("Ouvrir ou fermer le panneau"), selection: $prefs.toggleHotKey, slot: .togglePanel)
                 hotKeyPicker(L("Masquer ou réafficher la notch"), selection: $prefs.hideHotKey, slot: .toggleHidden)
+                hotKeyPicker(L("Barre de commande"), selection: $prefs.commandHotKey, slot: .commandBar)
                 SettingsNote(L("Partout, sans autorisation. Panneau ouvert au clavier : ← → ou ⌘1…9 pour les "
                     + "onglets, Échap pour fermer."))
+                SettingsNote(L("Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche "
+                    + "dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎."))
             }
             Section("Plein écran") {
                 Picker("Quand une app est en plein écran", selection: $prefs.fullScreenBehavior) {
@@ -282,6 +285,15 @@ private struct GeneralSettings: View {
                     }
                 }
                 SettingsNote(L("Sans encoche, une encoche virtuelle est dessinée en haut au centre."))
+            }
+            Section(L("Bulle", table: "Bubble")) {
+                Toggle(L("Permettre de détacher la notch", table: "Bubble"), isOn: $prefs.allowsDetach)
+                if prefs.allowsDetach {
+                    Toggle(L("Revenir à la notch au redémarrage", table: "Bubble"), isOn: $prefs.bubbleReturnsOnRelaunch)
+                }
+                SettingsNote(L("Maintiens l'angle en bas à droite du panneau puis glisse : la notch se décolle en bulle, "
+                               + "à poser où tu veux. Ramène-la sous la notch, double-clique sur son bord ou choisis "
+                               + "« Rattacher à la notch » pour la remettre.", table: "Bubble"))
             }
             Section {
                 HStack {
@@ -315,9 +327,9 @@ private struct GeneralSettings: View {
         case .whenClaudeOpen: return L("Tant que Claude Desktop ou une session Claude Code est ouverte.")
         case .duringActivity where claudeEnabled:
             return L("Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). "
-                + "Au repos, rouvre Claude Notch pour retrouver ces réglages.")
+                + "Au repos, rouvre Oriel pour retrouver ces réglages.")
         case .duringActivity:
-            return L("Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour "
+            return L("Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Oriel pour "
                 + "retrouver ces réglages.")
         }
     }
@@ -332,7 +344,7 @@ private struct GeneralSettings: View {
                 Label(HiddenNotice.text(until: until, now: now()), systemImage: "eye.slash")
                     .foregroundColor(Palette.amber)
             }
-            SettingsNote(L("Aussi par le raccourci, ou en rouvrant Claude Notch."))
+            SettingsNote(L("Aussi par le raccourci, ou en rouvrant Oriel."))
         } else {
             LabeledContent {
                 Menu {
@@ -768,7 +780,7 @@ private struct AboutSettings: View {
     @ObservedObject var registry: ModuleRegistry
     @ObservedObject var updater: Updater
 
-    static let repository = URL(string: "https://github.com/Slybald/claude-notch")!
+    static let repository = URL(string: "https://github.com/Slybald/oriel")!
 
     private var notices: [LicenseNotice] { registry.modules.flatMap { $0.licenseNotices } }
 
@@ -785,7 +797,7 @@ private struct AboutSettings: View {
                     }
                     .frame(width: 48, height: 48)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(verbatim: "Claude Notch")
+                        Text(verbatim: "Oriel")
                             .font(.system(size: 15, weight: .semibold))
                         Text(updater.versionLine)
                             .foregroundColor(.secondary)
@@ -795,7 +807,7 @@ private struct AboutSettings: View {
                 Text(registry.isClaudeEnabled ? L("Tes sessions Claude Code, d'un coup d'œil.")
                      : L("Des onglets utiles, dans la notch."))
                 Link(destination: Self.repository) {
-                    Text(verbatim: "github.com/Slybald/claude-notch")
+                    Text(verbatim: "github.com/Slybald/oriel")
                 }
                 SettingsNote(L("Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque "
                     + "d'Anthropic."))
@@ -804,7 +816,7 @@ private struct AboutSettings: View {
                 LabeledContent {
                     Text(verbatim: "MIT")
                 } label: {
-                    Text(verbatim: "Claude Notch")
+                    Text(verbatim: "Oriel")
                 }
                 if notices.isEmpty {
                     SettingsNote(L("Aucun composant tiers."))

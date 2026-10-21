@@ -285,7 +285,7 @@ private struct EarTabItemView: View {
 }
 
 /// Icône d'un intercalaire : l'état de Claude, la pochette ou le symbole du module, « … » pour le reste.
-private struct EarTabIcon: View {
+struct EarTabIcon: View {
     let tab: EarTab
     let accent: Color
 
@@ -317,7 +317,7 @@ private struct EarTabIcon: View {
 }
 
 /// Information courte d'un intercalaire : « 1·6 » (Claude, agents en couleur), texte du module ou barres d'égaliseur.
-private struct EarTabInfo: View {
+struct EarTabInfo: View {
     let tab: EarTab
     let claudeEars: SessionStore.EarsContent?
     let accent: Color

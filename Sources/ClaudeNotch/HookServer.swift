@@ -25,6 +25,8 @@ final class HookServer {
     weak var codex: CodexRelay?
     /// API locale (routes `/api/…`). À poser avant `start()` ; nil : 404.
     var api: LocalAPI?
+    /// Corps de `POST /claude/status` (JSON de la `statusLine` de Claude Code, relayé pour les jauges de quota). Tout thread.
+    var onClaudeStatus: ((Data) -> Void)?
 
     let port: UInt16
     let access: HookAccess
@@ -156,7 +158,7 @@ final class HookServer {
         guard access.accepts(request.headers[HookAccess.headerKey]) else {
             return reply(401, "Unauthorized", on: connection)
         }
-        if isPaused, request.method == "POST", ["/hook", "/permission", "/inbox"].contains(request.path) {
+        if isPaused, request.method == "POST", ["/hook", "/permission", "/inbox", "/claude/status"].contains(request.path) {
             return reply(204, "No Content", on: connection)
         }
         if isCodexPaused, request.method == "POST", ["/codex/hook", "/codex/permission"].contains(request.path) {
@@ -167,6 +169,9 @@ final class HookServer {
             relayCodex(request, on: connection)
         case ("POST", "/codex/permission"):
             holdCodex(request, on: connection)
+        case ("POST", "/claude/status"):
+            onClaudeStatus?(request.body)
+            reply(204, "No Content", on: connection)
         case ("POST", "/hook"):
             relay(request, on: connection)
         case ("POST", "/permission"):

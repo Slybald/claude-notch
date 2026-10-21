@@ -1,9 +1,14 @@
-# Claude Notch
+# Oriel
 
-A native macOS app that lives in your MacBook's notch and keeps track of your Claude Code sessions,
-whether they run in a terminal or an editor (CLI) or in the Code tab of Claude Desktop. Hover the notch
-and the panel unfolds with a summary of every session: state, current tool, task list, subagents. Six more
-tabs sit next to Claude: Player, Quick Settings, Shelf, Clipboard, Timer and Quick notes.
+A native macOS app that turns your MacBook's notch into a small panel for everyone. Hover the notch and it
+unfolds with a player, your agenda and its meetings, quick settings, a shelf, a clipboard history, a timer and quick notes.
+If you use Claude Code or Codex, two optional tabs follow their sessions too: state, current tool, task list,
+subagents, and permissions you can answer from the notch. Neither is needed to use the app.
+
+> **Formerly Claude Notch.** If you already have it, there is nothing to do: the automatic update installs the new
+> version, which becomes `Oriel.app` in Applications. Your macOS permissions, settings, hooks and data are kept.
+> To download it by hand, take `Oriel-<version>.dmg`; `ClaudeNotch-<version>.dmg` is published only so that versions
+> up to 1.9.0 can update themselves.
 
 <p align="center">
   <img src="docs/collapsed.png" width="380" alt="Collapsed notch: a raised hand on the left ear, 2·2 on the right ear">
@@ -42,6 +47,8 @@ Interface available in English and French (follows the system language). Screens
   time: the first answer wins. Never "always allow" from the notch. Return sends, Esc closes.
 - **Codex tab** (optional, see [Codex tab](#codex-tab)): the sessions of OpenAI's Codex (CLI or app), working, waiting for
   an approval or done, with the last message; allow or deny a command or a patch from the notch.
+- **Quota gauges** (optional, see [Quota gauges](#quota-gauges)): a thin ring and the percentage used of the 5-hour and
+  7-day windows in the Claude and Codex tabs, with the time they reset. Amber from 80 %, red from 95 %.
 - **Tasks**: progress bar and current task of Claude Code's task list; the chevron unfolds the whole list.
 - **Subagents**: number of subagents running in each session.
 - **Click to go back**: clicking a card brings the host app to the front (Terminal, iTerm2, Ghostty, VS Code,
@@ -49,9 +56,11 @@ Interface available in English and French (follows the system language). Screens
 - **Claude Desktop**: a row shows whether Claude Desktop is open, with a button to bring it to the front.
 - **Optional tools section**: files recently written by Claude, Git status of your repositories, today's usage.
   It only appears when its data files exist (see [Tools section](#tools-section)).
-- **Six more tabs**: Player, Quick Settings, Shelf, Clipboard, Timer and Quick notes (see [Tabs](#tabs)).
+- **Seven more tabs**: Player, Agenda, Quick Settings, Shelf, Clipboard, Timer and Quick notes (see [Tabs](#tabs)).
 - **Your own index tabs** (optional, see [Scripts](#scripts-local-api-and-notch-command)): `notch run -- make` shows an
   hourglass, then ✓ or ✗ with the duration; any script can show a short status through a local API.
+- **Command bar**: one field, one-key prefixes (see [Command bar](#command-bar)): `t 25` starts a timer, `n idea`
+  creates a note, `c link` searches your copies, `s presentation` applies a scene, `> message` writes to Claude.
 - Works on screens without a notch too (external display, closed lid): a small notch is drawn at the top
   center of the screen.
 
@@ -76,6 +85,10 @@ needs you.
   Codex-related runs.
 - **Player**: the track playing in Music, Spotify or your browser, with artwork, progress (drag to seek) and
   controls. Below it, a week view of your calendar: click an event to open it in Calendar.
+- **Agenda**: your next appointment, large, with a **Join** button that opens its Zoom, Meet, Teams, Webex or FaceTime
+  link, and the rest of the day below. On the collapsed notch it becomes an index tab that counts down (discreet from
+  15 minutes before, amber at 5, green `now` while it runs); no polling, nothing runs between two thresholds. A link is
+  only opened when you click **Join**.
 - **Quick Settings**: Wi-Fi, Bluetooth, Focus, Low Power Mode, caffeine (keeps the Mac awake for 1 h, 2 h or
   without limit), the battery of the Mac and of your AirPods, and three scenes: Battery, Normal and Presentation.
 - **Shelf**: files and folders to keep at hand. Drop them on the notch, even when it is collapsed, and drag them
@@ -92,8 +105,32 @@ needs you.
 - **Mail** (off by default): the unread count of Apple Mail and your latest 3 to 5 received emails (sender, subject,
   the start of the text, time, a dot when unread). Click one to open it in Mail; hover it and click **Reply** to
   write an answer right in the notch. The reply is sent only when you click **Send** (or press Return), and **Continue
-  in Mail** opens Mail's own reply window with your text already typed. Claude Notch never launches Mail: it only
+  in Mail** opens Mail's own reply window with your text already typed. Oriel never launches Mail: it only
   reads it while it is open.
+
+## Command bar
+
+A field in the notch to do things without looking for the right tab. Open it with its shortcut (Settings › General ›
+Shortcuts, none by default) or from **…** › **Command Bar…**, type, press Return. Nothing runs before Return (or a
+click on the row), and Esc closes it.
+
+| Type | What it does |
+|---|---|
+| `t 25`, `t 1h30`, `25 min` | Starts a timer (`t` alone: 25, 5 and 10 minutes, and the Pomodoro) |
+| `n some idea` | Creates a quick note |
+| `c link` | Searches the clipboard history; Return copies the entry again |
+| `s presentation` | Applies a Quick Settings scene (Battery Saver, Presentation, Normal); with a fixed fan speed, `s fans` gives the fans back to macOS |
+| `m invoice` | Searches the latest emails of the Mail tab; Return opens the email in Mail |
+| `a team` | Lists today's and tomorrow's appointments; Return joins the meeting (known link) or opens Calendar on that day |
+| `i backup` | Removes an index tab put up by one of your scripts (or all of them) |
+| `> run the tests again` | Writes to a Claude session (the same channel as the chat field; needs "Reply from the notch") |
+
+The prefixes are listed under the field and clickable. A prefix is one letter followed by a space (`>` needs no space);
+anything else is plain text, which only a duration with its unit (`25 min`), or a scene, an email or an appointment
+with three letters or more, can answer. When the names do not fit, only the keys are shown. The search ignores case and accents and forgives missing letters in short texts (`prsnt` finds
+Presentation). The bar asks only the tabs that are on and running: a hidden tab is not woken up, a turned-off Claude tab
+has no `>`. The clipboard and your scripts' tabs are never searched without
+their prefix. No natural language, no permission, nothing leaves your Mac.
 
 ## Reply from the notch
 
@@ -134,7 +171,7 @@ Codex has hooks of its own, so the tab works like Claude's. It follows Codex whe
    `~/.codex/hooks/`. Your `notify` is never touched.
 2. **Approve the hooks in Codex.** Codex ignores a new hook until it is approved, and says nothing about it. The tab and
    Settings › Codex show where you are (*not installed*, *waiting for approval in Codex*, *active*). While approval is
-   pending, click **Approve in Codex**: the app asks Codex itself to trust the 8 Claude Notch hooks, and only those (the
+   pending, click **Approve in Codex**: the app asks Codex itself to trust the 8 Oriel hooks, and only those (the
    request behind the **Review hooks** button of the ChatGPT app). You can also review them yourself there, or with
    `/hooks` in a terminal. The tab updates on its own as soon as they are approved.
 3. **Start a new conversation** in the ChatGPT app (or run `codex`). Conversations that were already open when the hooks
@@ -165,6 +202,25 @@ Only programs of your account that read the token file can call it, never a web 
 program sent it and can never pass for a Claude or Codex request. HTTP details, limits and the security model:
 [docs/API.md](docs/API.md).
 
+## Quota gauges
+
+A thin ring, the percentage used and the time of the next reset, for the 5-hour and 7-day windows, under the sessions of
+the **Claude** tab and of the **Codex** tab (and in the summary that unfolds when you hover their collapsed tab). Amber
+from 80 %, red from 95 %. Nothing is shown when a tab is off, or when the agent gives no figure.
+
+- **Claude** (Settings › Claude › Show quota, off by default). Claude Code gives the quota (`rate_limits`) to its
+  `statusLine` and nowhere else, and allows one `statusLine` command only. So the switch puts a small relay in its place in
+  `~/.claude/settings.json` (timestamped backup first). The relay sends the data to the app (127.0.0.1, with the token),
+  then runs **your previous command** with the same data, so your status line does not change (without one, it prints
+  `5h 39% · 7d 63%`). Turning the switch off, or uninstalling Oriel, puts your command back. Only for claude.ai Pro
+  and Max subscribers, and only after the first answer of a session. The figures belong to the account, so any session
+  updates them. The app keeps the percentages and reset times in memory; the rest of what the status line receives
+  (folder, model, session) is dropped. Measured with Claude Code 2.1.304: nothing before the first answer, then both windows.
+- **Codex** (Settings › Codex › Show quota, on by default). Nothing to install: while the panel is open, the app asks Codex
+  itself (`codex app-server`, request `account/rateLimits/read`, about 1 s) at most once a minute, then every 5 minutes.
+  Measured with the Codex command 0.154 and the ChatGPT app's Codex 0.162. It needs a ChatGPT sign-in: with an API key Codex
+  answers with an error and no gauge shows. A summary seen on a collapsed tab hides a figure older than 15 minutes.
+
 ## Notch settings
 
 Open **…** › **Settings…** (⌘,).
@@ -176,14 +232,18 @@ Open **…** › **Settings…** (⌘,).
   and in the right-click menu of the collapsed notch.
 - **Opening**: on hover (with an opening delay) or on click. **Close on click outside** keeps the panel open until
   you click elsewhere, instead of closing it when the mouse leaves.
-- **Shortcuts** (none by default): one opens or closes the panel, one hides or shows the notch. They work
-  everywhere, without the Accessibility permission. Once the panel is open from the keyboard, ← and → switch tabs,
+- **Shortcuts** (none by default): one opens or closes the panel, one hides or shows the notch, one opens the
+  [command bar](#command-bar). They work everywhere, without the Accessibility permission. Once the panel is open from the keyboard, ← and → switch tabs,
   ⌘1 to ⌘9 jump to a tab, and Esc closes it.
 - **Size and look**: panel width (compact, standard, large, or a custom width from 460 to 720 pt), background (black,
   graphite, midnight blue or a custom color), opacity, shadow, accent color and animation speed. With "Reduce
   motion" on in macOS, the animations become a simple fade.
 - **Screen**: the built-in display (the default), the main display, the display under the mouse, or a display
   picked by name. A screen without a notch gets a virtual one at the top center.
+- **Bubble**: hold the bottom right corner of the open panel and drag, and the notch peels off into a bubble you can put
+  anywhere, its tabs in a revolver cylinder (scroll or click to turn, click the centre to open). Bring it back under the
+  notch, double-click its edge or choose **Reattach to Notch**. It can be turned off, and can return to the notch at
+  each relaunch.
 - **Privacy**: hide the notch from screenshots and screen sharing. This depends on the app that captures the screen.
 - **Profile**: **Change Profile…** starts you from a profile (Developer, Student, Creative or Minimal): it shows
   the tabs it will show and hide, the opening mode and the ears, and changes nothing until you confirm. Your tab
@@ -195,22 +255,22 @@ Open **…** › **Settings…** (⌘,).
 
 ## Installation
 
-1. Download `ClaudeNotch-<version>.dmg` from the [Releases](https://github.com/Slybald/claude-notch/releases) page.
-2. Open it and drag **ClaudeNotch** onto **Applications**.
+1. Download `Oriel-<version>.dmg` from the [Releases](https://github.com/Slybald/oriel/releases) page.
+2. Open it and drag **Oriel** onto **Applications**.
 3. Optional: check the download against the `.sha256` file published next to it:
-   `shasum -a 256 -c ClaudeNotch-<version>.dmg.sha256` (run it in the download folder).
+   `shasum -a 256 -c Oriel-<version>.dmg.sha256` (run it in the download folder).
 
 ### First launch
 
-Claude Notch is not notarized (there is no Apple Developer ID behind it; releases are signed with a
+Oriel is not notarized (there is no Apple Developer ID behind it; releases are signed with a
 self-signed certificate), so macOS blocks it the first time you open it. Two ways around it:
 
 - Open the app once, dismiss the warning, then go to **System Settings › Privacy & Security**, scroll down
-  and click **Open Anyway** next to the message about ClaudeNotch. Confirm.
+  and click **Open Anyway** next to the message about Oriel. Confirm.
 - Or, in Terminal:
 
   ```sh
-  xattr -dr com.apple.quarantine /Applications/ClaudeNotch.app
+  xattr -dr com.apple.quarantine /Applications/Oriel.app
   ```
 
 The certificate is the same for every release, so macOS recognises each update as the same app and keeps the
@@ -222,13 +282,13 @@ On first launch, a setup assistant lets you pick what you need, in four short st
 changes nothing; nothing is written before you click **Apply**.
 
 1. **Welcome and profile**: what the notch is, and an optional profile: Developer (Claude and Codex if found,
-   clipboard, timer, notes), Student (player and calendar, timer, notes, quick settings), Creative (player and
+   clipboard, timer, notes), Student (agenda, player and calendar, timer, notes, quick settings), Creative (player and
    calendar, shelf, clipboard) or Minimal (player and calendar, quick settings). It ticks the tabs, sets how the
    panel opens and the ears; the next steps start from it, and everything stays editable. Without a choice,
    nothing changes.
 2. **Tabs**: one card per tab, tick the ones you want (at least one stays on). The Claude card is offered only when
    Claude Code is found on the Mac, and with it an unticked option to install the Claude Code hooks: they add
-   Claude Notch's entries to `~/.claude/settings.json` (a timestamped backup is written next to it first, and your
+   Oriel's entries to `~/.claude/settings.json` (a timestamped backup is written next to it first, and your
    existing hooks are kept) and install the hook script in `~/.claude/hooks/`. Without Claude Code, a line says
    where to turn the Claude tab on later (**Settings › Tabs**).
 3. **Behavior**: open on hover or on click, an optional keyboard shortcut, and open at login.
@@ -250,11 +310,11 @@ needs one. It is shown once, and not after an update from a version that was alr
 
 ## Updates
 
-Claude Notch updates itself from the [Releases](https://github.com/Slybald/claude-notch/releases) page.
+Oriel updates itself from the [Releases](https://github.com/Slybald/oriel/releases) page.
 
 - 60 seconds after launch, then every 6 hours, the app asks GitHub for the latest release
   (`api.github.com`; only the app version is sent, in the User-Agent). Drafts and pre-releases are ignored.
-- A newer version is downloaded with its signature (`ClaudeNotch-<version>.dmg.sig`) and installed only if
+- A newer version is downloaded with its signature (`Oriel-<version>.dmg.sig`) and installed only if
   its Ed25519 signature matches the public key built into the app. A DMG without a signature, or with an
   invalid one, is refused and nothing is installed.
 - At launch, a new version is installed right away; later on, only when no session is running or waiting
@@ -266,10 +326,15 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   menu, with an **Install** button. **Check for Updates** checks right away.
 - Apps built from source (`scripts/build.sh`, `scripts/install.sh`) never update themselves: the menu shows
   "Development build: updates disabled".
+- Coming from Claude Notch (1.9.0 or older): the update installs the new version in `ClaudeNotch.app`, which renames
+  itself `Oriel.app` at its first launch, points open-at-login to the new path and restarts (one instance only).
+  If an older `ClaudeNotch.app` is still next to `Oriel.app` (a manual install), it goes to the Trash. The data
+  folder and the hook scripts keep their old names (`ClaudeNotch`, `claude-notch-hook.sh`): that is on purpose, so
+  that nothing has to be moved or approved again. Details in [docs/RENAME.md](docs/RENAME.md).
 
 ## Privacy
 
-- Everything stays on your Mac. Claude Notch sends no data about you or your sessions: no analytics. Its only
+- Everything stays on your Mac. Oriel sends no data about you or your sessions: no analytics. Its only
   outgoing requests are the update check to `api.github.com` and the download of new versions from GitHub
   (see [Updates](#updates)).
 - The app listens on `127.0.0.1:47823` only, on the loopback interface: it cannot be reached from the network.
@@ -292,12 +357,16 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   or files. Pausing the capture stops the checks until the next launch.
 - What the app reads: the hook events (Claude Code and Codex), the end of the transcript of a running session (to detect Esc),
   Claude Code's task files, the process list (to find the host app), the track playing and its artwork (Player),
-  the events of the calendars you chose to show, the state of Wi-Fi and Bluetooth, and the battery level.
+  the events of the calendars you chose to show, the state of Wi-Fi and Bluetooth, and the battery level. With the quota on:
+  the percentages and reset times that Claude Code gives to its status line (relayed, kept in memory) and that Codex
+  returns when asked.
 - What the app writes: the logs and token files in `~/Library/Application Support/ClaudeNotch/` (see
   [Shared logs](#shared-logs)), and the data of the tabs in the same folder: `shelf.json` (references to your
   files), `notes.json`, `timer.json`, and `clipboard-history.json` only if you keep the history. These files are
   readable by your account only. Also the hooks in `~/.claude` when you ask for it, and the Codex hooks (`~/.codex/hooks.json` and
-  `~/.codex/hooks/codex-notch-hook.sh`) when you ask for it; `~/.codex/config.toml` is only read (to show the state of the
+  `~/.codex/hooks/codex-notch-hook.sh`) when you ask for it, and, when you turn the Claude quota on, `claude-notch-statusline.sh`
+  and a copy of your previous status line command (readable by you only) in `~/.claude/hooks/` and the `statusLine` of
+  `~/.claude/settings.json`; `~/.codex/config.toml` is only read (to show the state of the
   hooks), never written by the app: the approval of the hooks, when you click **Approve in Codex**, is written by Codex
   itself (the app starts `codex app-server` for a moment, with a minimal environment). During an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
@@ -305,10 +374,11 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
 
 ## macOS permissions
 
-Claude Notch asks for a permission only when you use the feature that needs it. Nothing is requested at launch.
+Oriel asks for a permission only when you use the feature that needs it. Nothing is requested at launch.
 
-- **Calendars** (full access): your week and events in the Player tab. Asked when you press the calendar's button
-  or turn the option on.
+- **Calendars** (full access): your week and events in the Player tab, and the next appointment of the Agenda tab
+  (including its countdown on the collapsed notch). Asked when you press the calendar's button, **Allow Calendar
+  Access** or turn the option on.
 - **Automation: Calendar** (Apple Events): to open a day or an event in Calendar. macOS asks the first time.
 - **Bluetooth**: to read the state of Bluetooth and switch it from Quick Settings. Asked when you first use the
   Bluetooth tile, or a scene that changes it.
@@ -317,7 +387,7 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
 - **Paste from other apps** (macOS 15.4 and later): so the Clipboard tab can read what you copy. macOS may ask each
   time, or block it. When it is blocked, nothing is recorded, and the tab and the settings link to System Settings.
 - **Full Disk Access** (Messages tab, off by default): to read the Messages database. macOS has no dialog for it: add
-  Claude Notch yourself in System Settings › Privacy & Security › Full Disk Access, then relaunch the app. Without it
+  Oriel yourself in System Settings › Privacy & Security › Full Disk Access, then relaunch the app. Without it
   the tab says so and links to System Settings.
 - **Contacts** (Messages tab): to show contact names instead of numbers. Asked when you click **Allow** in the tab.
 - **Automation: Messages** (Apple Events): to send a quick reply. macOS asks the first time you send.
@@ -391,7 +461,7 @@ folded. The Git and usage files are produced by separate command-line tools that
 ### Companion tool jobs
 
 If companion tools are installed in `~/.local/share/<tool>/` (`git-radar`, `claude-usage`, `course-sorter`,
-`claude-recap`), Claude Notch runs their background jobs itself instead of LaunchAgents: macOS denies
+`claude-recap`), Oriel runs their background jobs itself instead of LaunchAgents: macOS denies
 `~/Documents`, `~/Desktop` and `~/Downloads` to scripts started by launchd, while the access granted once to
 an app is inherited by the processes it starts. A missing tool is skipped. Logs:
 `~/Library/Logs/ClaudeNotch/<tool>.log`; state: `jobs` key of `/state`. Releases keep the same signing
@@ -425,11 +495,15 @@ hooks it already receives:
   (hooks started by an older script do not), and otherwise a message is queued and the conversation says it will
   go on Claude's next turn, with an **Open** button.
 - Codex: a new hook only runs after it is approved (**Approve in Codex**, or **Review hooks** in the ChatGPT app, or `/hooks`
-  in a terminal), and only in conversations started after that. Changing a hook (an update of Claude Notch) makes Codex ask
+  in a terminal), and only in conversations started after that. Changing a hook (an update of Oriel) makes Codex ask
   again. `codex exec` never asks for approvals, so nothing is held there; the interactive CLI and the ChatGPT app's engine
   do (measured with the app's own Codex 0.162). The ChatGPT app window itself was not driven; the link that opens a
   conversation (`codex://threads/<id>`) comes from the app's own routing. No free message to a running session, no answer to Codex's own questions (no hook for them), and a card
   stays on "needs your approval" after an approval given in the terminal until the tool ends.
+- Quota gauges: Claude's figure only arrives when a session that has the relay answers (Pro and Max, terminal sessions;
+  whether the Code tab of Claude Desktop runs the `statusLine` was not checked, the documentation only describes it for
+  the terminal), and is lost when the app restarts until the next answer. A project or local `settings.json` that sets its
+  own `statusLine` bypasses the relay. Codex's figure is read when the panel opens, so it can be a few minutes old.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -458,9 +532,9 @@ hooks it already receives:
 
 ## Uninstall
 
-**…** menu › **Uninstall Claude Notch…** removes the hooks (Claude Code's, and Codex's if you installed them) and what the app
+**…** menu › **Uninstall Oriel…** removes the hooks (Claude Code's, and Codex's if you installed them) and what the app
 installed, then quits.
-Then drag `ClaudeNotch.app` from Applications to the Trash.
+Then drag `Oriel.app` from Applications to the Trash.
 
 ## Development
 
@@ -470,8 +544,8 @@ Code map and design decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```sh
 swift build
 swift test
-scripts/build.sh      # universal (arm64 + x86_64) build/ClaudeNotch.app, signed ad hoc by default
-scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked after creation
+scripts/build.sh      # universal (arm64 + x86_64) build/Oriel.app, signed ad hoc by default
+scripts/make-dmg.sh   # build/Oriel-<version>.dmg and its .sha256, checked after creation
 ```
 
 - `VERSION=1.2.3 scripts/build.sh` sets the app version (default: `CFBundleShortVersionString` of
@@ -507,8 +581,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg and its .sha256, checked
 
   ```sh
   S=io.github.slybald.claudenotch.code-signing
-  printf %s "$(security find-generic-password -s $S -a p12-base64 -w)" | gh secret set SIGNING_CERT_P12 -R Slybald/claude-notch
-  printf %s "$(security find-generic-password -s $S -a p12-password -w)" | gh secret set SIGNING_CERT_PASSWORD -R Slybald/claude-notch
+  printf %s "$(security find-generic-password -s $S -a p12-base64 -w)" | gh secret set SIGNING_CERT_P12 -R Slybald/oriel
+  printf %s "$(security find-generic-password -s $S -a p12-password -w)" | gh secret set SIGNING_CERT_PASSWORD -R Slybald/oriel
   ```
 
   Do not replace this certificate lightly: a new one changes the requirement and every user gets the access
@@ -525,11 +599,17 @@ Its notice is listed in **About › Licenses**.
 
 ## Français
 
-App macOS native qui vit dans la notch du MacBook et suit les sessions Claude Code, dans un terminal ou un
-éditeur (CLI) comme dans l'onglet Code de Claude Desktop. Survole la notch : le panneau se déplie et résume
-chaque session (état, outil en cours, liste de tâches, sous-agents). Six autres onglets l'accompagnent : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et
-Notes rapides. Interface disponible en anglais et en
+App macOS native qui transforme la notch du MacBook en petit panneau pour tout le monde. Survole la notch : elle
+se déplie avec un lecteur, ton agenda et ses réunions, des réglages rapides, une étagère, l'historique du presse-papiers, un
+minuteur et des notes rapides. Si tu utilises Claude Code ou Codex, deux onglets optionnels suivent aussi leurs
+sessions : état, outil en cours, liste de tâches, sous-agents, et permissions auxquelles tu réponds depuis la
+notch. Ni l'un ni l'autre n'est nécessaire pour utiliser l'app. Interface disponible en anglais et en
 français (suit la langue du système). Les captures ci-dessus utilisent des données fictives.
+
+> **Anciennement Claude Notch.** Si tu l'as déjà, il n'y a rien à faire : la mise à jour automatique installe la
+> nouvelle version, qui devient `Oriel.app` dans Applications. Tes autorisations macOS, tes réglages, tes hooks et
+> tes données sont gardés. Pour un téléchargement manuel, prends `Oriel-<version>.dmg` ; `ClaudeNotch-<version>.dmg`
+> ne sert qu'à la mise à jour automatique des versions jusqu'à 1.9.0.
 
 *Projet indépendant, ni affilié à Anthropic ni approuvé par Anthropic. Claude est une marque d'Anthropic.*
 
@@ -559,6 +639,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
   Jamais de « toujours autoriser » depuis la notch. Entrée envoie, Échap ferme.
 - **Onglet Codex** (optionnel, voir [Onglet Codex](#onglet-codex)) : les sessions de Codex (OpenAI, CLI ou app), qui travaillent,
   attendent une approbation ou ont fini, avec le dernier message ; autoriser ou refuser une commande ou un patch depuis la notch.
+- **Jauges de quota** (optionnelles, voir [Jauges de quota](#jauges-de-quota)) : un anneau fin et le pourcentage utilisé des
+  fenêtres de 5 heures et de 7 jours dans les onglets Claude et Codex, avec l'heure de remise à zéro. Ambre dès 80 %, rouge dès 95 %.
 - **Tâches** : barre de progression et tâche en cours de la liste de Claude Code ; le chevron déplie la liste.
 - **Sous-agents** : nombre de sous-agents en cours dans chaque session.
 - **Clic → retour à la session** : un clic sur une carte ramène l'app hôte au premier plan (Terminal, iTerm2,
@@ -567,9 +649,12 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **Claude Desktop** : une ligne indique si Claude Desktop est ouvert, avec un bouton pour le ramener devant.
 - **Section outils (optionnelle)** : fichiers récemment écrits par Claude, état Git de tes dépôts, usage du
   jour. Elle n'apparaît que si ses fichiers de données existent (voir [Section outils](#section-outils)).
-- **Six autres onglets** : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
+- **Sept autres onglets** : Lecteur, Agenda, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
 - **Tes propres intercalaires** (en option, voir [Scripts](#scripts--api-locale-et-commande-notch)) : `notch run -- make`
   affiche un sablier, puis ✓ ou ✗ avec la durée ; n'importe quel script peut afficher un état court par une API locale.
+- **Barre de commande** : un champ, des préfixes d'une touche (voir [Barre de commande](#barre-de-commande)) : `t 25`
+  lance un minuteur, `n idée` crée une note, `c lien` cherche dans tes copies, `s présentation` applique une scène,
+  `> message` écrit à Claude.
 - Marche aussi sur un écran sans notch (écran externe, capot fermé) : une petite notch est dessinée en haut
   au centre de l'écran.
 
@@ -589,6 +674,10 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
 - **Lecteur** : le morceau en cours dans Musique, Spotify ou ton navigateur, avec la pochette, la progression
   (glisse pour avancer) et les commandes. Dessous, une vue de la semaine de ton calendrier : un clic sur un
   événement l'ouvre dans Calendrier.
+- **Agenda** : ton prochain rendez-vous en grand, avec un bouton **Rejoindre** qui ouvre son lien Zoom, Meet, Teams,
+  Webex ou FaceTime, et le reste de la journée dessous. Notch repliée, il devient un intercalaire qui compte à rebours
+  (discret à 15 minutes, ambre à 5, « en cours » en vert pendant le rendez-vous) ; aucun sondage, rien ne tourne entre
+  deux échéances. Un lien ne s'ouvre que sur un clic sur **Rejoindre**.
 - **Réglages rapides** : Wi-Fi, Bluetooth, Concentration, Économie d'énergie, caféine (empêche la mise en veille
   pendant 1 h, 2 h ou sans limite), batterie du Mac et des AirPods, et trois scènes : Autonomie, Normal et
   Présentation.
@@ -607,8 +696,33 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
 - **Mail** (désactivé par défaut) : le nombre de messages non lus d'Apple Mail et tes 3 à 5 derniers mails reçus
   (expéditeur, objet, début du texte, heure, pastille s'il n'est pas lu). Un clic en ouvre un dans Mail ; au survol,
   **Répondre** ouvre un champ pour écrire la réponse dans la notch. Elle ne part que sur ton clic sur **Envoyer** (ou
-  Entrée) ; **Continuer dans Mail** ouvre la fenêtre de réponse de Mail avec ton texte déjà tapé. Claude Notch ne
+  Entrée) ; **Continuer dans Mail** ouvre la fenêtre de réponse de Mail avec ton texte déjà tapé. Oriel ne
   lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
+
+### Barre de commande
+
+Un champ dans la notch pour agir sans chercher le bon onglet. Ouvre-le avec son raccourci (Réglages › Général ›
+Raccourcis, aucun par défaut) ou par **…** › **Barre de commande…**, tape, appuie sur Entrée. Rien ne part avant
+Entrée (ou un clic sur la ligne), et Échap la ferme.
+
+| Tape | Effet |
+|---|---|
+| `t 25`, `t 1h30`, `25 min` | Lance un minuteur (`t` seul : 25, 5 et 10 minutes, et le Pomodoro) |
+| `n une idée` | Crée une note rapide |
+| `c lien` | Cherche dans l'historique du presse-papiers ; Entrée recopie l'élément |
+| `s présentation` | Applique une scène des Réglages rapides (Autonomie, Présentation, Normal) ; avec une vitesse fixe des ventilateurs, `s ventil` la rend à macOS |
+| `m facture` | Cherche dans les derniers mails de l'onglet Mail ; Entrée ouvre le mail dans Mail |
+| `a équipe` | Liste les rendez-vous d'aujourd'hui et de demain ; Entrée rejoint la réunion (lien reconnu) ou ouvre Calendrier à ce jour |
+| `i sauvegarde` | Retire un intercalaire posé par un de tes scripts (ou tous) |
+| `> relance les tests` | Écrit à une session Claude (le même canal que le champ de la conversation ; demande « Répondre depuis la notch ») |
+
+Les préfixes sont listés sous le champ, et cliquables. Un préfixe est une lettre suivie d'une espace (`>` n'en demande
+pas) ; le reste est du texte libre, auquel seule une durée avec son unité (`25 min`), ou une scène, un mail ou un rendez-vous d'au
+moins trois lettres, peut répondre. Quand les noms ne tiennent pas, seules les touches sont montrées. La recherche ignore la casse et les accents et pardonne des lettres manquantes dans un texte court
+(`prsnt` trouve Présentation). La barre n'interroge que les onglets activés et en marche : un onglet masqué n'est pas
+réveillé, un onglet Claude coupé n'a pas de `>`. Le presse-papiers et les intercalaires de tes scripts ne sont
+jamais cherchés sans leur préfixe. Pas de langage
+naturel, aucune permission, rien ne quitte ton Mac.
 
 ### Répondre depuis la notch
 
@@ -651,7 +765,7 @@ Codex a ses propres hooks : l'onglet marche comme celui de Claude. Il suit Codex
 2. **Approuve les hooks dans Codex.** Codex ignore un hook neuf tant qu'il n'est pas approuvé, sans rien dire.
    L'onglet et Réglages › Codex montrent où tu en es (*non posés*, *en attente d'approbation dans Codex*, *actifs*).
    Tant que l'approbation attend, clique sur **Approuver dans Codex** : l'app demande à Codex lui-même de faire confiance
-   aux 8 hooks de Claude Notch, et seulement à eux (la requête du bouton **Review hooks** de l'app ChatGPT). Tu peux aussi
+   aux 8 hooks d'Oriel, et seulement à eux (la requête du bouton **Review hooks** de l'app ChatGPT). Tu peux aussi
    les revoir toi-même là, ou avec `/hooks` dans un terminal. L'onglet se met à jour tout seul dès qu'ils sont approuvés.
 3. **Ouvre une nouvelle conversation** dans l'app ChatGPT (ou lance `codex`). Les conversations déjà ouvertes quand les
    hooks ont été approuvés ne sont pas suivies.
@@ -682,6 +796,27 @@ tu as nommée. Seuls les programmes de ton compte qui lisent le fichier du jeton
 l'intercalaire d'un script dit toujours de quel programme il vient et ne peut pas se faire passer pour une demande de
 Claude ou de Codex. Détails HTTP, limites et modèle de sécurité : [docs/API.md](docs/API.md).
 
+### Jauges de quota
+
+Un anneau fin, le pourcentage utilisé et l'heure de la prochaine remise à zéro, pour les fenêtres de 5 heures et de 7 jours,
+sous les sessions de l'onglet **Claude** et de l'onglet **Codex** (et dans le résumé qui se déplie quand tu survoles leur
+intercalaire). Ambre dès 80 %, rouge dès 95 %. Rien n'apparaît quand un onglet est désactivé, ni quand l'agent ne donne aucun
+chiffre.
+
+- **Claude** (Réglages › Claude › Afficher le quota, désactivé par défaut). Claude Code donne le quota (`rate_limits`) à sa
+  `statusLine` et nulle part ailleurs, et n'accepte qu'une seule commande de `statusLine`. Le réglage met donc un petit relais à
+  sa place dans `~/.claude/settings.json` (sauvegarde horodatée d'abord). Le relais envoie les données à l'app (127.0.0.1, avec
+  le jeton), puis relance **ta commande précédente** avec les mêmes données : ta ligne d'état ne change pas (sans commande, il
+  affiche `5h 39% · 7d 63%`). Couper le réglage, ou désinstaller Oriel, remet ta commande. Seulement pour les abonnés
+  Pro et Max de claude.ai, et seulement après la première réponse d'une session. Les chiffres sont ceux du compte : n'importe
+  quelle session les met à jour. L'app garde les pourcentages et les heures en mémoire ; le reste de ce que reçoit la ligne
+  d'état (dossier, modèle, session) est jeté. Mesuré avec Claude Code 2.1.304 : rien avant la première réponse, puis les deux fenêtres.
+- **Codex** (Réglages › Codex › Afficher le quota, activé par défaut). Rien à installer : panneau ouvert, l'app interroge
+  Codex lui-même (`codex app-server`, requête `account/rateLimits/read`, environ 1 s) au plus une fois par minute, puis toutes
+  les 5 minutes. Mesuré avec la commande Codex 0.154 et le Codex de l'app ChatGPT 0.162. Il faut un compte ChatGPT : avec une clé
+  d'API, Codex répond par une erreur et aucune jauge ne s'affiche. Un résumé vu sur un intercalaire replié cache un chiffre de
+  plus de 15 minutes.
+
 ### Réglages de la notch
 
 Ouvre **…** › **Réglages…** (⌘,).
@@ -693,14 +828,18 @@ Ouvre **…** › **Réglages…** (⌘,).
   menu **…** et dans le menu du clic droit sur la notch repliée.
 - **Ouverture** : au survol (avec un délai) ou au clic. **Fermer au clic à l'extérieur** garde le panneau ouvert
   jusqu'à un clic ailleurs, au lieu de le refermer quand la souris le quitte.
-- **Raccourcis** (aucun par défaut) : l'un ouvre ou ferme le panneau, l'autre masque ou réaffiche la notch. Ils
-  marchent partout, sans l'autorisation d'accessibilité. Panneau ouvert au clavier : ← et → changent d'onglet, ⌘1 à
+- **Raccourcis** (aucun par défaut) : l'un ouvre ou ferme le panneau, l'autre masque ou réaffiche la notch, un
+  troisième ouvre la [barre de commande](#barre-de-commande). Ils marchent partout, sans l'autorisation d'accessibilité. Panneau ouvert au clavier : ← et → changent d'onglet, ⌘1 à
   ⌘9 vont à un onglet, Échap ferme.
 - **Taille et apparence** : largeur du panneau (compact, standard, grand, ou une largeur personnalisée de 460 à
   720 pt), fond (noir, graphite, bleu nuit ou couleur libre), opacité, ombre, couleur d'accent et vitesse des
   animations. Avec « Réduire les animations » activé dans macOS, les animations deviennent un simple fondu.
 - **Écran** : l'écran intégré (par défaut), l'écran principal, l'écran sous la souris, ou un écran choisi par son
   nom. Un écran sans encoche reçoit une encoche virtuelle en haut au centre.
+- **Bulle** : maintiens l'angle en bas à droite du panneau ouvert puis glisse, et la notch se décolle en une bulle à
+  poser où tu veux, ses onglets en barillet de revolver (molette ou clic pour tourner, clic au centre pour ouvrir).
+  Ramène-la sous la notch, double-clique sur son bord ou choisis **Rattacher à la notch**. Désactivable, et elle peut
+  revenir dans la notch à chaque lancement.
 - **Confidentialité** : masquer la notch des captures d'écran et du partage d'écran. Cela dépend de l'app qui capture
   l'écran.
 - **Profil** : **Changer de profil…** te fait partir d'un profil (Développeur, Étudiant, Créatif ou Minimal) : la
@@ -714,22 +853,22 @@ Ouvre **…** › **Réglages…** (⌘,).
 
 ### Installation
 
-1. Télécharge `ClaudeNotch-<version>.dmg` depuis la page [Releases](https://github.com/Slybald/claude-notch/releases).
-2. Ouvre-le et glisse **ClaudeNotch** sur **Applications**.
+1. Télécharge `Oriel-<version>.dmg` depuis la page [Releases](https://github.com/Slybald/oriel/releases).
+2. Ouvre-le et glisse **Oriel** sur **Applications**.
 3. Facultatif : vérifie le téléchargement avec le fichier `.sha256` publié à côté :
-   `shasum -a 256 -c ClaudeNotch-<version>.dmg.sha256` (dans le dossier du téléchargement).
+   `shasum -a 256 -c Oriel-<version>.dmg.sha256` (dans le dossier du téléchargement).
 
 #### Premier lancement
 
-Claude Notch n'est pas notarisée (pas de compte Apple Developer ID ; les releases sont signées avec un
+Oriel n'est pas notarisée (pas de compte Apple Developer ID ; les releases sont signées avec un
 certificat auto-signé) : macOS la bloque à la première ouverture. Deux façons de passer outre :
 
 - Ouvre l'app une fois, ferme l'avertissement, puis va dans **Réglages Système › Confidentialité et
-  sécurité**, descends et clique sur **Ouvrir quand même** à côté du message sur ClaudeNotch. Confirme.
+  sécurité**, descends et clique sur **Ouvrir quand même** à côté du message sur Oriel. Confirme.
 - Ou, dans le Terminal :
 
   ```sh
-  xattr -dr com.apple.quarantine /Applications/ClaudeNotch.app
+  xattr -dr com.apple.quarantine /Applications/Oriel.app
   ```
 
 Le certificat est le même à chaque release : macOS reconnaît chaque mise à jour comme la même app et garde les
@@ -741,13 +880,13 @@ Au premier lancement, un assistant de configuration te laisse choisir ce qui t'i
 étapes. **Passer** est toujours possible et ne change rien ; rien n'est écrit avant **Appliquer**.
 
 1. **Bienvenue et profil** : ce qu'est la notch, et un profil facultatif : Développeur (Claude et Codex s'ils sont
-   trouvés, presse-papiers, minuteur, notes), Étudiant (lecteur et calendrier, minuteur, notes, réglages rapides),
+   trouvés, presse-papiers, minuteur, notes), Étudiant (agenda, lecteur et calendrier, minuteur, notes, réglages rapides),
    Créatif (lecteur et calendrier, étagère, presse-papiers) ou Minimal (lecteur et calendrier, réglages rapides). Il
    coche les onglets, règle l'ouverture du panneau et les oreilles ; les étapes suivantes partent de lui et tout reste
    modifiable. Sans choix, rien ne change.
 2. **Onglets** : une carte par onglet, coche ceux que tu veux (au moins un reste activé). La carte Claude n'est
    proposée que si Claude Code est sur le Mac, avec une option décochée pour installer les hooks de Claude Code :
-   ils ajoutent les entrées de Claude Notch dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à
+   ils ajoutent les entrées d'Oriel dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à
    côté avant, tes hooks existants sont conservés) et installent le script de hook dans `~/.claude/hooks/`. Sans
    Claude Code, une ligne dit où activer l'onglet Claude plus tard (**Réglages › Onglets**).
 3. **Comportement** : ouverture au survol ou au clic, un raccourci clavier facultatif, et le lancement à l'ouverture
@@ -770,12 +909,12 @@ aussi s'installer plus tard depuis **Réglages › Claude** ; une session déjà
 
 ### Mises à jour
 
-Claude Notch se met à jour seule depuis la page [Releases](https://github.com/Slybald/claude-notch/releases).
+Oriel se met à jour seule depuis la page [Releases](https://github.com/Slybald/oriel/releases).
 
 - 60 secondes après le lancement, puis toutes les 6 heures, l'app demande à GitHub la dernière release
   (`api.github.com` ; seule la version de l'app part, dans le User-Agent). Brouillons et préversions sont
   ignorés.
-- Une version plus récente est téléchargée avec sa signature (`ClaudeNotch-<version>.dmg.sig`) et n'est
+- Une version plus récente est téléchargée avec sa signature (`Oriel-<version>.dmg.sig`) et n'est
   installée que si sa signature Ed25519 correspond à la clé publique intégrée à l'app. Un DMG sans signature,
   ou à la signature invalide, est refusé et rien n'est installé.
 - Au lancement, la nouvelle version s'installe tout de suite ; ensuite, seulement quand aucune session n'est
@@ -788,10 +927,16 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
   tout de suite.
 - Une app compilée depuis les sources (`scripts/build.sh`, `scripts/install.sh`) ne se met jamais à jour
   seule : le menu affiche « Build de développement : mises à jour désactivées ».
+- Si tu viens de Claude Notch (1.9.0 ou plus ancienne) : la mise à jour installe la nouvelle version dans
+  `ClaudeNotch.app`, qui se renomme `Oriel.app` à son premier lancement, repointe l'ouverture à la connexion vers
+  le nouveau chemin et redémarre (une seule instance). Si une ancienne `ClaudeNotch.app` traîne encore à côté
+  d'`Oriel.app` (installation manuelle), elle part à la Corbeille. Le dossier de données et les scripts de hook
+  gardent leurs anciens noms (`ClaudeNotch`, `claude-notch-hook.sh`) : c'est voulu, pour ne rien déplacer ni
+  faire réapprouver. Détails dans [docs/RENAME.md](docs/RENAME.md).
 
 ### Confidentialité
 
-- Tout reste sur ton Mac. Claude Notch n'envoie aucune donnée sur toi ni sur tes sessions : pas de
+- Tout reste sur ton Mac. Oriel n'envoie aucune donnée sur toi ni sur tes sessions : pas de
   statistiques. Ses seules requêtes sortantes sont la recherche de mise à jour sur `api.github.com` et le
   téléchargement des nouvelles versions depuis GitHub (voir [Mises à jour](#mises-à-jour)).
 - L'app n'écoute que sur `127.0.0.1:47823`, sur l'interface de bouclage : elle est injoignable depuis le réseau.
@@ -816,13 +961,15 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
 - Ce que l'app lit : les événements de hook, la fin du transcript d'une session en cours (pour détecter
   Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte), le morceau en cours
   et sa pochette (Lecteur), les événements des calendriers que tu as choisi d'afficher, l'état du Wi-Fi et du
-  Bluetooth, et le niveau de la batterie.
+  Bluetooth, et le niveau de la batterie. Avec le quota activé : les pourcentages et heures de remise à zéro que Claude Code
+  donne à sa ligne d'état (relayés, gardés en mémoire) et que Codex renvoie quand on le lui demande.
 - Ce que l'app écrit : les journaux et les fichiers du jeton dans `~/Library/Application Support/ClaudeNotch/`
   (voir [Registres partagés](#registres-partagés)), et les données des onglets dans le même dossier :
   `shelf.json` (les références à tes fichiers), `notes.json`, `timer.json`, et `clipboard-history.json` seulement
   si tu gardes l'historique. Ces fichiers ne sont lisibles que par ton compte. Il y a aussi les hooks dans
   `~/.claude` quand tu le demandes, les hooks Codex (`~/.codex/hooks.json` et `~/.codex/hooks/codex-notch-hook.sh`) quand tu
-  le demandes (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit par l'app : l'approbation des
+  le demandes, `claude-notch-statusline.sh` et une copie de ta commande de ligne d'état précédente (lisible par toi seul) dans
+  `~/.claude/hooks/`, et la `statusLine` de `~/.claude/settings.json`, quand tu actives le quota de Claude (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit par l'app : l'approbation des
   hooks, quand tu cliques sur **Approuver dans Codex**, est écrite par Codex lui-même, que l'app lance un instant avec un
   environnement minimal) et, pendant une mise à jour, le DMG dans
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
@@ -830,11 +977,12 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
 
 ### Autorisations macOS
 
-Claude Notch ne demande une autorisation que lorsque tu utilises la fonction qui en a besoin. Rien n'est demandé au
+Oriel ne demande une autorisation que lorsque tu utilises la fonction qui en a besoin. Rien n'est demandé au
 lancement.
 
-- **Calendriers** (accès complet) : ta semaine et tes événements dans l'onglet Lecteur. Demandé quand tu appuies sur
-  le bouton du calendrier ou que tu actives l'option.
+- **Calendriers** (accès complet) : ta semaine et tes événements dans l'onglet Lecteur, et le prochain rendez-vous de
+  l'onglet Agenda (avec son compte à rebours sur la notch repliée). Demandé quand tu appuies sur le bouton du
+  calendrier ou sur **Autoriser l'accès au calendrier**, ou que tu actives l'option.
 - **Automatisation : Calendrier** (Apple Events) : pour ouvrir un jour ou un événement dans Calendrier. macOS le
   demande la première fois.
 - **Bluetooth** : pour lire l'état du Bluetooth et le couper ou le rallumer depuis Réglages rapides. Demandé quand tu
@@ -845,7 +993,7 @@ lancement.
   tu copies. macOS peut le demander à chaque fois, ou le bloquer. Bloqué, rien ne peut être enregistré ; l'onglet et
   les réglages renvoient vers Réglages Système.
 - **Accès complet au disque** (onglet Messages, désactivé par défaut) : pour lire la base de Messages. macOS n'a pas
-  de fenêtre pour ça : ajoute Claude Notch toi-même dans Réglages Système › Confidentialité et sécurité › Accès
+  de fenêtre pour ça : ajoute Oriel toi-même dans Réglages Système › Confidentialité et sécurité › Accès
   complet au disque, puis relance l'app. Sans lui, l'onglet le dit et renvoie vers Réglages Système.
 - **Contacts** (onglet Messages) : pour afficher les noms des contacts au lieu des numéros. Demandé quand tu cliques
   sur **Autoriser** dans l'onglet.
@@ -925,7 +1073,7 @@ tourne. Les fichiers Git et usage viennent d'outils en ligne de commande sépar�
 #### Tâches des outils compagnons
 
 Si des outils compagnons sont installés dans `~/.local/share/<outil>/` (`git-radar`, `claude-usage`,
-`course-sorter`, `claude-recap`), Claude Notch lance lui-même leurs tâches de fond à la place de
+`course-sorter`, `claude-recap`), Oriel lance lui-même leurs tâches de fond à la place de
 LaunchAgents : macOS refuse `~/Documents`, `~/Desktop` et `~/Downloads` aux scripts démarrés par launchd,
 alors que l'accès accordé une fois à une app est hérité par les processus qu'elle lance. Un outil absent est
 ignoré. Journaux : `~/Library/Logs/ClaudeNotch/<outil>.log` ; état : clé `jobs` de `/state`. Les releases
@@ -960,11 +1108,15 @@ partir de hooks qu'elle reçoit déjà :
   ancien script), sinon un message reste en file et la conversation dit qu'il partira au prochain tour de Claude,
   avec un bouton **Ouvrir**.
 - Codex : un hook neuf ne tourne qu'une fois approuvé (**Approuver dans Codex**, ou **Review hooks** dans l'app ChatGPT, ou
-  `/hooks` dans un terminal), et seulement dans les conversations démarrées ensuite. Modifier un hook (une mise à jour de
-  Claude Notch) fait que Codex le redemande. `codex exec` ne demande jamais d'approbation : rien n'y est tenu ; le CLI
+  `/hooks` dans un terminal), et seulement dans les conversations démarrées ensuite. Modifier un hook (une mise à jour d'Oriel) fait que Codex le redemande. `codex exec` ne demande jamais d'approbation : rien n'y est tenu ; le CLI
   interactif et le moteur de l'app ChatGPT, si (mesuré avec le Codex 0.162 de l'app). La fenêtre de l'app ChatGPT elle-même
   n'a pas été pilotée ; le lien qui ouvre une conversation (`codex://threads/<id>`) vient du routage de l'app. Pas de message libre à une session en cours, pas de réponse aux questions propres de Codex (aucun hook), et
   la carte reste sur « Attend ton approbation » après une approbation donnée dans le terminal, jusqu'à la fin de l'outil.
+- Jauges de quota : le chiffre de Claude n'arrive que quand une session munie du relais répond (Pro et Max, sessions de
+  terminal ; on n'a pas vérifié si l'onglet Code de Claude Desktop exécute la `statusLine`, la documentation ne la décrit que
+  pour le terminal), et il est perdu au redémarrage de l'app jusqu'à la réponse suivante. Un `settings.json` de projet ou local
+  qui impose sa propre `statusLine` contourne le relais. Le chiffre de Codex est lu à l'ouverture du panneau : il peut avoir
+  quelques minutes.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app
@@ -995,9 +1147,9 @@ partir de hooks qu'elle reçoit déjà :
 
 ### Désinstallation
 
-Menu **…** › **Désinstaller Claude Notch…** retire les hooks (ceux de Claude Code, et ceux de Codex si tu les as installés) et ce
+Menu **…** › **Désinstaller Oriel…** retire les hooks (ceux de Claude Code, et ceux de Codex si tu les as installés) et ce
 que l'app a installé, puis la quitte.
-Jette ensuite `ClaudeNotch.app` du dossier Applications à la Corbeille.
+Jette ensuite `Oriel.app` du dossier Applications à la Corbeille.
 
 ### Développement
 
@@ -1007,8 +1159,8 @@ Carte du code et décisions de conception (en anglais) : [docs/ARCHITECTURE.md](
 ```sh
 swift build
 swift test
-scripts/build.sh      # build/ClaudeNotch.app universelle (arm64 + x86_64), signée ad hoc par défaut
-scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifié après création
+scripts/build.sh      # build/Oriel.app universelle (arm64 + x86_64), signée ad hoc par défaut
+scripts/make-dmg.sh   # build/Oriel-<version>.dmg et son .sha256, vérifié après création
 ```
 
 - `VERSION=1.2.3 scripts/build.sh` fixe la version de l'app (par défaut : `CFBundleShortVersionString` de
@@ -1046,8 +1198,8 @@ scripts/make-dmg.sh   # build/ClaudeNotch-<version>.dmg et son .sha256, vérifi�
 
   ```sh
   S=io.github.slybald.claudenotch.code-signing
-  printf %s "$(security find-generic-password -s $S -a p12-base64 -w)" | gh secret set SIGNING_CERT_P12 -R Slybald/claude-notch
-  printf %s "$(security find-generic-password -s $S -a p12-password -w)" | gh secret set SIGNING_CERT_PASSWORD -R Slybald/claude-notch
+  printf %s "$(security find-generic-password -s $S -a p12-base64 -w)" | gh secret set SIGNING_CERT_P12 -R Slybald/oriel
+  printf %s "$(security find-generic-password -s $S -a p12-password -w)" | gh secret set SIGNING_CERT_PASSWORD -R Slybald/oriel
   ```
 
   Ne remplace pas ce certificat à la légère : un nouveau change l'exigence et tous les utilisateurs

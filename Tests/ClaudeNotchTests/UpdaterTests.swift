@@ -10,16 +10,16 @@ final class UpdaterTests: XCTestCase {
     /// Réponse de /repos/…/releases/latest, au format de l'API GitHub (valeurs fictives).
     static let releaseJSON = #"""
     {
-      "url": "https://api.github.com/repos/Slybald/claude-notch/releases/250000001",
-      "assets_url": "https://api.github.com/repos/Slybald/claude-notch/releases/250000001/assets",
-      "upload_url": "https://uploads.github.com/repos/Slybald/claude-notch/releases/250000001/assets{?name,label}",
-      "html_url": "https://github.com/Slybald/claude-notch/releases/tag/v1.2.0",
+      "url": "https://api.github.com/repos/Slybald/oriel/releases/250000001",
+      "assets_url": "https://api.github.com/repos/Slybald/oriel/releases/250000001/assets",
+      "upload_url": "https://uploads.github.com/repos/Slybald/oriel/releases/250000001/assets{?name,label}",
+      "html_url": "https://github.com/Slybald/oriel/releases/tag/v1.2.0",
       "id": 250000001,
       "author": {"login": "github-actions[bot]", "id": 41898282, "type": "Bot", "site_admin": false},
       "node_id": "RE_kwDOExample",
       "tag_name": "v1.2.0",
       "target_commitish": "main",
-      "name": "Claude Notch 1.2.0",
+      "name": "Oriel 1.2.0",
       "draft": false,
       "immutable": false,
       "prerelease": false,
@@ -28,42 +28,42 @@ final class UpdaterTests: XCTestCase {
       "published_at": "2026-11-02T09:20:03Z",
       "assets": [
         {
-          "url": "https://api.github.com/repos/Slybald/claude-notch/releases/assets/300000001",
+          "url": "https://api.github.com/repos/Slybald/oriel/releases/assets/300000001",
           "id": 300000001,
-          "name": "ClaudeNotch-1.2.0.dmg",
+          "name": "Oriel-1.2.0.dmg",
           "label": "",
           "content_type": "application/x-apple-diskimage",
           "state": "uploaded",
           "size": 2411520,
           "digest": "sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
           "download_count": 12,
-          "browser_download_url": "https://github.com/Slybald/claude-notch/releases/download/v1.2.0/ClaudeNotch-1.2.0.dmg"
+          "browser_download_url": "https://github.com/Slybald/oriel/releases/download/v1.2.0/Oriel-1.2.0.dmg"
         },
         {
-          "url": "https://api.github.com/repos/Slybald/claude-notch/releases/assets/300000002",
+          "url": "https://api.github.com/repos/Slybald/oriel/releases/assets/300000002",
           "id": 300000002,
-          "name": "ClaudeNotch-1.2.0.dmg.sha256",
+          "name": "Oriel-1.2.0.dmg.sha256",
           "label": "",
           "content_type": "application/octet-stream",
           "state": "uploaded",
           "size": 88,
           "download_count": 3,
-          "browser_download_url": "https://github.com/Slybald/claude-notch/releases/download/v1.2.0/ClaudeNotch-1.2.0.dmg.sha256"
+          "browser_download_url": "https://github.com/Slybald/oriel/releases/download/v1.2.0/Oriel-1.2.0.dmg.sha256"
         },
         {
-          "url": "https://api.github.com/repos/Slybald/claude-notch/releases/assets/300000003",
+          "url": "https://api.github.com/repos/Slybald/oriel/releases/assets/300000003",
           "id": 300000003,
-          "name": "ClaudeNotch-1.2.0.dmg.sig",
+          "name": "Oriel-1.2.0.dmg.sig",
           "label": null,
           "content_type": "application/octet-stream",
           "state": "uploaded",
           "size": 89,
           "download_count": 12,
-          "browser_download_url": "https://github.com/Slybald/claude-notch/releases/download/v1.2.0/ClaudeNotch-1.2.0.dmg.sig"
+          "browser_download_url": "https://github.com/Slybald/oriel/releases/download/v1.2.0/Oriel-1.2.0.dmg.sig"
         }
       ],
-      "tarball_url": "https://api.github.com/repos/Slybald/claude-notch/tarball/v1.2.0",
-      "zipball_url": "https://api.github.com/repos/Slybald/claude-notch/zipball/v1.2.0",
+      "tarball_url": "https://api.github.com/repos/Slybald/oriel/tarball/v1.2.0",
+      "zipball_url": "https://api.github.com/repos/Slybald/oriel/zipball/v1.2.0",
       "body": "## What's Changed\n* feat: something by @someone"
     }
     """#
@@ -108,12 +108,12 @@ final class UpdaterTests: XCTestCase {
         XCTAssertEqual(release.version, "1.2.0")
         XCTAssertFalse(release.draft)
         XCTAssertFalse(release.prerelease)
-        XCTAssertEqual(release.htmlUrl.absoluteString, "https://github.com/Slybald/claude-notch/releases/tag/v1.2.0")
+        XCTAssertEqual(release.htmlUrl.absoluteString, "https://github.com/Slybald/oriel/releases/tag/v1.2.0")
         let assets = try Updater.updateAssets(in: release)
         XCTAssertEqual(assets.dmg.absoluteString,
-                       "https://github.com/Slybald/claude-notch/releases/download/v1.2.0/ClaudeNotch-1.2.0.dmg")
+                       "https://github.com/Slybald/oriel/releases/download/v1.2.0/Oriel-1.2.0.dmg")
         XCTAssertEqual(assets.signature.absoluteString,
-                       "https://github.com/Slybald/claude-notch/releases/download/v1.2.0/ClaudeNotch-1.2.0.dmg.sig")
+                       "https://github.com/Slybald/oriel/releases/download/v1.2.0/Oriel-1.2.0.dmg.sig")
     }
 
     func testMissingOrUnsafeAssetsAreRefused() throws {
@@ -122,11 +122,11 @@ final class UpdaterTests: XCTestCase {
             XCTAssertEqual($0 as? UpdateError, .missingSignature)
         }
         XCTAssertThrowsError(try Updater.updateAssets(in: release(assets: all.filter { !$0.name.hasSuffix(".dmg") }))) {
-            XCTAssertEqual($0 as? UpdateError, .missingAsset("ClaudeNotch-1.2.0.dmg"))
+            XCTAssertEqual($0 as? UpdateError, .missingAsset("Oriel-1.2.0.dmg"))
         }
         // Les fichiers d'une autre version ne comptent pas.
         XCTAssertThrowsError(try Updater.updateAssets(in: release(tag: "v1.3.0"))) {
-            XCTAssertEqual($0 as? UpdateError, .missingAsset("ClaudeNotch-1.3.0.dmg"))
+            XCTAssertEqual($0 as? UpdateError, .missingAsset("Oriel-1.3.0.dmg"))
         }
         // Signature servie en HTTP : refusée comme absente.
         let insecure = all.map { asset in
@@ -254,7 +254,7 @@ final class UpdaterTests: XCTestCase {
     func testSwapBundlesRollsBackWhenTheSecondRenameFails() throws {
         let folder = try makeTemporaryDirectory(self)
         let current = try makeApp(in: folder, version: "1.1.0")
-        let missing = folder.appendingPathComponent(".ClaudeNotch-update/ClaudeNotch.app")
+        let missing = folder.appendingPathComponent(".ClaudeNotch-update/\(AppIdentity.bundleName)")
 
         XCTAssertThrowsError(try Updater.swapBundles(current: current, replacement: missing))
         XCTAssertEqual(try version(of: current), "1.1.0", "l'ancienne app est revenue à sa place")
@@ -267,8 +267,8 @@ final class UpdaterTests: XCTestCase {
         let root = try makeTemporaryDirectory(self)
         let volume = root.appendingPathComponent("volume")
         _ = try makeApp(in: volume, version: "1.2.0")
-        let dmg = root.appendingPathComponent("ClaudeNotch-1.2.0.dmg")
-        try Updater.run("/usr/bin/hdiutil", ["create", "-quiet", "-volname", "Claude Notch Test", "-srcfolder", volume.path,
+        let dmg = root.appendingPathComponent("Oriel-1.2.0.dmg")
+        try Updater.run("/usr/bin/hdiutil", ["create", "-quiet", "-volname", "Oriel Test", "-srcfolder", volume.path,
                                              "-fs", "HFS+", "-format", "UDZO", "-ov", dmg.path])
         let applications = root.appendingPathComponent("Applications")
         let installed = try makeApp(in: applications, version: "1.1.0")
@@ -278,11 +278,11 @@ final class UpdaterTests: XCTestCase {
             XCTAssertEqual($0 as? UpdateError, .wrongBundle)
         }
         XCTAssertEqual(try version(of: installed), "1.1.0")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: applications.path), ["ClaudeNotch.app"])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: applications.path), [AppIdentity.bundleName])
 
         try Updater.installUpdate(dmg: dmg, version: "1.2.0", over: installed)
         XCTAssertEqual(try version(of: installed), "1.2.0")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: applications.path), ["ClaudeNotch.app"],
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: applications.path), [AppIdentity.bundleName],
                        "ni dossier de copie ni ancienne app oubliés")
         // Dossier unique du test (hdiutil info affiche le chemin résolu, /private/var/…).
         XCTAssertFalse(try mountedImages().contains(root.lastPathComponent), "image démontée")
@@ -327,10 +327,10 @@ final class UpdaterTests: XCTestCase {
 
     // MARK: - Outils
 
-    /// ClaudeNotch.app minimale : Info.plist et exécutable.
+    /// App minimale (Oriel.app par défaut) : Info.plist et exécutable.
     @discardableResult
-    private func makeApp(in folder: URL, version: String) throws -> URL {
-        let app = folder.appendingPathComponent("ClaudeNotch.app")
+    private func makeApp(in folder: URL, version: String, name: String = AppIdentity.bundleName) throws -> URL {
+        let app = folder.appendingPathComponent(name)
         let macOS = app.appendingPathComponent("Contents/MacOS")
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
         let info: [String: Any] = ["CFBundleIdentifier": AppIdentity.bundleId, "CFBundleShortVersionString": version,

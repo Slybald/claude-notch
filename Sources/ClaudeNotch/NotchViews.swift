@@ -89,7 +89,12 @@ struct NotchRootView: View {
     private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : 9 }
     /// Repliée : la notch seule ; les intercalaires se posent contre elle (`EarTabsView`).
     private var bodyWidth: CGFloat {
-        expanded ? prefs.expandedWidth(compact: compact) : model.notchSize.width
+        expanded ? prefs.expandedWidth(compact: compact && !model.isCommandBarOpen) : model.notchSize.width
+    }
+
+    /// Poignée de l'angle bas droit : panneau déplié (pas en plein écran compact ni en mode édition).
+    private var showsHandle: Bool {
+        expanded && !compact && prefs.allowsDetach && !model.isEditingTabs && model.bubble == .attached
     }
 
     var body: some View {
@@ -99,6 +104,9 @@ struct NotchRootView: View {
                 .id(prefs.accentHex)
             Spacer(minLength: 0)
         }
+        // Décollage : la goutte (autre fenêtre, dessous) prend la place de la notch.
+        .opacity(model.gooActive ? 0 : 1)
+        .animation(.easeOut(duration: 0.15), value: model.gooActive)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
         // Plein écran compact : pas de barre d'onglets, donc pas de mode édition.
@@ -107,7 +115,11 @@ struct NotchRootView: View {
 
     private var notch: some View {
         ZStack(alignment: .top) {
-            if expanded {
+            if expanded, model.isCommandBarOpen {
+                CommandBarView(registry: registry, prefs: prefs, notchHeight: model.notchSize.height,
+                               close: actions.closeCommandBar)
+                    .transition(.opacity)
+            } else if expanded {
                 ExpandedPanel(registry: registry, prefs: prefs, selection: $model.selectedTab,
                               editingTabs: $model.isEditingTabs, compact: compact, notchSize: model.notchSize,
                               tabAnimation: motion, reduceMotion: model.reduceMotion, actions: actions)
@@ -123,6 +135,13 @@ struct NotchRootView: View {
         .padding(.horizontal, topRadius)
         .background(background)
         .clipShape(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius))
+        .overlay(alignment: .bottomTrailing) {
+            if showsHandle {
+                DetachHandle(begin: actions.beginDetach, detach: { actions.detach?() }, cornerRadius: bottomRadius)
+                    .padding(.trailing, topRadius)
+                    .transition(.opacity)
+            }
+        }
         .shadow(color: .black.opacity(expanded && prefs.panelShadow ? 0.45 : 0), radius: 14, y: 6)
         // Replié et sans activité sur une vraie encoche : exactement l'encoche, donc invisible. Sans encoche,
         // la forme reste dessinée : c'est l'encoche virtuelle.
@@ -136,6 +155,7 @@ struct NotchRootView: View {
         .animation(motion, value: compact)
         .animation(motion, value: model.selectedTab)
         .animation(motion, value: model.isEditingTabs)
+        .animation(motion, value: model.isCommandBarOpen)
         // Hors de la forme de la notch (qui rogne) : les intercalaires dépassent de chaque côté.
         .overlay(alignment: .top) {
             if !expanded, showsEars {
@@ -818,7 +838,15 @@ struct NotchMoreMenu: View {
         Menu {
             Button("Réglages…", action: actions.openSettings)
                 .keyboardShortcut(",", modifiers: .command)
+            Button("Barre de commande…", action: actions.openCommandBar)
             Divider()
+            if let reattach = actions.reattach {
+                Button(L("Rattacher à la notch", table: "Bubble"), action: reattach)
+                Divider()
+            } else if prefs.allowsDetach, let detach = actions.detach {
+                Button(L("Détacher la notch", table: "Bubble"), action: detach)
+                Divider()
+            }
             Picker("Afficher la notch", selection: Self.visibility(prefs, claudeEnabled: claudeEnabled)) {
                 ForEach(NotchVisibility.choices(claudeEnabled: claudeEnabled)) { mode in
                     Text(NotchMoreMenu.title(mode)).tag(mode)
@@ -841,7 +869,7 @@ struct NotchMoreMenu: View {
             Divider()
             UpdateMenuItems(updater: .shared, prefs: prefs)
             Divider()
-            Button("Quitter Claude Notch", action: actions.quit)
+            Button("Quitter Oriel", action: actions.quit)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 12, weight: .semibold))

@@ -498,11 +498,11 @@ extension ClipboardAccess {
             return nil
         case .ask:
             return L("macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, "
-                + "autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis "
+                + "autorise Oriel dans Réglages Système › Confidentialité et sécurité › Coller depuis "
                 + "d'autres apps.", table: "Clipboard")
         case .denied:
-            return L("macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Claude "
-                + "Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps.",
+            return L("macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Oriel "
+                + "dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps.",
                      table: "Clipboard")
         }
     }

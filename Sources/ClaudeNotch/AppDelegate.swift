@@ -10,6 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        // Installée par l'Updater d'une version d'avant le renommage : on repart depuis Oriel.app.
+        if let renamed = AppIdentity.adoptNewBundleName(Bundle.main.bundleURL) {
+            relaunch(renamed)
+            return
+        }
         replaceLegacyInstance()
         AppIdentity.migrateLegacyInstall()
         core.start()
@@ -27,20 +32,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// Une instance de cette version tourne déjà : elle suffit.
+    /// Une instance de cette version tourne déjà : elle suffit. Sauf, pour Oriel.app, une instance lancée depuis une
+    /// ancienne ClaudeNotch.app (Oriel installée à la main à côté) : elle cède la place.
     private func isAnotherInstanceRunning() -> Bool {
         let me = ProcessInfo.processInfo.processIdentifier
         let ids = Set([AppIdentity.bundleId, Bundle.main.bundleIdentifier].compactMap { $0 })
-        return ids.contains { id in
-            NSRunningApplication.runningApplications(withBundleIdentifier: id)
-                .contains { $0.processIdentifier != me && !$0.isTerminated }
+        let others = ids.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
+            .filter { $0.processIdentifier != me && !$0.isTerminated }
+        let legacy = Bundle.main.bundleURL.lastPathComponent != AppIdentity.bundleName ? []
+            : others.filter { $0.bundleURL?.lastPathComponent == AppIdentity.legacyBundleName }
+        if others.count > legacy.count { return true }
+        replace(legacy)
+        return false
+    }
+
+    /// Relance depuis `app` une fois cette instance sortie (une seule instance à la fois).
+    private func relaunch(_ app: URL) {
+        do {
+            try Updater.spawnRelaunch(of: app, waitingFor: ProcessInfo.processInfo.processIdentifier)
+        } catch {
+            NSLog("ClaudeNotch : relance depuis %@ impossible (%@).", app.path, String(describing: error))
         }
+        // Même sans relance : ce bundle a changé de chemin (ses ressources ne se chargeraient plus) ou cède la place.
+        NSApp.terminate(nil)
     }
 
     /// L'ancienne version (local.claudenotch) cède la place : elle tient le port des hooks.
     private func replaceLegacyInstance() {
-        let legacy = NSRunningApplication.runningApplications(withBundleIdentifier: AppIdentity.legacyBundleId)
-            .filter { !$0.isTerminated }
+        replace(NSRunningApplication.runningApplications(withBundleIdentifier: AppIdentity.legacyBundleId)
+            .filter { !$0.isTerminated })
+    }
+
+    private func replace(_ legacy: [NSRunningApplication]) {
         guard !legacy.isEmpty else { return }
         legacy.forEach { $0.terminate() }
         let deadline = Date().addingTimeInterval(3)
@@ -99,6 +122,7 @@ final class AppCore {
         }
         server.codex = notch.codex
         server.api = notch.registry.external
+        server.onClaudeStatus = { data in DispatchQueue.main.async { ClaudeUsageStore.shared.ingest(data) } }
         self.server = server
         // Onglet Codex : même principe, indépendant de celui de Claude.
         notch.registry.$enabled
@@ -139,6 +163,7 @@ final class AppCore {
             monitor.stop()
             store.stop()
             ReplyCenter.shared.releaseAll()
+            ClaudeUsageStore.shared.forget()
         }
     }
 
@@ -193,6 +218,7 @@ final class AppCore {
         state["notch"] = notch?.debugInfo
         state["codex"] = notch?.codex.debugInfo
         state["api"] = notch?.registry.external.debugInfo
+        state["claudeQuota"] = ClaudeUsageStore.shared.snapshot.map { $0.windows.map { ["percent": $0.usedPercent, "minutes": $0.minutes ?? 0] } }
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged
         tools["permissionsLogged"] = activityLog.permissionsLogged

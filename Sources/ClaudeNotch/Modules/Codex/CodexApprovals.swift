@@ -196,7 +196,7 @@ final class CodexApprovals: ObservableObject {
     /// message qui revient à Codex comme raison du refus. Ni `updatedInput` ni `updatedPermissions` (refusés).
     static func output(allow: Bool) -> Data {
         var decision: [String: Any] = ["behavior": allow ? "allow" : "deny"]
-        if !allow { decision["message"] = "Denied from the Claude Notch." }
+        if !allow { decision["message"] = "Denied from Oriel." }
         let root: [String: Any] = ["hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": decision]]
         return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
     }

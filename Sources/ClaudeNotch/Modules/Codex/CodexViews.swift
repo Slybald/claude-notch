@@ -64,6 +64,7 @@ struct CodexPanel: View {
     @ObservedObject var store: CodexStore
     @ObservedObject var approvals: CodexApprovals
     @ObservedObject var setup: CodexHookSetup
+    @ObservedObject var usage: CodexUsageStore
 
     @Environment(\.notchContentMaxHeight) private var contentMaxHeight
     @State private var listHeight: CGFloat = 0
@@ -77,6 +78,9 @@ struct CodexPanel: View {
                 emptyState
             } else {
                 sessionList(sessions)
+            }
+            if module.showsQuota, let windows = usage.snapshot?.live(at: Date()) {
+                QuotaStrip(windows: windows)
             }
         }
     }
@@ -173,7 +177,7 @@ struct CodexSetupState: View {
                            action: .settings)
         case .pendingApproval:
             return Content(symbol: "hand.raised.fill", title: L("À approuver dans Codex", table: "Codex"),
-                           detail: L("Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n"
+                           detail: L("Codex ignore les hooks d'Oriel tant que tu ne les as pas approuvés.\n"
                                      + "1. Clique sur « Approuver dans Codex ».\n"
                                      + "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex).", table: "Codex"),
                            warning: true, action: .approve)
@@ -402,7 +406,10 @@ struct CodexCompactView: View {
     let module: CodexModule
     @ObservedObject var store: CodexStore
     @ObservedObject var approvals: CodexApprovals
+    @ObservedObject var usage: CodexUsageStore
 
+    /// Codex n'est relu que panneau ouvert : au-delà de 15 min, l'intercalaire ne montre plus la mesure.
+    static let quotaMaxAge: TimeInterval = 15 * 60
     static let maxSessions = 4
 
     var body: some View {
@@ -427,6 +434,9 @@ struct CodexCompactView: View {
                     .font(.system(size: 10.5))
                     .foregroundColor(Palette.secondary)
                     .padding(.leading, 26)
+            }
+            if module.showsQuota, let windows = usage.snapshot?.live(at: Date(), maxAge: Self.quotaMaxAge) {
+                QuotaStrip(windows: windows, title: "Codex")
             }
         }
     }
@@ -488,6 +498,18 @@ struct CodexSettingsView: View {
             }
             if module.replyFromNotch { ApprovalKeysSettings(prefs: prefs) }
             Section {
+                Toggle(isOn: $module.showsQuota) {
+                    Text("Afficher le quota (5 h et 7 jours)", tableName: "Codex")
+                }
+            } header: {
+                Text("Quota", tableName: "Codex")
+            } footer: {
+                VStack(alignment: .leading, spacing: 2) {
+                    SettingsNote(L("Lu par Codex lui-même (compte ChatGPT), seulement panneau ouvert : au plus une fois par minute, "
+                                   + "puis toutes les 5 min. Rien sans compte ChatGPT.", table: "Codex"))
+                }
+            }
+            Section {
                 LabeledContent("État") {
                     HStack(spacing: 6) {
                         if setup.isWorking { ProgressView().controlSize(.small) }
@@ -542,7 +564,7 @@ struct CodexSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 2) {
                     SettingsNote(L("Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1).", table: "Codex"))
-                    SettingsNote(L("Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais "
+                    SettingsNote(L("Oriel n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais "
                                    + "touché.", table: "Codex"))
                     SettingsNote(L("« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml "
                                    + "(la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : "

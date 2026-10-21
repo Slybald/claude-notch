@@ -1,6 +1,6 @@
-# Editions of Claude Notch / Les « versions » de Claude Notch
+# Editions of Oriel / Les « versions » d'Oriel
 
-Claude Notch is for everyone; the current build is the "developer" way to use it (Claude tab, soon Codex). People
+Oriel is for everyone; the current build is the "developer" way to use it (Claude tab, soon Codex). People
 want other ways to use it (student, creative, minimal). Three ways to deliver that.
 
 ## English

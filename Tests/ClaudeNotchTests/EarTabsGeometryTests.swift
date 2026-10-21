@@ -183,15 +183,20 @@ final class EarTabsGeometryTests: XCTestCase {
     func testNothingSticksOutOfTheNotchOnTheSideWithoutTab() throws {
         for (size, hasNotch) in Self.notches where hasNotch {
             let sil = try silhouette(scene(.claudeOnly, notch: size, hasNotch: true))
+            // SwiftUI aligne le cadre sur les pixels de la fenêtre : sur un écran 1× (CI), une encoche de largeur impaire
+            // centrée glisse d'un demi-point (93 au lieu de 92,5). Ce décalage est borné par un demi-pixel de l'écran.
+            let shift = try XCTUnwrap(sil.extent(row: 0.25, toward: 1)) - size.width / 2
+            let backing = NSScreen.main?.backingScaleFactor ?? 1
+            XCTAssertLessThanOrEqual(abs(shift), 0.5 / backing + 0.01, "\(size) : bord droit décalé de \(shift)")
             var outside: [String] = []
             for y in stride(from: CGFloat(0.25), through: 40, by: 0.5) {
-                for x in stride(from: size.width / 2 + 0.4, through: size.width / 2 + 10, by: 0.5) where sil.covered(x, y) {
+                for x in stride(from: size.width / 2 + shift + 0.4, through: size.width / 2 + 10, by: 0.5) where sil.covered(x, y) {
                     outside.append("(\(x), \(y))")
                 }
             }
             XCTAssertTrue(outside.isEmpty, "\(size) : du noir hors de l'encoche, côté libre : " + outside.prefix(6).joined(separator: " "))
             for y in stride(from: CGFloat(0.25), through: size.height - 10, by: 1) {
-                XCTAssertEqual(sil.extent(row: y, toward: 1) ?? 0, size.width / 2, accuracy: 0.3, "\(size) ligne \(y)")
+                XCTAssertEqual(sil.extent(row: y, toward: 1) ?? 0, size.width / 2 + shift, accuracy: 0.3, "\(size) ligne \(y)")
             }
         }
     }

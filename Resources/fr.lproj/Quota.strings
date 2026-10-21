@@ -1,0 +1,7 @@
+/* Claude Notch : textes français des jauges de quota (onglets Claude et Codex). La clé est le texte du code. */
+
+"%d h" = "%d h";
+"%d j" = "%d j";
+"%@ : %@ utilisés, remise à zéro %@" = "%@ : %@ utilisés, remise à zéro %@";
+"Quota" = "Quota";
+"remise à zéro %@" = "remise à zéro %@";

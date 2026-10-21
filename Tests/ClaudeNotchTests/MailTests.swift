@@ -628,4 +628,29 @@ final class MailTests: XCTestCase {
         XCTAssertEqual(module.messages.first(where: \.isUnread)?.sender, "Durand, Alex")
         XCTAssertNotNil(module.makeCompactView())
     }
+
+    // MARK: - Barre de commande
+
+    /// « m » cherche dans les mails déjà lus (aucun script de plus), ⏎ ouvre le mail dans Mail ; jamais de réponse.
+    func testCommandBarSearchesTheLatestEmailsAndOpensOnlyOnRun() throws {
+        let rig = MailRig(self)
+        let module = rig.readyModule(unread: 2, messages: sample)
+        let scripts = rig.runner.calls.count
+        func ids(_ verb: String?, _ argument: String) -> [String] {
+            module.commands(for: CommandQuery(verb: verb, argument: argument)).map(\.id)
+        }
+        XCTAssertEqual(ids("m", ""), module.messages.map { "mail.open.\($0.id)" } + ["mail.app"])
+        XCTAssertEqual(ids("m", "facture"), ["mail.open.abc123@mail.example.com"])
+        XCTAssertEqual(ids(nil, "fa"), [], "sans verbe, trois lettres au moins")
+        XCTAssertEqual(ids(nil, "factu"), ["mail.open.abc123@mail.example.com"])
+        let command = try XCTUnwrap(module.commands(for: CommandQuery(verb: "m", argument: "facture")).first)
+        XCTAssertTrue(rig.opened.isEmpty, "rien ne s'ouvre avant ⏎")
+        XCTAssertNil(command.run())
+        XCTAssertEqual(rig.opened.map(\.scheme), ["message"])
+        XCTAssertEqual(rig.runner.calls.count, scripts, "la recherche ne lance aucun script")
+        XCTAssertNil(module.replyTarget)
+
+        module.showSubjects = false
+        XCTAssertEqual(ids("m", ""), ["mail.app"], "sujets masqués : aucun mail montré")
+    }
 }

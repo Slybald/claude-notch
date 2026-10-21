@@ -27,6 +27,7 @@ struct SetupTab: Identifiable, Equatable {
         case ModuleRegistry.claudeId: return L("Tes sessions Claude Code : état, tâches et permissions.")
         case ModuleRegistry.codexId: return L("Tes sessions Codex : état et approbations.")
         case "media": return L("La musique en cours et ton calendrier de la semaine.")
+        case "agenda": return L("Ton prochain rendez-vous, un compte à rebours et le bouton pour le rejoindre.")
         case "quicksettings": return L("Wi-Fi, Bluetooth, concentration, économie d'énergie, batterie.")
         case "shelf": return L("Dépose des fichiers sur la notch, reprends-les plus tard.")
         case "clipboard": return L("Tes dernières copies, à reprendre d'un clic.")
@@ -303,8 +304,8 @@ struct SetupAssistantView: View {
                         .foregroundColor(Palette.accent)
                 }
                 .frame(width: 44, height: 44)
-                header(L("Bienvenue dans Claude Notch"),
-                       L("Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, "
+                header(L("Bienvenue dans Oriel"),
+                       L("Oriel transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, "
                          + "presse-papiers et plus encore."))
             }
             Text("En trois étapes, choisis ce qui t'intéresse. Tu pourras tout changer ensuite.")

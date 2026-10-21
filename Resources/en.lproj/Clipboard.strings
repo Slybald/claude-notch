@@ -40,6 +40,6 @@
 "Tes copies ne sont pas enregistrées." = "Your copies are not being recorded.";
 "Image de plus de 5 Mo : non gardée." = "Image over 5 MB: not kept.";
 "Fermer" = "Dismiss";
-"macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS asks before letting an app read the clipboard. To stop the interruptions, allow Claude Notch in System Settings › Privacy & Security › Paste from Other Apps.";
-"macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS blocks clipboard access, so nothing can be recorded. Allow Claude Notch in System Settings › Privacy & Security › Paste from Other Apps.";
+"macOS demande l'accord avant de laisser lire le presse-papiers. Pour ne plus être interrompu, autorise Oriel dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS asks before letting an app read the clipboard. To stop the interruptions, allow Oriel in System Settings › Privacy & Security › Paste from Other Apps.";
+"macOS bloque la lecture du presse-papiers : rien ne peut être enregistré. Autorise Oriel dans Réglages Système › Confidentialité et sécurité › Coller depuis d'autres apps." = "macOS blocks clipboard access, so nothing can be recorded. Allow Oriel in System Settings › Privacy & Security › Paste from Other Apps.";
 "L'historique n'a pas pu être écrit sur le disque. Il sera perdu à la fermeture de l'app." = "The history could not be written to disk. It will be lost when the app quits.";

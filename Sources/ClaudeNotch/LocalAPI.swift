@@ -133,7 +133,7 @@ final class LocalAPI: ObservableObject {
     /// Une requête `/api/…` dont `Host` et `Origin` sont déjà vérifiés. Main thread.
     func handle(_ request: HTTPRequest, now: Date = Date()) -> Response {
         guard isEnabled else {
-            return .error(403, "api_disabled", "The local API is off: turn it on in Claude Notch, Settings, Scripts.")
+            return .error(403, "api_disabled", "The local API is off: turn it on in Oriel, Settings, Scripts.")
         }
         guard HookAccess.constantTimeEquals(request.headers[Self.headerName.lowercased()], "Bearer \(token)") else {
             return .error(401, "unauthorized", "Missing or wrong token (Authorization header, see docs/API.md).")
@@ -459,7 +459,7 @@ struct ExternalEar: Equatable, Identifiable {
 
 /// La commande `notch` (hooks/notch, livrée dans l'app) : copiée dans ~/.local/bin seulement sur un clic dans les
 /// réglages, jamais par-dessus un autre programme du même nom.
-enum NotchCommand {
+enum NotchCLI {
     /// Ligne que porte notre script : un fichier sans elle n'est pas à nous.
     static let marker = "# claude-notch-cli"
 

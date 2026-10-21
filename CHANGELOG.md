@@ -6,16 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-### Changed
-
-- **Index tabs fan out like cards on a table.** At rest the tabs of each side overlap: the most important one is on
-  top, against the notch, with its icon and short text; each of the others slides under the previous one and shows a
-  regular slice with its icon only, with a thin light edge and a soft shade so the stack reads. Every tab is exactly as
-  tall as the notch (same top, same bottom, one continuous base, no staircase): the overlap is only horizontal. Hover a
-  slice and the tab opens wide with its details, with the usual spring; the tabs closer to the notch stay where they are
-  and the ones further out go under it, so nothing slides under a still pointer. Click a tab to open the panel on it, as
-  before. *Always Visible* is the half-closed fan, *Retracted* the tight one (a thin sliver per tab); an alert still
-  stays open. Nothing runs at rest and the hover zones are the exact shapes.
+**Claude Notch is now Oriel.** Same app, same settings, same data: the automatic update installs it in place and it
+renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). Entries below use the new name.
 
 ### Added
 
@@ -27,6 +19,95 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   passed with `curl -H @file`), exact `Host` and no `Origin` (no web page can call it), strict schema, rate limit; no
   code, command or URL from a tab, only a button that opens a named app. A script's tab always says which program sent
   it and can never pass for a Claude or Codex request. Settings › Scripts lists the last clients.
+- **Fans in Quick Settings.** A Fans card shows both fan speeds and the hottest CPU and GPU temperatures, read only
+  while the tab is shown. **Fixed speed** sets the fans to a speed of your choice with a slider, never below the Mac's
+  minimum nor above its maximum; **Give control back to macOS** is always visible while it is active, and the
+  collapsed notch shows the speed in an index tab. Absent on Macs without fans; read-only on Intel Macs.
+- The first fixed speed installs, after one administrator password, a small helper
+  (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows only this
+  helper, with only `auto` or `hold`. The helper checks every request against the bounds read from the Mac.
+- Safety: macOS gets control back when the app quits or crashes, freezes for 30 s, on sleep or session change, above
+  105 °C, or when macOS itself takes a fan back. "Remove the authorization" (Settings › Quick Settings) and
+  uninstalling remove the helper and its rule. Details and measurements: [docs/FANS.md](docs/FANS.md).
+- **Agenda tab and a live countdown on the collapsed notch.** The next appointment becomes an index tab that counts
+  down: a discreet calendar icon and `14 min` from 15 minutes before, amber with a camera and `4 min` from 5 minutes
+  before, green `now` during the meeting, then it goes away. An amber tab stays unfolded even in *Retracted* mode, and
+  ranks above the timer. Hover it to see the title, the time and the place, with a **Join** button.
+- **Join.** When the event holds a Zoom, Google Meet, Microsoft Teams, Webex or FaceTime link (in its URL, its location or
+  its notes), **Join** opens it in one click, from the tab, the unfolded index tab or the full-screen summary. The text
+  of an event comes from a third party (an invitation), so only an `https` link on the service's own domain is kept
+  (never `zoom.us.other.com`, nor an address with an account in it), plus a `facetime:` link from the event's URL field;
+  the link is re-checked just before opening and never opens on its own. No link: no button, **View in Calendar** stays.
+- **Agenda tab**: the week, the next appointment large (amber frame at 5 minutes, green while it runs) and the rest of the
+  day below, past ones dimmed, with the place under each title. Settings › Agenda: the tab before a meeting (on by
+  default) and the calendars to read. The tab is on by default and is part of the *Student* profile. It reads the
+  Calendars permission the Player tab already uses, asked only when you press **Allow Calendar Access**.
+- Nothing is polled: once access is granted the tab listens to the calendar database (a change, a day change, the clock,
+  waking from sleep) and plans ONE wake-up at the next threshold (start − 15 min, − 5 min, start, end), one per minute
+  during the 15-minute countdown. Between two wake-ups the CPU is at zero. Many changes in a row (an iCloud sync) cost a
+  single re-read.
+- **Quota gauges** in the Claude and Codex tabs: a thin ring, the percentage used and the reset time of the 5-hour and
+  7-day windows, amber from 80 % and red from 95 %, also in the summary that unfolds from the collapsed tab. Nothing is
+  shown when a tab is off or when the agent gives no figure.
+- **Claude** (Settings › Claude › Show quota, off by default): Claude Code only gives the quota to its `statusLine`, so a small
+  relay takes its place in `~/.claude/settings.json` (timestamped backup), sends `rate_limits` to the app and then runs your
+  previous command with the same data. Turning it off, or uninstalling, puts your command back exactly. Pro and Max only.
+  Measured with Claude Code 2.1.304. Only percentages and reset times are kept, in memory.
+- **Codex** (Settings › Codex › Show quota, on by default): read from Codex itself (`account/rateLimits/read`, ChatGPT
+  sign-in) only while the panel is open, at most once a minute, then every 5 minutes. Measured with Codex 0.154 and 0.162.
+- **Command bar.** A field in the notch with one-key prefixes: `t 25` starts a timer (also `t 1h30`, or `25 min`
+  without the prefix; `t` alone offers 25, 5 and 10 minutes and the Pomodoro), `n idea` creates a quick note,
+  `c link` searches the clipboard history and copies the chosen entry again, `s presentation` applies a Quick Settings
+  scene (and `s fans` gives a fixed fan speed back to macOS), `m invoice` opens one of the latest emails in Mail,
+  `a team` joins the next meeting or opens Calendar on that day, `i backup` removes a tab put up by a script,
+  `> message` writes to a Claude session (only with "Reply from the notch" on). The prefixes are shown under the
+  field and can be clicked; typing one turns it into a pill, Backspace brings it back. ↑ ↓ choose, ⏎ runs, Esc closes;
+  nothing runs before ⏎ (or a click on the row). The panel opens with the bar and closes with it.
+  Settings › General › Shortcuts has a new "Command bar" shortcut (none by default, ⌥⌘K is offered), and
+  **…** › **Command Bar…** opens it without a shortcut. Fuzzy search ignores case and accents.
+- `NotchModule` gets two optional members, `commandVerb` and `commands(for:)` (empty by default): a module offers its
+  own actions to the bar, nothing is hard-coded in the bar. A stopped or hidden tab is never woken by a search.
+- **Detach the notch into a bubble.** Hold the bottom right corner of the open panel (a small arc marks it), then drag:
+  the panel stretches like a drop of liquid, a neck forms and thins, and the drop comes off as a round bubble you can put
+  anywhere on your screens (all Spaces, above apps, like the notch). Its position is remembered per display.
+- **Tabs in a revolver cylinder.** Inside the bubble, your tabs sit in a circle in the order you chose; the one at the
+  top is the active tab. Scroll, drag around the cylinder or click a tab to turn it, one detent at a time; click the
+  centre (or the top tab) and the bubble opens into the panel with that tab, then closes back into a bubble. Activities
+  (Claude working, a timer, music…) show as a colored ring and a pill on the bubble, and a dot on their tab.
+- **Back to the notch**: bring the bubble under the notch (it snaps to it) and it merges back with the reverse drop
+  effect; or double-click its edge, or choose **Reattach to Notch** (right click, **…** menu). While detached, hovering
+  the notch does not open a second panel; index tabs still work and open the bubble on their tab, and the panel
+  shortcut, the command bar and a keyboard approval open in the bubble's panel. **Detach Notch** is
+  also in the **…** menu and the right-click menu of the notch, and VoiceOver can use it and turn the cylinder.
+- **Settings › General › Bubble**: *Allow detaching the notch* (on by default) and *Return to the notch at relaunch*.
+  With "Reduce motion", the drop becomes a simple fade.
+
+### Changed
+
+- **Index tabs fan out like cards on a table.** At rest the tabs of each side overlap: the most important one is on
+  top, against the notch, with its icon and short text; each of the others slides under the previous one and shows a
+  regular slice with its icon only, with a thin light edge and a soft shade so the stack reads. Every tab is exactly as
+  tall as the notch (same top, same bottom, one continuous base, no staircase): the overlap is only horizontal. Hover a
+  slice and the tab opens wide with its details, with the usual spring; the tabs closer to the notch stay where they are
+  and the ones further out go under it, so nothing slides under a still pointer. Click a tab to open the panel on it, as
+  before. *Always Visible* is the half-closed fan, *Retracted* the tight one (a thin sliver per tab); an alert still
+  stays open. Nothing runs at rest and the hover zones are the exact shapes.
+- **Renamed to Oriel.** The app, its menus, settings, setup assistant, alerts and macOS permission prompts now say
+  Oriel. The bundle is `Oriel.app`, the disk image `Oriel-<v>.dmg` (volume "Oriel"). The repository is now
+  `github.com/Slybald/oriel`; the old address redirects.
+- **Existing users have nothing to do.** The automatic update installs the new version in place of `ClaudeNotch.app`;
+  at its first launch the app renames itself `Oriel.app`, points open-at-login to the new path and restarts (one
+  instance only). macOS permissions, settings, hooks and data are kept: the bundle identifier
+  (`io.github.slybald.claudenotch`), the signing certificate, the data and log folders and the hook scripts keep their
+  names. An older `ClaudeNotch.app` found next to `Oriel.app` is moved to the Trash. Details in `docs/RENAME.md`.
+- **Two disk images per release.** `Oriel-<v>.dmg` (with `Oriel.app`) is the one to download. A second signed image,
+  `ClaudeNotch-<v>.dmg` (the same app in a `ClaudeNotch.app` folder), is still published because versions 1.1.0 to
+  1.9.0 only look for that name when they update themselves.
+- Messages sent to Claude now say "Message from Oriel" and "Message from the user, sent from Oriel:", and a denial
+  from the notch says "The user denied this from Oriel." (Codex: "Denied from Oriel."). The Claude Code hook entries
+  are rewritten at launch, with a timestamped backup of `settings.json`; sessions already open keep the old text,
+  which is still recognised. The Codex hook entries are not touched, so Codex does not ask for their approval again;
+  its status line during a held request still reads "Claude Notch" until the Codex hooks next change.
 
 ### Fixed
 
@@ -52,16 +133,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   - one request at a time: once it is settled, the next one starts its one second again, so a repeated press never
     settles two requests; questions and plans still need the mouse;
   - same deciders as a click: nothing is ever "always allowed", the timeouts and "first answer wins" are unchanged.
-- **Fans in Quick Settings.** A Fans card shows both fan speeds and the hottest CPU and GPU temperatures, read only
-  while the tab is shown. **Fixed speed** sets the fans to a speed of your choice with a slider, never below the Mac's
-  minimum nor above its maximum; **Give control back to macOS** is always visible while it is active, and the
-  collapsed notch shows the speed in an index tab. Absent on Macs without fans; read-only on Intel Macs.
-- The first fixed speed installs, after one administrator password, a small helper
-  (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows only this
-  helper, with only `auto` or `hold`. The helper checks every request against the bounds read from the Mac.
-- Safety: macOS gets control back when the app quits or crashes, freezes for 30 s, on sleep or session change, above
-  105 °C, or when macOS itself takes a fan back. "Remove the authorization" (Settings › Quick Settings) and
-  uninstalling remove the helper and its rule. Details and measurements: [docs/FANS.md](docs/FANS.md).
 
 ## [1.8.0] - 2026-10-21
 
@@ -377,6 +448,6 @@ First public release.
 - Universal app (Apple silicon and Intel), macOS 13 or later, distributed as a DMG built by GitHub Actions
   from version tags.
 
-[1.2.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.2.0
-[1.1.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.1.0
-[1.0.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.0.0
+[1.2.0]: https://github.com/Slybald/oriel/releases/tag/v1.2.0
+[1.1.0]: https://github.com/Slybald/oriel/releases/tag/v1.1.0
+[1.0.0]: https://github.com/Slybald/oriel/releases/tag/v1.0.0

@@ -8,6 +8,7 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
     case controlOptionSpace
     case controlCommandN
     case optionCommandJ
+    case optionCommandK
     /// Réservées à « Approuver au clavier » (touches fixes, pas dans les listes de choix).
     case controlOptionY
     case controlOptionN
@@ -25,6 +26,7 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
         case .controlOptionSpace: return (UInt32(kVK_Space), UInt32(controlKey | optionKey))
         case .controlCommandN: return (UInt32(kVK_ANSI_N), UInt32(controlKey | cmdKey))
         case .optionCommandJ: return (UInt32(kVK_ANSI_J), UInt32(optionKey | cmdKey))
+        case .optionCommandK: return (UInt32(kVK_ANSI_K), UInt32(optionKey | cmdKey))
         case .controlOptionY: return (UInt32(kVK_ANSI_Y), UInt32(controlKey | optionKey))
         case .controlOptionN: return (UInt32(kVK_ANSI_N), UInt32(controlKey | optionKey))
         }
@@ -37,6 +39,7 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
         case .controlOptionSpace: return L("⌃⌥Espace")
         case .controlCommandN: return "⌃⌘N"
         case .optionCommandJ: return "⌥⌘J"
+        case .optionCommandK: return "⌥⌘K"
         case .controlOptionY: return "⌃⌥Y"
         case .controlOptionN: return "⌃⌥N"
         }
@@ -55,6 +58,7 @@ final class HotKeyCenter: ObservableObject, HotKeyRegistering {
     enum Slot: UInt32 {
         case togglePanel = 1
         case toggleHidden = 2
+        case commandBar = 10
         /// Enregistrées seulement pendant une demande à régler (`ApprovalQueue`).
         case approve = 3
         case deny = 4

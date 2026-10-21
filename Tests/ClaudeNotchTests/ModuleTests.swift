@@ -37,10 +37,10 @@ final class ModuleTests: XCTestCase {
     func testStandardModulesHaveStableIdsAndClaudeFirst() {
         let notch = NotchHarness(self)
         XCTAssertEqual(notch.registry.modules.map { $0.id },
-                       ["claude", "codex", "media", "quicksettings", "shelf", "clipboard", "timer", "notes", "messages", "mail"])
+                       ["claude", "codex", "media", "agenda", "quicksettings", "shelf", "clipboard", "timer", "notes", "messages", "mail"])
         // Codex n'est activé d'office que s'il est détecté (décidé au premier lancement, jamais sous test) ; Messages et
         // Mail restent désactivés tant que l'utilisateur ne les choisit pas.
-        XCTAssertEqual(notch.registry.enabled.map { $0.id }, ["claude", "media", "quicksettings", "shelf", "clipboard", "timer", "notes"],
+        XCTAssertEqual(notch.registry.enabled.map { $0.id }, ["claude", "media", "agenda", "quicksettings", "shelf", "clipboard", "timer", "notes"],
                        "Codex, Messages et Mail restent désactivés tant que l'utilisateur ne les choisit pas")
         XCTAssertEqual(notch.registry.hidden.map { $0.id }, ["codex", "messages", "mail"])
         for module in notch.registry.modules {
@@ -199,8 +199,8 @@ final class ModuleTests: XCTestCase {
         prefs.lastTab = "claude"
         prefs.defaultTab = Preferences.lastTabChoice
         settle()
-        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: true), "quicksettings", "Claude désactivé")
-        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: false), "quicksettings")
+        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: true), "agenda", "Claude désactivé")
+        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: false), "agenda")
     }
 
     /// Le module Claude n'active la section outils que panneau ouvert, et oublie ses volets à la fermeture.
