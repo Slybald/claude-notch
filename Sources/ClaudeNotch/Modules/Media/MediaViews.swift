@@ -431,6 +431,47 @@ struct MediaCompactView: View {
     }
 }
 
+/// Intercalaire de lecture déployé (survol, notch repliée) : pochette, titre, artiste et les trois commandes.
+struct MediaTabDetailView: View {
+    @ObservedObject var module: MediaModule
+
+    var body: some View {
+        if let info = module.nowPlaying {
+            ModuleSummaryRow {
+                VStack(spacing: 4) {
+                    HStack(spacing: 8) {
+                        ArtworkView(image: module.artwork, size: 34)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(verbatim: info.title)
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundColor(Palette.primary)
+                            if let artist = info.artist {
+                                Text(verbatim: artist)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Palette.secondary)
+                            }
+                        }
+                        .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    HStack(spacing: 12) {
+                        MediaControlButton(symbol: "backward.fill", size: 11, label: L("Précédent", table: "Media")) {
+                            module.send(.previous)
+                        }
+                        MediaControlButton(symbol: info.isPlaying ? "pause.fill" : "play.fill", size: 14,
+                                           label: info.isPlaying ? L("Pause", table: "Media") : L("Lecture", table: "Media")) {
+                            module.send(.togglePlayPause)
+                        }
+                        MediaControlButton(symbol: "forward.fill", size: 11, label: L("Suivant", table: "Media")) {
+                            module.send(.next)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Réglages
 
 /// Réglages › Lecteur : lecteur, oreilles, calendrier et calendriers affichés.

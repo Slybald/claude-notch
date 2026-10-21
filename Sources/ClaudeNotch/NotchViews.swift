@@ -71,12 +71,12 @@ struct NotchRootView: View {
 
     private var expanded: Bool { model.isExpanded }
     private var compact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
-    /// Contenus des oreilles repliées : un seul, ou plusieurs qui alternent (voir `EarsRotation`).
-    private var slots: [EarsSlot] { registry.earsSlots(claude: store.indicator) }
-    private var showsEars: Bool { !slots.isEmpty }
-    private var shouldRotateEars: Bool {
-        EarsRotation.shouldRotate(slots: slots, expanded: expanded, shown: model.isShown)
+    /// Intercalaires de la notch repliée : un par activité, de part et d'autre de la notch (voir `EarTabs`).
+    private var layout: EarTabsLayout {
+        EarTabsLayout(tabs: registry.earTabs(claude: store.indicator, claudeEars: store.ears),
+                      notch: model.notchSize, mode: prefs.earTabsMode)
     }
+    private var showsEars: Bool { !layout.isEmpty }
     /// Ressort choisi dans les réglages, ou fondu simple avec « Réduire les animations ».
     private var motion: Animation { NotchMotion.animation(prefs.animationSpeed, reduceMotion: model.reduceMotion) }
     /// Repliée sur une vraie encoche : noir pur pour s'y fondre. Teintée seulement sur demande, sans encoche.
@@ -84,10 +84,10 @@ struct NotchRootView: View {
         expanded || (prefs.tintCollapsed && !model.hasNotch) ? prefs.panelColor : .black
     }
     private var topRadius: CGFloat { expanded ? 12 : 6 }
-    private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : (showsEars ? 12 : 9) }
+    private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : 9 }
+    /// Repliée : la notch seule ; les intercalaires se posent contre elle (`EarTabsView`).
     private var bodyWidth: CGFloat {
-        if expanded { return prefs.expandedWidth(compact: compact) }
-        return model.notchSize.width + 2 * EarsRotation.sideWidth(slots)
+        expanded ? prefs.expandedWidth(compact: compact) : model.notchSize.width
     }
 
     var body: some View {
@@ -99,8 +99,6 @@ struct NotchRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
-        .onAppear { model.setEarsRotation(shouldRotateEars) }
-        .onChange(of: shouldRotateEars) { model.setEarsRotation($0) }
         // Plein écran compact : pas de barre d'onglets, donc pas de mode édition.
         .onChange(of: compact) { if $0 { model.isEditingTabs = false } }
     }
@@ -116,10 +114,6 @@ struct NotchRootView: View {
                             .animation(motion.delay(0.06)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
-            } else if let slot = currentSlot {
-                earsView(slot)
-                    .id(slot.id)
-                    .transition(earsTransition)
             }
         }
         .frame(width: bodyWidth, alignment: .top)
@@ -137,40 +131,18 @@ struct NotchRootView: View {
         .onPreferenceChange(NotchSizeKey.self) { size in model.contentSize = size }
         .animation(motion, value: expanded)
         .animation(motion, value: showsEars)
-        // Seulement pendant l'alternance : l'arrivée des oreilles garde son ressort.
-        .animation(Self.slideAnimation, value: slots.count >= 2 ? currentSlot?.id : nil)
         .animation(motion, value: compact)
         .animation(motion, value: model.selectedTab)
         .animation(motion, value: model.isEditingTabs)
-    }
-
-    /// Intercalaire montré : le premier à l'arrivée des oreilles, puis un de plus toutes les 4 s.
-    private var currentSlot: EarsSlot? {
-        let slots = slots
-        return slots.isEmpty ? nil : slots[model.earsStep % slots.count]
-    }
-
-    @ViewBuilder
-    private func earsView(_ slot: EarsSlot) -> some View {
-        switch slot {
-        case .claude(let indicator):
-            CollapsedEars(indicator: indicator, ears: store.ears, notchSize: model.notchSize)
-        case .module(_, let ears):
-            ModuleEarsView(ears: ears, notchSize: model.notchSize)
+        // Hors de la forme de la notch (qui rogne) : les intercalaires dépassent de chaque côté.
+        .overlay(alignment: .top) {
+            if !expanded, showsEars {
+                EarTabsView(layout: layout, hovered: model.hoveredTab, claudeEars: store.ears, fill: fill,
+                            animation: motion, registry: registry, openTab: actions.openTab,
+                            cardHeightChanged: { model.tabCardHeight = $0 })
+                    .transition(.opacity)
+            }
         }
-    }
-
-    private static let slideAnimation = Animation.easeInOut(duration: 0.35)
-
-    /// Oreilles seules : fondu. Intercalaires : glissement vertical court (la forme coupe ce qui dépasse), fondu
-    /// seul avec « Réduire les animations ».
-    private var earsTransition: AnyTransition {
-        guard slots.count >= 2 else { return .opacity.animation(.easeInOut(duration: 0.18)) }
-        if model.reduceMotion { return AnyTransition.opacity.animation(Self.slideAnimation) }
-        return AnyTransition.asymmetric(
-            insertion: .move(edge: .bottom).combined(with: .opacity),
-            removal: .move(edge: .top).combined(with: .opacity)
-        ).animation(Self.slideAnimation)
     }
 
     /// Fond choisi, translucide une fois déplié si les réglages le demandent ; la bande de la notch reste opaque.
@@ -185,78 +157,12 @@ struct NotchRootView: View {
 
 // MARK: - Replié
 
-struct CollapsedEars: View {
-    let indicator: NotchIndicator
-    let ears: SessionStore.EarsContent?
-    let notchSize: CGSize
-
-    var body: some View {
-        HStack(spacing: 0) {
-            IndicatorGlyph(indicator: indicator)
-                .frame(width: NotchController.earWidth)
-            Color.clear.frame(width: notchSize.width)
-            earText
-                .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(width: NotchController.earWidth)
-        }
-        .frame(height: notchSize.height)
-    }
-
-    /// « 3/7 » (tâches), « 1 » (sessions) ou « 1·6 » avec les agents en orange.
-    private var earText: Text {
-        guard let ears else { return Text(verbatim: "") }
-        if let tasks = ears.tasks { return Text(tasks).foregroundColor(.white.opacity(0.85)) }
-        let sessions = Text(verbatim: "\(ears.sessions)").foregroundColor(.white.opacity(0.85))
-        guard ears.agents > 0 else { return sessions }
-        return sessions + Text(verbatim: "·").foregroundColor(Palette.secondary)
-            + Text(verbatim: "\(ears.agents)").foregroundColor(Palette.accent)
-    }
-}
-
-/// Oreilles d'un module (minuteur, lecture en cours…) : symbole ou image à gauche, texte court ou barres à droite.
-struct ModuleEarsView: View {
-    let ears: ModuleEars
-    let notchSize: CGSize
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Group {
-                if let image = ears.image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 18, height: 18)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                } else {
-                    Image(systemName: ears.symbol)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Palette.accent)
-                }
-            }
-            .frame(width: NotchController.earWidth)
-            Color.clear.frame(width: notchSize.width)
-            Group {
-                if ears.bars {
-                    EqualizerBars()
-                } else {
-                    Text(ears.text)
-                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-            }
-            .frame(width: NotchController.earWidth)
-        }
-        .frame(height: notchSize.height)
-    }
-}
-
-/// Barres d'égaliseur des oreilles, animées par Core Animation comme `AnimatedGlyphView` (rien par image côté app).
+/// Barres d'égaliseur d'un intercalaire, animées par Core Animation comme `AnimatedGlyphView` (rien par image côté app).
 struct EqualizerBars: NSViewRepresentable {
-    func makeNSView(context: Context) -> EqualizerView { EqualizerView() }
+    /// Couleur des barres ; l'accent des réglages par défaut.
+    var color: Color?
+
+    func makeNSView(context: Context) -> EqualizerView { EqualizerView(color: color.map { NSColor($0) }) }
     func updateNSView(_ view: EqualizerView, context: Context) {}
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: EqualizerView, context: Context) -> CGSize? {
         nsView.intrinsicContentSize
@@ -272,8 +178,10 @@ final class EqualizerView: NSView {
     private static let periods: [CFTimeInterval] = [0.42, 0.31, 0.47, 0.36]
 
     private let bars = rest.map { _ in CALayer() }
+    private let color: NSColor?
 
-    init() {
+    init(color: NSColor? = nil) {
+        self.color = color
         super.init(frame: NSRect(origin: .zero, size: Self.size))
         wantsLayer = true
         bars.forEach { layer?.addSublayer($0) }
@@ -293,7 +201,7 @@ final class EqualizerView: NSView {
         CATransaction.setDisableActions(true)
         for (index, bar) in bars.enumerated() {
             bar.removeAllAnimations()
-            bar.backgroundColor = NSColor(Palette.accent).cgColor
+            bar.backgroundColor = (color ?? NSColor(Palette.accent)).cgColor
             bar.cornerRadius = Self.barWidth / 2
             bar.frame = NSRect(x: CGFloat(index) * (Self.barWidth + Self.gap), y: 0, width: Self.barWidth,
                                height: Self.height)

@@ -217,10 +217,12 @@
 "Opacité du fond" = "Opacité du fond";
 "Notch repliée" = "Notch repliée";
 "Afficher les oreilles" = "Afficher les oreilles";
-"De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours)." = "De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours).";
-"De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)." = "De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours).";
-"Alterner Claude et les autres oreilles" = "Alterner Claude et les autres oreilles";
-"Quand Claude travaille ou vient de finir, ses oreilles et celles d'un onglet (lecture en cours, minuteur) se relaient toutes les 4 s. Quand Claude attend ta réponse, il reste seul." = "Quand Claude travaille ou vient de finir, ses oreilles et celles d'un onglet (lecture en cours, minuteur) se relaient toutes les 4 s. Quand Claude attend ta réponse, il reste seul.";
+"Un intercalaire par activité, de part et d'autre de la notch : Claude (main levée, spinner, coche, sessions), lecture en cours, minuteur…" = "Un intercalaire par activité, de part et d'autre de la notch : Claude (main levée, spinner, coche, sessions), lecture en cours, minuteur…";
+"Un intercalaire par activité, de part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)." = "Un intercalaire par activité, de part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours).";
+"Intercalaires" = "Intercalaires";
+"Rétractés" = "Rétractés";
+"Toujours visibles" = "Toujours visibles";
+"Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible." = "Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible.";
 "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide." = "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide.";
 "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic." = "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic.";
 "Licences" = "Licences";
@@ -371,3 +373,12 @@
 "Aucun onglet masqué" = "Aucun onglet masqué";
 "Remettre un onglet" = "Remettre un onglet";
 "Appui long sur la barre d'onglets : les déplacer, les masquer, en remettre." = "Appui long sur la barre d'onglets : les déplacer, les masquer, en remettre.";
+
+// Intercalaires de la notch repliée
+"Claude attend ta réponse" = "Claude attend ta réponse";
+"Claude travaille" = "Claude travaille";
+"Claude a terminé" = "Claude a terminé";
+"%@ : %@" = "%@ : %@";
+"%d autre activité" = "%d autre activité";
+"%d autres activités" = "%d autres activités";
+"Ouvre l'onglet correspondant" = "Ouvre l'onglet correspondant";

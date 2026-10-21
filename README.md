@@ -23,11 +23,13 @@ Interface available in English and French (follows the system language). Screens
 - **Session states at a glance**: ready, thinking, running a tool (with the command or the file),
   waiting for your permission, waiting for your answer, plan to review, done, error, compacting the context.
   Sessions that need you are listed first, with an amber outline.
-- **Collapsed notch with two "ears"**: the left one shows the overall state (a raised hand when a session
-  needs you, a spinner while Claude works, a check mark when a turn ends); the right one shows
-  `active sessions·running subagents`, for example `1·6`, or the progress of the task list (`2/5`). When a tab
-  also has ears (now playing, timer), they take turns with Claude's every 4 seconds while Claude works
-  (Settings › Appearance to turn it off).
+- **Collapsed notch with index tabs**: every activity (Claude, now playing, timer, Codex, unread messages…) gets
+  its own small tab against the notch, on the left and the right, the most important one closest to it (up to three
+  per side, then a "+N"). Claude's tab shows its state (a raised hand when a session needs you, a spinner while Claude
+  works, a check mark when a turn ends) and `active sessions·running subagents`, for example `1·6`, or the progress
+  of the task list (`2/5`). Hover a tab and it unfolds with its details (the track and its controls, the timer, the
+  sessions and their state); click it to open the panel on that tab. Settings › Appearance: always visible, or
+  retracted to a thin sliver until you hover (an alert, like Claude waiting for you, always stays visible).
 - **Permissions**: the card shows what Claude is asking for (`Terminal · rm -rf build`, the file to edit,
   the question asked).
 - **Reply from the notch** (off by default; a card at the top of the Claude tab offers to turn it on, and so does
@@ -496,11 +498,14 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **États des sessions** : prête, réfléchit, outil en cours (avec la commande ou le fichier), attend ta
   permission, attend ta réponse, plan à valider, terminé, erreur, compacte le contexte. Les sessions qui
   t'attendent passent en tête, avec un contour ambre.
-- **Notch repliée avec deux « oreilles »** : à gauche l'état global (main levée quand une session t'attend,
-  un spinner pendant que Claude travaille, une coche à la fin d'un tour) ;
-  à droite `sessions actives·sous-agents en cours`, par exemple `1·6`, ou l'avancement de la liste de tâches
-  (`2/5`). Quand un onglet a aussi des oreilles (lecture en cours, minuteur), elles alternent avec celles de Claude
-  toutes les 4 secondes pendant qu'il travaille (Réglages › Apparence pour le désactiver).
+- **Notch repliée avec des intercalaires** : chaque activité (Claude, lecture en cours, minuteur, Codex, messages non
+  lus…) a son petit onglet contre la notch, à gauche et à droite, le plus important au plus près d'elle (trois par
+  côté au plus, puis un « +N »). Celui de Claude montre son état (main levée quand une session t'attend, un spinner
+  pendant que Claude travaille, une coche à la fin d'un tour) et `sessions actives·sous-agents en cours`, par exemple
+  `1·6`, ou l'avancement de la liste de tâches (`2/5`). Passe la souris sur un intercalaire : il se déploie avec son
+  détail (le morceau et ses commandes, le minuteur, les sessions et leur état) ; un clic ouvre le panneau sur son
+  onglet. Réglages › Apparence : toujours visibles, ou rétractés en fine languette jusqu'au survol (une alerte, comme
+  Claude qui attend ta réponse, reste toujours visible).
 - **Permissions** : la carte montre ce que Claude demande (`Terminal · rm -rf build`, le fichier à modifier,
   la question posée).
 - **Répondre depuis la notch** (désactivé par défaut ; une carte en haut de l'onglet Claude propose de

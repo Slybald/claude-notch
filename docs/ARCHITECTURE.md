@@ -40,8 +40,9 @@ organised and why some choices were made, so they are not undone by accident.
 - `SessionStore`: per-session state machine, task lists (`~/.claude/tasks/<session_id>/`), Esc detection, the last
   6 lines of each conversation (`Utterance`: prompt, `Stop`, `SubagentStop`; memory only, never on disk or in
   `/state`).
-- `NotchController` (window, hover, visibility, full screen), `NotchViews` (root, ears, panel, tab bar,
-  session cards), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
+- `NotchController` (window, hover, visibility, full screen), `NotchViews` (root, panel, tab bar,
+  session cards), `EarTabs` (index tabs of the collapsed notch: choice, left/right split, geometry and hover zones, pure)
+  and `EarTabViews` (their drawing), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen. `NotchShell`: rules tested without a real screen (visibility, screen choice, real or
   virtual notch, "hidden until" text). `HotKeys`: global shortcuts and the keys of the panel.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
@@ -139,22 +140,39 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     after the exit transition. Off with "Reduce motion" (fade only). The views exist only in edit mode, panel open.
   - Tests play the gestures with mouse events sent to the expanded notch in an offscreen window (long press,
     click, drag, "−", Done, click outside the bar) and render `tabs-*.png` with `CLAUDE_NOTCH_SNAPSHOT_DIR`.
-- **Ears** (collapsed notch; Claude only while its tab is on; Codex is an ordinary module here, see "Codex" below): Claude waiting for you > Claude working > Claude
-  just finished (5 s) > the module ears with the highest priority (timer 5, player 1, caffeine -10; tab order
-  breaks ties) > nothing. Only running modules count. "Show the ears" off: the collapsed notch is exactly the
-  notch. Module ears also keep the notch window on screen.
-  - **Index-tab rotation** (`EarsRotation.slots`, pure; "Alternate Claude and the other ears", on by default,
-    `appearance.alternateEars`): while Claude is working or has just finished and at least one module has ears,
-    the contents alternate every 4 s: Claude, then each module by decreasing priority (Claude + 2 modules at most),
-    with a short vertical slide (a plain fade with "Reduce motion"). Claude waiting for you stays alone (it is an
-    alert), and without Claude activity the highest-priority module is shown alone, as before. Setting off: the
-    old rule.
-  - **Cost**: one `Timer` of 4 s (tolerance 1 s) in `NotchViewModel.setEarsRotation`, driven by the root view
-    (`EarsRotation.shouldRotate`): it exists only while the notch is collapsed, shown and has at least 2 contents;
-    the panel open, one content left, ears off or the notch hidden cancel it. Nothing else runs at rest.
-  - **Stable shape**: the body width uses the widest ear in play (`EarsRotation.sideWidth`), so neither the shape
-    nor the hover zone moves from one content to the next. `/state` lists the contents (`notch.earsSlots`, ids
-    only) and whether the rotation runs (`notch.earsRotating`).
+- **Ears = index tabs** (collapsed notch; Claude only while its tab is on; Codex is an ordinary module here, see
+  "Codex" below). Every activity that has ears gets its own tab against the notch: Claude (waiting for you >
+  working > just finished, 5 s) first, then the running modules by decreasing priority (timer 5, Codex 9 while it waits
+  and 6 otherwise, player 1, caffeine −10; tab order breaks ties). The first goes on the left against the notch, the second
+  on the right against it, then each side one step further (`EarTabs.distribute`, pure): at most three per side, and with
+  more than six the sixth place becomes "+N" (the activities left out). "Show the ears" off: the collapsed notch is exactly
+  the notch. Module ears also keep the notch window on screen. This replaced the 1.2.2 rotation (Claude and the other
+  ears took turns every 4 s, with its `Timer`, `EarsRotation` and `appearance.alternateEars`): it was a misreading of
+  "index tabs", which are side by side, not one after another.
+  - **Look** (`EarTabViews.swift`): each tab is its own shape (rounded outer bottom corner) drawn in the notch's black,
+    one step shorter than the previous one going outwards (a staircase, `EarTabs.height`), with a discreet accent per
+    activity (`EarTabs.accentHex`: Claude takes the accent of the settings). Setting `appearance.earTabs`
+    (`EarTabsMode`): **visible** (default: icon and a very short text, `4:59`, `1·6`, equalizer bars, always readable at a
+    glance, same footprint as the old ears for the usual Claude + player case) or **retracted** (8 pt sliver until
+    hovered, for a quiet notch). An alert (Claude waiting, Codex waiting for an approval: `ModuleEars.alert`) stays
+    deployed in both. The old "Alternate Claude and the other ears" setting migrates once (`Preferences.migratedEarTabs`):
+    on or never set → visible, off → retracted; the old key is removed.
+  - **Hover and click** (`EarTabsLayout`, pure; `NotchController.collapsedHit`): the window ignores the mouse while
+    collapsed, so the controller decides from mouse events. The zones are the real shapes (rounded corner included), in
+    one coordinate system shared with the view (origin at the top centre of the notch): the notch centre (panel opens as
+    before, with the same 2 pt margin under the band), each tab, and the deployed tab. They never overlap, so a tab does
+    not open the panel and the centre does not unfold a tab. A tab unfolds after 0.12 s of hover (crossing the menu bar
+    unfolds nothing) and folds 0.2 s after the mouse leaves, or at once when it reaches the notch centre. Unfolded, its
+    inner edge does not move: it grows outwards and downwards over its outer neighbours, nothing slides under a still
+    pointer (the 1.2.1 tab bar lesson). The card shows the module's `makeTabDetailView()` (default: its compact
+    summary, so Claude lists its sessions and their state, the timer its clock and a pause button; the player has its own:
+    artwork, title, previous / play-pause / next). Its height is measured by the view and handed to the controller
+    (`NotchViewModel.tabCardHeight`) so the zone follows the real size. Click on a tab (unfolded or not): the panel opens
+    on its tab (`NotchActions.openTab`); a button inside keeps its own click.
+  - **Cost**: nothing runs at rest (no timer: the rotation one is gone; the hover work items exist only while the mouse
+    is over a tab). While a tab is unfolded the window takes the mouse (its buttons need it) and the 15 Hz mouse poll of
+    the open panel runs too, then both stop. The equalizer bars and the Claude spinner are Core Animation as before.
+  - `/state` lists the tabs (`notch.earTabs`: ids left and right from the notch outwards, the mode, the unfolded one).
 - **Full screen**: detected on events only (Space change, plus 0.4 s later, app activation, screen change): a
   layer-0 window of the front app covers the notch's whole screen, menu bar included (a zoomed window does not).
   Window bounds need no screen-recording permission. Setting: compact (270 pt, no tabs, each module's compact

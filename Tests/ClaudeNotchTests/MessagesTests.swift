@@ -375,10 +375,10 @@ final class MessagesTests: XCTestCase {
         XCTAssertTrue(registry.running.contains("messages"), "replié : l'écoute des fichiers continue")
         XCTAssertEqual(registry.earsEntries.map { $0.id }, ["messages"])
         XCTAssertEqual(registry.moduleEars?.text, "3")
-        let slots = EarsRotation.slots(claude: .working, modules: registry.earsEntries, showEars: true, alternate: true)
-        XCTAssertEqual(slots.map { $0.id }, ["claude", "messages"], "alterne avec Claude")
-        XCTAssertEqual(EarsRotation.slots(claude: .attention, modules: registry.earsEntries, showEars: true,
-                                          alternate: true).map { $0.id }, ["claude"], "Claude qui attend passe seul")
+        let tabs = EarTabs.tabs(claude: .working, claudeEars: nil, modules: registry.earsEntries, showEars: true)
+        XCTAssertEqual(tabs.map { $0.id }, ["claude", "messages"], "un intercalaire chacun")
+        XCTAssertEqual(EarTabs.tabs(claude: .attention, claudeEars: nil, modules: registry.earsEntries, showEars: true)
+            .map { $0.id }, ["claude", "messages"], "Claude qui attend n'efface plus les autres")
 
         registry.setEnabled("messages", false)
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))

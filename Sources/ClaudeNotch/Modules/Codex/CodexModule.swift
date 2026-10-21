@@ -127,7 +127,7 @@ final class CodexModule: NotchModule {
         switch store.indicator {
         case .attention:
             let waiting = store.liveSessions.filter { $0.phase == .waitingApproval }.count
-            return ModuleEars(symbol: "hand.raised.fill", text: "\(waiting)", priority: 9)
+            return ModuleEars(symbol: "hand.raised.fill", text: "\(waiting)", priority: 9, alert: true)
         case .working:
             return ModuleEars(symbol: symbol, text: "\(store.activeCount)", priority: 6)
         case .done:

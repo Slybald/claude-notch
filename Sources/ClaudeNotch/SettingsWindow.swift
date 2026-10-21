@@ -568,16 +568,19 @@ private struct AppearanceSettings: View {
             Section("Notch repliée") {
                 Toggle("Afficher les oreilles", isOn: $prefs.showEars)
                 SettingsNote(claudeEnabled
-                    ? L("De part et d'autre de la notch : l'état de Claude (main levée, spinner, coche) et "
-                        + "le nombre de sessions, ou ce qu'un onglet signale (minuteur, lecture en cours).")
-                    : L("De part et d'autre de la notch : ce qu'un onglet signale (minuteur, lecture en cours)."))
-                if claudeEnabled {
-                    Toggle("Alterner Claude et les autres oreilles", isOn: $prefs.alternateEars)
-                        .disabled(!prefs.showEars)
-                    SettingsNote(L("Quand Claude travaille ou vient de finir, ses oreilles et celles d'un onglet "
-                        + "(lecture en cours, minuteur) se relaient toutes les 4 s. Quand Claude attend ta réponse, "
-                        + "il reste seul."))
+                    ? L("Un intercalaire par activité, de part et d'autre de la notch : Claude (main levée, spinner, "
+                        + "coche, sessions), lecture en cours, minuteur…")
+                    : L("Un intercalaire par activité, de part et d'autre de la notch : ce qu'un onglet signale "
+                        + "(minuteur, lecture en cours)."))
+                Picker("Intercalaires", selection: $prefs.earTabsMode) {
+                    Text("Rétractés").tag(EarTabsMode.retracted)
+                    Text("Toujours visibles").tag(EarTabsMode.visible)
                 }
+                .pickerStyle(.segmented)
+                .disabled(!prefs.showEars)
+                SettingsNote(L("Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un "
+                    + "intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend "
+                    + "ta réponse) reste toujours visible."))
                 Toggle("Teinter aussi la notch repliée", isOn: $prefs.tintCollapsed)
                 SettingsNote(L("Écrans sans encoche seulement : sur une vraie encoche, elle reste noire."))
             }

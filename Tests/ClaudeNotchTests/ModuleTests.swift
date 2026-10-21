@@ -162,19 +162,19 @@ final class ModuleTests: XCTestCase {
                                                 ModuleEars(symbol: "b", text: "2")])?.text, "1")
     }
 
-    /// Alternance éteinte : la règle d'avant, Claude attend > Claude travaille > Claude vient de finir > module > rien
-    /// (la table complète, alternance comprise, est dans `EarsRotationTests`).
+    /// Claude d'abord (attend, travaille, vient de finir), puis chaque module qui a des oreilles
+    /// (la table complète, répartition comprise, est dans `EarTabsTests`).
     func testEarsChoice() {
         let timer = ModuleEarsEntry(id: "timer", ears: ModuleEars(symbol: "timer", text: "4:59"))
-        func slots(_ claude: NotchIndicator, _ modules: [ModuleEarsEntry], showEars: Bool = true) -> [EarsSlot] {
-            EarsRotation.slots(claude: claude, modules: modules, showEars: showEars, alternate: false)
+        func ids(_ claude: NotchIndicator, _ modules: [ModuleEarsEntry], showEars: Bool = true) -> [String] {
+            EarTabs.tabs(claude: claude, claudeEars: nil, modules: modules, showEars: showEars).map { $0.id }
         }
-        XCTAssertEqual(slots(.attention, [timer]), [.claude(.attention)])
-        XCTAssertEqual(slots(.working, [timer]), [.claude(.working)])
-        XCTAssertEqual(slots(.done, [timer]), [.claude(.done)])
-        XCTAssertEqual(slots(.none, [timer]), [.module(id: "timer", ears: timer.ears)])
-        XCTAssertEqual(slots(.none, []), [])
-        XCTAssertEqual(slots(.attention, [timer], showEars: false), [])
+        XCTAssertEqual(ids(.attention, [timer]), ["claude", "timer"])
+        XCTAssertEqual(ids(.working, [timer]), ["claude", "timer"])
+        XCTAssertEqual(ids(.done, [timer]), ["claude", "timer"])
+        XCTAssertEqual(ids(.none, [timer]), ["timer"])
+        XCTAssertEqual(ids(.none, []), [])
+        XCTAssertEqual(ids(.attention, [timer], showEars: false), [])
     }
 
     func testInitialTab() {

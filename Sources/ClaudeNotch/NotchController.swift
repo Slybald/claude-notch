@@ -24,28 +24,10 @@ final class NotchViewModel: ObservableObject {
     /// La fenêtre est à l'écran (le contrôleur la masque : « Masquer la notch », plein écran « masquée »).
     @Published var isShown = true
 
-    /// Intercalaire des oreilles repliées : monte d'un cran toutes les 4 s tant que `setEarsRotation(true)`.
-    @Published private(set) var earsStep = 0
-    /// Remplaçable dans les tests : une fausse minuterie, pas de 4 s réelles.
-    var earsTimer = EarsTimer.system
-    private var cancelEarsTimer: (() -> Void)?
-
-    var isRotatingEars: Bool { cancelEarsTimer != nil }
-
-    deinit { cancelEarsTimer?() }
-
-    /// Un seul timer, créé quand il y a au moins deux contenus à alterner sous les yeux (voir
-    /// `EarsRotation.shouldRotate`), annulé sinon. Chaque démarrage repart du premier contenu (Claude).
-    func setEarsRotation(_ on: Bool) {
-        guard on != isRotatingEars else { return }
-        cancelEarsTimer?()
-        cancelEarsTimer = nil
-        if earsStep != 0 { earsStep = 0 }
-        guard on else { return }
-        cancelEarsTimer = earsTimer.every(EarsRotation.interval, EarsRotation.tolerance) { [weak self] in
-            self?.earsStep &+= 1
-        }
-    }
+    /// Intercalaire déployé par le survol (identifiant de l'activité). Le contrôleur le décide, la vue le dessine.
+    @Published var hoveredTab: String?
+    /// Hauteur mesurée de l'intercalaire déployé : avec sa largeur, la zone de survol qui le garde ouvert.
+    var tabCardHeight: CGFloat = 0
 }
 
 struct NotchActions {
@@ -56,6 +38,8 @@ struct NotchActions {
     /// Révèle un fichier (ou un dépôt) dans le Finder.
     var revealFile: (String) -> Void = { _ in }
     var openSettings: () -> Void = {}
+    /// Ouvre le panneau sur l'onglet de cette activité (clic sur un intercalaire).
+    var openTab: (String) -> Void = { _ in }
 }
 
 final class NotchPanel: NSPanel {
@@ -102,6 +86,8 @@ final class NotchController {
     private var openWork: DispatchWorkItem?
     private var closeWork: DispatchWorkItem?
     private var hideWork: DispatchWorkItem?
+    /// Déploiement ou repli d'un intercalaire en attente du délai d'intention, avec l'intercalaire visé.
+    private var pendingTab: (target: String?, work: DispatchWorkItem)?
     private var suppressUntilExit = false
     private var menuTracking = false
     private var isShown = false { didSet { model.isShown = isShown } }
@@ -117,6 +103,8 @@ final class NotchController {
     private var unhideTimer: Timer?
     /// Horloge du masquage temporaire.
     var now: () -> Date = Date.init
+    /// Position de la souris relue après un délai d'intention ; remplaçable dans les tests.
+    var mouseLocation: () -> CGPoint = { NSEvent.mouseLocation }
     /// Onglet d'avant qu'un glisser de fichiers montre l'Étagère ; nil dès qu'un dépôt a lieu.
     private var tabBeforeDrag: String?
 
@@ -169,7 +157,8 @@ final class NotchController {
             clearEnded: { [weak self] in self?.store.clearEnded() },
             quit: { NSApp.terminate(nil) },
             revealFile: { [weak self] path in self?.reveal(path) },
-            openSettings: { [weak self] in self?.openSettings() }
+            openSettings: { [weak self] in self?.openSettings() },
+            openTab: { [weak self] id in self?.openTab(id) }
         )
         claude.actions = actions
         codex.openHost = { [weak self] bundleId in
@@ -235,9 +224,8 @@ final class NotchController {
             "fullScreenBehavior": prefs.fullScreenBehavior.rawValue,
             "selectedTab": model.selectedTab,
             "modules": registry.debugInfo,
-            // Contenus des oreilles repliées (identifiants seulement) et alternance en cours.
-            "earsSlots": registry.earsSlots(claude: store.indicator).map { $0.id },
-            "earsRotating": model.isRotatingEars,
+            // Intercalaires de la notch repliée (identifiants seulement), de la notch vers l'extérieur.
+            "earTabs": earTabsDebugInfo,
             "visibility": prefs.visibility.rawValue,
             "openTrigger": prefs.openTrigger.rawValue,
             "closeOnClickOutside": prefs.closeOnClickOutside,
@@ -265,6 +253,17 @@ final class NotchController {
             ]
         }
         info["frontmostApp"] = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        return info
+    }
+
+    private var earTabsDebugInfo: [String: Any] {
+        let layout = earLayout()
+        var info: [String: Any] = [
+            "left": layout.left.map { $0.id },
+            "right": layout.right.map { $0.id },
+            "mode": prefs.earTabsMode.rawValue,
+        ]
+        if let hovered = model.hoveredTab { info["hovered"] = hovered }
         return info
     }
 
@@ -348,31 +347,42 @@ final class NotchController {
         }
     }
 
-    /// Zone de survol en coordonnées écran : la notch (et ses oreilles) repliée, le panneau déplié.
+    /// Zone de survol du panneau déplié, en coordonnées écran. Replié, la zone dépend de ce qu'on survole : voir
+    /// `collapsedHit`.
     private func hoverZone() -> CGRect {
         let size = model.contentSize
-        let width: CGFloat
-        let height: CGFloat
-        if model.isExpanded {
-            width = max(size.width, prefs.expandedWidth(compact: isCompact)) + 8
-            height = max(size.height, notchRect.height + 40) + 8
-        } else {
-            width = max(size.width, notchRect.width) + 8
-            height = notchRect.height + 2
-        }
+        let width = max(size.width, prefs.expandedWidth(compact: isCompact)) + 8
+        let height = max(size.height, notchRect.height + 40) + 8
         return CGRect(x: notchRect.midX - width / 2, y: screenFrame.maxY - height, width: width, height: height)
     }
 
     /// Bords inclusifs : la souris peut être pile sur le bord haut de l'écran.
     private func isInsideZone(_ point: CGPoint) -> Bool {
+        guard model.isExpanded else { return collapsedHit(point) != .none }
         let zone = hoverZone()
         return point.x >= zone.minX && point.x <= zone.maxX && point.y >= zone.minY && point.y <= zone.maxY
     }
 
-    private func mouseMoved() {
+    private func earLayout() -> EarTabsLayout {
+        registry.earLayout(claude: store.indicator, claudeEars: store.ears, notch: notchRect.size)
+    }
+
+    /// Notch repliée : ce qui est sous `point`, la forme réelle de chaque intercalaire (déployé compris) ou le centre de la
+    /// notch. Les zones ne se recouvrent pas : un intercalaire n'ouvre pas le panneau, et le centre n'en déploie aucun.
+    private func collapsedHit(_ point: CGPoint) -> EarTabsLayout.Hit {
+        // Hors de la fenêtre : rien à calculer (cette fonction tourne à chaque mouvement de souris).
+        guard abs(point.x - notchRect.midX) <= Self.panelSize.width / 2,
+              point.y >= screenFrame.maxY - Self.panelSize.height else { return .none }
+        let local = CGPoint(x: point.x - notchRect.midX, y: screenFrame.maxY - point.y)
+        return earLayout().hit(local, hovered: model.hoveredTab, cardHeight: model.tabCardHeight)
+    }
+
+    func mouseMoved() {
         followMouseScreen()
         guard isShown else { return }
-        let inside = isInsideZone(NSEvent.mouseLocation)
+        let point = mouseLocation()
+        let hit = model.isExpanded ? .none : collapsedHit(point)
+        let inside = model.isExpanded ? isInsideZone(point) : hit != .none
         if !inside { suppressUntilExit = false }
 
         if model.isExpanded {
@@ -383,19 +393,24 @@ final class NotchController {
                 let work = DispatchWorkItem { [weak self] in
                     guard let self else { return }
                     self.closeWork = nil
-                    if !self.menuTracking, !self.model.isEditingTabs, !self.isInsideZone(NSEvent.mouseLocation) {
+                    if !self.menuTracking, !self.model.isEditingTabs, !self.isInsideZone(self.mouseLocation()) {
                         self.collapse()
                     }
                 }
                 closeWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + prefs.closeDelay, execute: work)
             }
-        } else if inside, !suppressUntilExit, prefs.openTrigger == .hover {
+            return
+        }
+        updateTabHover(hit)
+        if hit == .notch, !suppressUntilExit, prefs.openTrigger == .hover {
             guard openWork == nil else { return }
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 self.openWork = nil
-                if self.isShown, !self.suppressUntilExit, self.isInsideZone(NSEvent.mouseLocation) { self.expand() }
+                if self.isShown, !self.suppressUntilExit, self.collapsedHit(self.mouseLocation()) == .notch {
+                    self.expand()
+                }
             }
             openWork = work
             DispatchQueue.main.asyncAfter(deadline: .now() + prefs.openDelay, execute: work)
@@ -405,6 +420,81 @@ final class NotchController {
         }
     }
 
+    // MARK: - Intercalaires
+
+    /// Intention de survol : un intercalaire ne se déploie qu'après ce délai (traverser la barre des menus ne déploie
+    /// rien), et ne se replie qu'après le sien (un écart de souris ne le referme pas).
+    private static let tabHoverDelay: TimeInterval = 0.12
+    private static let tabLeaveDelay: TimeInterval = 0.2
+
+    /// L'intercalaire que la souris vise, sauf s'il vient d'être utilisé (`suppressUntilExit`).
+    private func tabTarget(_ hit: EarTabsLayout.Hit) -> String? {
+        guard !suppressUntilExit, case .tab(let id) = hit else { return nil }
+        return id
+    }
+
+    /// Événementiel : appelé à chaque mouvement de souris, rien ne tourne entre deux. Au centre de la notch le panneau
+    /// va s'ouvrir, l'intercalaire se replie tout de suite ; ailleurs on laisse passer le délai d'intention.
+    private func updateTabHover(_ hit: EarTabsLayout.Hit) {
+        let target = tabTarget(hit)
+        if hit == .notch {
+            cancelPendingTab()
+            setHoveredTab(nil)
+            return
+        }
+        if model.hoveredTab == target {
+            cancelPendingTab()
+            return
+        }
+        if let pendingTab, pendingTab.target == target { return }
+        cancelPendingTab()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingTab = nil
+            // La souris est-elle toujours sur la même cible ?
+            guard self.isShown, !self.model.isExpanded,
+                  self.tabTarget(self.collapsedHit(self.mouseLocation())) == target else { return }
+            self.setHoveredTab(target)
+        }
+        pendingTab = (target, work)
+        let delay = target == nil ? Self.tabLeaveDelay : Self.tabHoverDelay
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func cancelPendingTab() {
+        pendingTab?.work.cancel()
+        pendingTab = nil
+    }
+
+    /// Déploie (ou replie, `nil`) un intercalaire. Déployé, il a des boutons : la fenêtre reprend la souris tant qu'il
+    /// est là, et 15 Hz de relevé de la souris le gardent honnête (rattrape un mouvement que les moniteurs ne voient pas).
+    private func setHoveredTab(_ id: String?) {
+        guard model.hoveredTab != id else { return }
+        model.hoveredTab = id
+        if id == nil { model.tabCardHeight = 0 }
+        panel.ignoresMouseEvents = id == nil && !model.isExpanded
+        if id != nil {
+            startPolling()
+        } else if !model.isExpanded {
+            stopPolling()
+        }
+    }
+
+    /// L'activité de l'intercalaire déployé a disparu (Claude a fini, minuteur arrêté) : on le replie.
+    private func syncHoveredTab() {
+        guard let id = model.hoveredTab, earLayout().item(id) == nil else { return }
+        cancelPendingTab()
+        setHoveredTab(nil)
+    }
+
+    /// Clic sur un intercalaire : le panneau s'ouvre sur son onglet (le « +N » et l'inconnu : l'onglet habituel).
+    private func openTab(_ id: String) {
+        guard isShown, !model.isExpanded else { return }
+        openWork?.cancel()
+        openWork = nil
+        expand(tab: registry.isEnabled(id) ? id : nil)
+    }
+
     /// Fermé par un clic à l'extérieur (réglage, ou panneau ouvert au clavier), pas par la sortie de la souris.
     private var staysOpenOutside: Bool { prefs.closeOnClickOutside || openedByKeyboard }
 
@@ -412,8 +502,8 @@ final class NotchController {
     /// En mode édition des onglets, un clic à l'extérieur sort seulement du mode.
     func mouseDown(at point: CGPoint = NSEvent.mouseLocation) {
         guard isShown else { return }
-        let inside = isInsideZone(point)
         if model.isExpanded {
+            let inside = isInsideZone(point)
             // Un clic dans un menu ouvert depuis le panneau (« … », « + ») n'est pas un clic à l'extérieur.
             guard !inside, !menuTracking else { return }
             if model.isEditingTabs {
@@ -421,10 +511,18 @@ final class NotchController {
             } else if staysOpenOutside {
                 collapse()
             }
-        } else if inside, prefs.openTrigger == .click {
-            openWork?.cancel()
-            openWork = nil
-            expand()
+        } else {
+            switch collapsedHit(point) {
+            case .tab(let id):
+                // Le clic est arrivé avant le déploiement : même effet que sur l'intercalaire déployé.
+                openTab(id)
+            case .notch where prefs.openTrigger == .click:
+                openWork?.cancel()
+                openWork = nil
+                expand()
+            case .notch, .none:
+                break
+            }
         }
     }
 
@@ -440,6 +538,11 @@ final class NotchController {
 
     private func expand(tab: String? = nil) {
         guard !model.isExpanded else { return }
+        cancelPendingTab()
+        if model.hoveredTab != nil {
+            model.hoveredTab = nil
+            model.tabCardHeight = 0
+        }
         panel.ignoresMouseEvents = false
         model.selectedTab = tab ?? registry.initialTab(claudeNeedsAttention: store.indicator == .attention)
         model.isExpanded = true
@@ -455,6 +558,9 @@ final class NotchController {
         openWork = nil
         closeWork?.cancel()
         closeWork = nil
+        cancelPendingTab()
+        model.hoveredTab = nil
+        model.tabCardHeight = 0
         stopPolling()
         // Le clavier revient à l'app de devant (panneau ouvert au raccourci, ou champ resté actif).
         if panel.isKeyWindow { NotchKeyboard.release(force: true) }
@@ -499,7 +605,8 @@ final class NotchController {
     /// prend le relais (fenêtre qui accepte la souris). Une fois par glisser ; jamais en plein écran « masquée ».
     private func openForFileDrag() -> Bool {
         guard let baseline = fileDragBaseline, !model.isExpanded, !hiddenForFullScreen, !prefs.isHidden(at: now()),
-              Self.dropZone(notch: notchRect, screen: screenFrame, contentWidth: model.contentSize.width)
+              Self.dropZone(notch: notchRect, screen: screenFrame,
+                            contentWidth: max(model.contentSize.width, 2 * earLayout().reach))
                 .contains(NSEvent.mouseLocation) else { return false }
         let pasteboard = NSPasteboard(name: .drag)
         guard pasteboard.changeCount != baseline else { return false }
@@ -604,7 +711,10 @@ final class NotchController {
         Publishers.Merge4(store.objectWillChange, monitor.objectWillChange, prefs.objectWillChange,
                           registry.objectWillChange)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.updateVisibility() }
+            .sink { [weak self] _ in
+                self?.updateVisibility()
+                self?.syncHoveredTab()
+            }
             .store(in: &cancellables)
 
         let center = NotificationCenter.default

@@ -178,7 +178,9 @@ final class Preferences: ObservableObject {
         static let shadow = "appearance.shadow"
         static let animationSpeed = "appearance.animationSpeed"
         static let showEars = "appearance.showEars"
-        static let alternateEars = "appearance.alternateEars"
+        static let earTabs = "appearance.earTabs"
+        /// Réglage de la 1.2.2 à la 1.7.0 (« Alterner Claude et les autres oreilles »), remplacé par `earTabs`.
+        static let legacyAlternateEars = "appearance.alternateEars"
         static let hideFromCapture = "privacy.hideFromCapture"
         static let replyFromNotch = "claude.replyFromNotch"
         static let replyPromptDismissed = "claude.replyPromptDismissed"
@@ -188,7 +190,7 @@ final class Preferences: ObservableObject {
         static let notchSettings = [
             alwaysVisible, visibility, hiddenUntil, openTrigger, closeOnClickOutside, openDelay, closeDelay, haptics,
             toggleHotKey, hideHotKey, fullScreen, screen, accent, panelSize, customWidth, background, customBackground,
-            tintCollapsed, opacity, shadow, animationSpeed, showEars, alternateEars, hideFromCapture,
+            tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
         ]
     }
 
@@ -348,9 +350,9 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(showEars, forKey: Key.showEars) }
     }
 
-    /// Claude au travail et un onglet qui signale quelque chose : leurs oreilles alternent au lieu que Claude masque l'autre.
-    @Published var alternateEars: Bool {
-        didSet { defaults.set(alternateEars, forKey: Key.alternateEars) }
+    /// Intercalaires de la notch repliée : languettes qui se déploient au survol, ou toujours visibles.
+    @Published var earTabsMode: EarTabsMode {
+        didSet { defaults.set(earTabsMode.rawValue, forKey: Key.earTabs) }
     }
 
     // MARK: Claude
@@ -423,9 +425,22 @@ final class Preferences: ObservableObject {
         panelShadow = defaults.object(forKey: Key.shadow) as? Bool ?? true
         animationSpeed = choice(Key.animationSpeed, AnimationSpeed.normal)
         showEars = defaults.object(forKey: Key.showEars) as? Bool ?? true
-        alternateEars = defaults.object(forKey: Key.alternateEars) as? Bool ?? true
+        let legacyAlternate = defaults.object(forKey: Key.legacyAlternateEars) as? Bool
+        let tabsMode = choice(Key.earTabs, Self.migratedEarTabs(alternateEars: legacyAlternate))
+        earTabsMode = tabsMode
+        // Migré une fois : l'ancienne clé ne sert plus.
+        if legacyAlternate != nil {
+            defaults.set(tabsMode.rawValue, forKey: Key.earTabs)
+            defaults.removeObject(forKey: Key.legacyAlternateEars)
+        }
         replyFromNotch = defaults.bool(forKey: Key.replyFromNotch)
         replyPromptDismissed = defaults.bool(forKey: Key.replyPromptDismissed)
+    }
+
+    /// Ancien « Alterner Claude et les autres oreilles » : activé (ou jamais réglé) → intercalaires toujours visibles,
+    /// comme les oreilles qui montraient tout ; désactivé (qui voulait Claude seul, une notch discrète) → rétractés.
+    static func migratedEarTabs(alternateEars: Bool?) -> EarTabsMode {
+        alternateEars == false ? .retracted : .visible
     }
 
     /// Ancien « Toujours visible » : vrai → toujours, faux → quand Claude est ouvert, jamais réglé → toujours (les
@@ -530,7 +545,7 @@ final class Preferences: ObservableObject {
         panelShadow = fresh.panelShadow
         animationSpeed = fresh.animationSpeed
         showEars = fresh.showEars
-        alternateEars = fresh.alternateEars
+        earTabsMode = fresh.earTabsMode
     }
 }
 

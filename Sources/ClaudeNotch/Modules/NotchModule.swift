@@ -2,18 +2,20 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// Contenu des oreilles proposé par un module quand la notch est repliée (minuteur, lecture en cours…).
+/// Intercalaire proposé par un module quand la notch est repliée (minuteur, lecture en cours…).
 struct ModuleEars: Equatable {
-    /// Oreille gauche : SF Symbol, teinté de la couleur d'accent.
+    /// Icône : SF Symbol, teinté de la couleur de l'activité.
     var symbol: String
-    /// Oreille droite : texte très court (« 4:59 »).
+    /// Information très courte à côté de l'icône (« 4:59 »).
     var text: String
     /// Départage les modules entre eux : le plus grand gagne, à égalité l'ordre des onglets.
     var priority: Int = 0
-    /// Oreille gauche : image à la place du symbole (pochette), petite et arrondie.
+    /// Icône : image à la place du symbole (pochette), petite et arrondie.
     var image: NSImage? = nil
-    /// Oreille droite : barres d'égaliseur animées à la place du texte.
+    /// Barres d'égaliseur animées à la place du texte.
     var bars = false
+    /// Le module attend l'utilisateur : son intercalaire reste déployé, même en mode « Rétractés ».
+    var alert = false
 }
 
 /// Notice d'un composant tiers, affichée dans Réglages › À propos › Licences.
@@ -61,6 +63,9 @@ protocol NotchModule: ObservableObject where ObjectWillChangePublisher == Observ
     func makeTabIcon() -> AnyView?
     /// Contenu à droite de la barre d'onglets quand le module est l'onglet actif.
     func makeHeaderAccessory() -> AnyView?
+    /// Contenu de l'intercalaire déployé (survol de son intercalaire, notch repliée) ; par défaut le résumé compact.
+    /// Largeur : `\.notchContentWidth`.
+    func makeTabDetailView() -> AnyView?
 }
 
 extension NotchModule {
@@ -74,6 +79,7 @@ extension NotchModule {
     func makeSettingsView() -> AnyView? { nil }
     func makeTabIcon() -> AnyView? { nil }
     func makeHeaderAccessory() -> AnyView? { nil }
+    func makeTabDetailView() -> AnyView? { makeCompactView() }
 }
 
 // MARK: - Environnement des vues de module
