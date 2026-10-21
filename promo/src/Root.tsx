@@ -7,6 +7,7 @@ import { FPS } from "./motion";
 import { DURATION2, Promo2 } from "./promo2/Promo2";
 import { FPS2 } from "./motion2";
 import { DURATION3, Promo3 } from "./promo3/Promo3";
+import { DURATION4, Promo4 } from "./promo4/Promo4";
 import { README_FRAMES, README_SIZE, Readme } from "./promo/Readme";
 
 const base: PromoProps = { format: "wide", lang: "en", music: null };
@@ -19,6 +20,8 @@ export const Root: React.FC = () => (
     <Composition id="Promo2-9x16" component={Promo2} width={1080} height={1920} fps={FPS2} durationInFrames={DURATION2} defaultProps={{ format: "tall" as const, lang: "en" as const }} />
     <Composition id="Promo3-16x9" component={Promo3} width={1920} height={1080} fps={FPS2} durationInFrames={DURATION3} defaultProps={{ format: "wide" as const, lang: "en" as const }} />
     <Composition id="Promo3-9x16" component={Promo3} width={1080} height={1920} fps={FPS2} durationInFrames={DURATION3} defaultProps={{ format: "tall" as const, lang: "en" as const }} />
+    <Composition id="Promo4-16x9" component={Promo4} width={1920} height={1080} fps={FPS2} durationInFrames={DURATION4} defaultProps={{ format: "wide" as const, lang: "en" as const }} />
+    <Composition id="Promo4-9x16" component={Promo4} width={1080} height={1920} fps={FPS2} durationInFrames={DURATION4} defaultProps={{ format: "tall" as const, lang: "en" as const }} />
     <Composition id="Readme" component={Readme} width={README_SIZE.w} height={README_SIZE.h} fps={FPS} durationInFrames={README_FRAMES} defaultProps={{ lang: "en" as const }} />
     <Still id="Proof" component={Proof as React.FC<any>} width={1400} height={960} defaultProps={{ tab: "quick", lang: "fr" } satisfies ProofProps} />
     <Still id="ConceptA" component={ConceptA} width={1920} height={1080} />

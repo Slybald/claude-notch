@@ -118,6 +118,8 @@ const ShelfAccessory: React.FC<{ n: number }> = ({ n }) => {
 // ─────────────────────────────── Composition ───────────────────────────────
 
 export type Promo3Props = { format: Format3; lang: Lang };
+/** v4 : la scène se rend en deux calques (la scène sous la caméra, la roue et les mentions au-dessus). */
+export type Layer3 = "all" | "stage" | "hud";
 
 export const Promo3: React.FC<Promo3Props> = ({ format, lang }) => {
   useFontsReady();
@@ -138,8 +140,10 @@ const crossAt = (slot: number) => {
 };
 const CROSS = [2, 3, 4, 5, 6].map(crossAt);
 
-const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => {
-  const f = useCurrentFrame();
+export const Scene3: React.FC<{ format: Format3; lang: Lang; layer?: Layer3; whip?: boolean; frame?: number }> = ({ format, lang, layer = "all", whip = false, frame }) => {
+  // `frame` : la v4 joue la v3 à un autre rythme (un <Freeze> serait borné à la durée de la composition v4).
+  const current = useCurrentFrame();
+  const f = frame ?? current;
   const t = f / FPS2;
   const L = layout3(format);
   const S = L.S;
@@ -309,6 +313,7 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
   const inA = ti === 0 ? R(T.open + 0.12, T.open + 0.26, BLUR_EASE) : R(cur.at + 0.07, cur.at + 0.2, BLUR_EASE);
   const titleOp = ti === 0 || p > 0.98 ? 1 : outA > 0.02 ? outA : inA;
   const titleTab = outA > 0.02 && ti > 0 ? prev.tab : cur.tab;
+  const whipDir = whip ? Math.sign(b - a) : 0;
 
   // ── Mode édition des onglets : appui long, tremblement, glisser, « + », OK ──
   const editing = t >= T.edit && t < T.done;
@@ -377,10 +382,10 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
   const names = FEATURES.map(([en, frn]) => tr(en, frn));
 
   return (
-    <AbsoluteFill style={{ background: "#EDEDE8", overflow: "hidden" }}>
-      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 62% 58% at 50% ${format === "wide" ? 40 : 32}%, #F1F1ED 0%, rgba(237,237,232,0) 100%)` }} />
+    <AbsoluteFill style={{ background: layer === "hud" ? undefined : "#EDEDE8", overflow: "hidden" }}>
+      {layer !== "hud" && <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 62% 58% at 50% ${format === "wide" ? 40 : 32}%, #F1F1ED 0%, rgba(237,237,232,0) 100%)` }} />}
 
-      <Wheel
+      {layer !== "stage" && <Wheel
         index={index}
         speed={speed}
         names={names}
@@ -388,8 +393,9 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
         cx={L.cx}
         morph={morph}
         link={{ top: E.top + E.cardH + E.gap, w: E.linkW, h: E.linkH, font: E.link, text: APP.link }}
-      />
+      />}
 
+      {layer !== "hud" && <>
       {/* la notch, ses intercalaires et le panneau */}
       <div style={{ position: "absolute", left: L.cx, top: 0, transform: `scale(${S})`, transformOrigin: "0 0", opacity: showNotch, filter: shadow }}>
         <IndexTabs
@@ -423,8 +429,8 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
                   okPress={t >= T.done && t < T.done + 0.1 ? 1 : 0}
                   tabBarProps={{ capsule, count: barCount, xs, opacities, lifted, badge }}
                 >
-                  {switching && outA > 0.01 && <div style={{ position: "absolute", inset: 0, opacity: outA, filter: `blur(${(1 - outA) * 5}px)` }}>{prevOut.node}</div>}
-                  <div style={{ position: "absolute", inset: 0, opacity: inA, filter: inA < 1 ? `blur(${(1 - inA) * 6}px)` : undefined }}>{curOut.node}</div>
+                  {switching && outA > 0.01 && <div style={{ position: "absolute", inset: 0, opacity: outA, filter: `blur(${(1 - outA) * 5}px)`, transform: whipDir ? `translateX(${-whipDir * 90 * (1 - outA)}px)` : undefined }}>{prevOut.node}</div>}
+                  <div style={{ position: "absolute", inset: 0, opacity: inA, filter: inA < 1 ? `blur(${(1 - inA) * 6}px)` : undefined, transform: whipDir && inA < 1 ? `translateX(${whipDir * 120 * (1 - inA)}px)` : undefined }}>{curOut.node}</div>
                 </PanelInner>
               </div>
             )}
@@ -455,7 +461,8 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
       <BlackCard f={f} t={t} L={L} lang={lang} FALL={FALL} />
 
       <FileAndCursor f={f} t={t} L={L} />
-      <Legal f={f} t={t} L={L} lang={lang} />
+      </>}
+      {layer !== "stage" && <Legal f={f} t={t} L={L} lang={lang} />}
     </AbsoluteFill>
   );
 };
@@ -478,9 +485,10 @@ const moreEntries = (lang: Lang): MenuEntry[] => {
 
 // ─────────────────────────────── Curseur ───────────────────────────────
 
-type Key = { arrive: number; x: number; y: number };
+export type Key = { arrive: number; x: number; y: number };
 
-function keysFor(L: Layout3): Key[] {
+/** Positions du curseur (px de la vidéo, repère de la scène) et instants d'arrivée ; la v4 en tire les cibles de sa caméra. */
+export function keysFor(L: Layout3): Key[] {
   const S = L.S;
   const left = L.cx - (W_OPEN * S) / 2;
   const P = (x: number, y: number) => ({ x: left + x * S, y: y * S });
