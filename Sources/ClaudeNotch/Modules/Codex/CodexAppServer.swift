@@ -78,8 +78,9 @@ struct CodexAppServer: CodexHooksService {
     let executable: URL
     /// `CODEX_HOME` : le dossier dont on veut lire les hooks.
     let home: URL
-    /// Dossier pour lequel Codex liste les hooks (les hooks utilisateur valent pour tous).
-    var workingDirectory = FileManager.default.homeDirectoryForCurrentUser.path
+    /// Dossier pour lequel Codex liste les hooks. Les hooks de l'utilisateur valent pour tous ; la racine évite qu'un
+    /// `.codex/` du dossier personnel soit lu aussi comme réglage de projet (le même hooks.json deux fois).
+    var workingDirectory = "/"
     /// Un `CODEX_HOME` neuf met plus de dix secondes à répondre.
     var timeout: TimeInterval = 40
 
