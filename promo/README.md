@@ -2,10 +2,14 @@
 
 Vidéo en motion design codée avec [Remotion](https://www.remotion.dev) (composition React, rendu déterministe).
 
-- **Version 3 (courante)** : toutes les fonctions de l'app (intercalaires, Claude, Codex, lecteur et calendrier,
+- **Version 4 (courante)** : la v3, rendue nettement plus dynamique d'après une analyse mesurée des vidéos de
+  référence de l'utilisateur : rampe de vitesse qui supprime les temps morts, caméra qui suit chaque geste (poussée,
+  recul), fouetté du contenu entre onglets, flou de vitesse. 22,0 s. Plan par plan et mesures : [STORYBOARD.md](STORYBOARD.md).
+  Code : `src/promo4/Promo4.tsx` (il rejoue la scène de la v3 à son propre rythme, sous sa caméra).
+- **Version 3** : toutes les fonctions de l'app (intercalaires, Claude, Codex, lecteur et calendrier,
   réglages rapides, étagère, presse-papiers, minuteur, notes, Mail, Messages, déplacement des onglets par appui long,
   mises à jour automatiques, assistant et profils), 28,25 s, même style que la v2, avec une **roue de noms** qui lit
-  chaque fonction pendant le geste. Plan par plan : [STORYBOARD.md](STORYBOARD.md). Code : `src/promo3/`.
+  chaque fonction pendant le geste. Plan par plan : [STORYBOARD-v3.md](STORYBOARD-v3.md). Code : `src/promo3/`. Rendu avec `--v=3`.
   **Le nom, le slogan, le lien et l'icône de l'app sont dans un seul fichier : `src/promo3/identity.ts`.**
 - **Version 2** : refaite dans le style d'une vidéo de référence fournie par l'utilisateur. Un seul objet noir, un
   curseur, des transformations continues, 60 i/s, muette, 15,8 s. Analyse mesurée de la référence :
@@ -23,31 +27,31 @@ La référence elle-même (vidéo et images) n'est pas dans le dépôt.
 ```sh
 cd promo
 npm install
-npm run studio                                      # aperçu interactif (compositions Promo3-16x9, Promo3-9x16, Promo2-…)
-node scripts/render.mjs                             # v3 : out/v3/notch-promo-16x9.mp4 et -9x16.mp4 (+ versions 4K)
+npm run studio                                      # aperçu interactif (compositions Promo4-16x9, Promo4-9x16, Promo3-…, Promo2-…)
+node scripts/render.mjs                             # v4 : out/v4/notch-promo-16x9.mp4 et -9x16.mp4 (+ versions 4K) ; --v=3 pour la v3
 node scripts/render.mjs --lang=fr                   # mêmes fichiers avec le suffixe -fr
 node scripts/render.mjs --preview --target=16x9     # demi-résolution dans tmp/, pour relire vite
 node scripts/render.mjs --v=2                       # version 2 dans out/v2/ (claude-notch-*), --v=1 : version 1 dans out/
-node scripts/gif.mjs                                # ../docs/media/claude-notch.gif (boucle complète de la v3, 16:9, 16 i/s)
-node scripts/frames.mjs Promo3-16x9 en 100,200      # images isolées dans tmp/frames/ (numéros d'images à 60 i/s) ; 5ᵉ argument : échelle
+node scripts/gif.mjs                                # ../docs/media/claude-notch.gif (boucle complète de la v4, 16:9)
+node scripts/frames.mjs Promo4-16x9 en 100,200      # images isolées dans tmp/frames/ (numéros d'images à 60 i/s) ; 5ᵉ argument : échelle
 ```
 
 Chaque composition est dessinée en 1080p ; le rendu se fait à l'échelle 2, donc en vraie 4K vectorielle
 (3840 × 2160 et 2160 × 3840). Le 1080p est ensuite dérivé du master par ffmpeg (Lanczos). H.264, `-crf 15` pour le
 master, `-crf 17` pour le 1080p, `-movflags +faststart`.
 
-| Fichier (`out/v3/`) | Contenu |
+| Fichier (`out/v4/`) | Contenu |
 |---|---|
-| `notch-promo-16x9.mp4` | 1920 × 1080, 28,25 s, 60 i/s |
+| `notch-promo-16x9.mp4` | 1920 × 1080, 22,0 s, 60 i/s |
 | `notch-promo-16x9-4k.mp4` | 3840 × 2160 (master) |
 | `notch-promo-9x16.mp4` | 1080 × 1920 : mise en page verticale refaite, pas un zoom |
 | `notch-promo-9x16-4k.mp4` | 2160 × 3840 (master) |
 | `*-fr.mp4` | mêmes fichiers, textes en français |
 | `../docs/media/claude-notch.gif` | boucle de 28,95 s pour le README, 16 i/s, 960 × 540 (versionnée, moins de 5 Mo) |
 
-`out/` et `tmp/` ne sont pas versionnés. La vidéo MP4 s'arrête sur la carte finale (image 1695) ; le GIF va jusqu'à
-l'image 1736, où la notch redevient fermée, pour que la boucle soit sans saut. Un rendu 4K complet (EN + FR, 2 formats)
-et le GIF prennent une demi-heure environ.
+`out/` et `tmp/` ne sont pas versionnés. La vidéo MP4 s'arrête sur la carte finale (image 1321) ; le GIF va jusqu'à
+l'image 1357, où la notch redevient fermée, pour que la boucle soit sans saut. Le flou de vitesse multiplie le coût des
+images rapides : compter une heure environ pour un rendu 4K complet (EN + FR, 2 formats) et le GIF.
 
 ### Changer le nom de l'app
 
@@ -108,6 +112,10 @@ Installées depuis npm (@fontsource), embarquées dans le rendu, licences SIL Op
 
 ## Structure
 
+- `src/promo4/Promo4.tsx` : la v4. Rampe de vitesse (`RUSH`, tenues de la v3 et vitesse de lecture), caméra
+  (`SHOTS`, temps de la v3, échelle, point visé), fenêtres de flou de vitesse (`FAST`). Elle rend `Scene3` deux fois :
+  la scène sous la caméra (`layer="stage"`, avec le fouetté entre onglets), la roue et les mentions au-dessus
+  (`layer="hud"`), à l'image de la v3 donnée par la rampe (`frame`).
 - `src/promo3/` : la v3. `Promo3.tsx` (timeline unique `T` en secondes, tout est calculé depuis le numéro d'image),
   `Wheel.tsx` (la roue et son compteur), `copy3.ts` (les noms de la roue), `identity.ts` (nom, slogan, icône),
   `layout3.ts` (16:9 et 9:16).
@@ -122,4 +130,5 @@ Installées depuis npm (@fontsource), embarquées dans le rendu, licences SIL Op
 
 Pour décaler un temps fort de la v3 : éditer `T` en haut de `src/promo3/Promo3.tsx` (secondes ; `T.wheel` pour la roue).
 Si `T.ret` change, mettre à jour `CTA_END_FRAME_V3` dans `scripts/lib.mjs` (`T.ret × 60`). Même règle pour la v2
-(`CTA_END_FRAME`, `T.ret` de `src/promo2/Promo2.tsx`).
+(`CTA_END_FRAME`, `T.ret` de `src/promo2/Promo2.tsx`). La v4 suit la v3 : si `T` ou `RUSH` change, mettre à jour
+`CTA_END_FRAME_V4` (`CTA_END4` de `src/promo4/Promo4.tsx`, l'instant v4 de `T.ret` × 60).
