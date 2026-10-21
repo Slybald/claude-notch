@@ -210,6 +210,8 @@ function tabOut(tab: TabId, lf: number, f: number, lang: Lang): TabOut {
         ),
       };
     }
+    default:
+      return { h: 0, node: null };
   }
 }
 
