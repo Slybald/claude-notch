@@ -1,4 +1,4 @@
-# Idées pour Claude Notch
+# Idées pour Oriel
 
 Pistes pour les prochaines versions, à choisir : ce ne sont pas des engagements. Écrit le 2026-10-21 sur la base de la
 1.7.0 (les intercalaires de la 1.8.0 sont en cours de fusion : PR #11).
@@ -26,7 +26,7 @@ Les autres apps de notch, d'après leurs sites et la presse (prix et versions : 
 | Vibe Island, Vibeclove (payants) | agents de code : approuver, répondre, quotas, saut vers le bon terminal | agents seulement, ou presque ; essai de quelques jours |
 | CodeIsland, Vibe Notch (libres) | agents de code, « smart suppress », push téléphone | mono-agent ou développement en pause |
 
-**Ce qui rend Claude Notch unique, à garder** : gratuit, sans télémétrie ; agents de code **et** vie quotidienne dans la
+**Ce qui rend Oriel unique, à garder** : gratuit, sans télémétrie ; agents de code **et** vie quotidienne dans la
 même notch ; sobre ; 0 % de CPU au repos. **Les trous du marché** : la plainte n°1 (CPU, batterie) n'a pas de réponse
 chiffrée (je n'ai trouvé aucune mesure publiée) ; les apps d'agents ne visent pas le grand public ; un script ne peut pas poser
 une oreille sans plugin (DynamicLake 2.0 en annonce, d'après une source secondaire).
@@ -110,11 +110,11 @@ une oreille sans plugin (DynamicLake 2.0 en annonce, d'après une source seconda
   connue (non vérifié). Repli sur le comportement actuel.
 - *Désirable* : le geste qu'on fait cent fois par jour quand plusieurs agents tournent.
 
-**11. ★ API locale, commande `notch` et lien `claude-notch://`** · effort M
+**11. ★ API locale, commande `notch` et lien `oriel://`** · effort M
 - *Problème* : on veut voir « build fini » ou « rendu terminé » dans la notch ; les concurrents annoncent des plugins (DynamicLake 2.0) ou rien.
 - *Idée* : `notch run -- make` affiche un sablier puis ✓ ou ✗ avec la durée ; `notch ears --text "12 non lus"` pose une oreille
   pour 60 s ; mêmes appels depuis Raccourcis (action « Ouvrir l'URL ») ou n'importe quel script.
-- *Permissions et risques* : le serveur local et son jeton existent déjà. Un lien `claude-notch://` peut être déclenché par une page
+- *Permissions et risques* : le serveur local et son jeton existent déjà. Un lien `oriel://` peut être déclenché par une page
   web : réservé à du texte court et temporaire, désactivé par défaut. Texte et symboles filtrés, 3 éléments au plus.
 - *Désirable* : des « plugins » sans charger de code (écarté par `docs/EDITIONS.md`), donc sans risque de signature ; chacun
   fabrique son intercalaire.
@@ -279,10 +279,10 @@ Maquettes : [barre de commande](ideas/commande.png), [agenda vivant](ideas/agend
 ### ★5 API locale et commande `notch` : mini-plan
 
 - **Fichiers.** `HookServer.swift` (routes `POST /ears` et `DELETE /ears/<id>`, même jeton que les autres), nouveau `Modules/External/` (source d'oreilles sans onglet : durée de vie, 3 éléments au plus, texte de 12 caractères,
-  symboles et couleurs pris dans une liste), `Resources/Info.plist` (`CFBundleURLTypes`, schéma `claude-notch`), `AppDelegate.swift` (`application(_:open:)` vers le même traitement), `hooks/notch` (script shell :
+  symboles et couleurs pris dans une liste), `Resources/Info.plist` (`CFBundleURLTypes`, schéma `oriel`), `AppDelegate.swift` (`application(_:open:)` vers le même traitement), `hooks/notch` (script shell :
   `notch ears`, `notch run -- <commande>` avec sablier puis ✓ ou ✗ et durée), `Preferences.swift` et un volet Réglages (activé ou non, derniers appelants), `docs/API.md`, `README`.
 - **Faisabilité vérifiée.** `application(_:open:)` compile contre le SDK macOS 27 ; le serveur et le jeton (fichier en 0600) existent. Les intercalaires (PR #11) devraient fournir le rendu : l'API n'aurait qu'à alimenter `ModuleEars` (à confirmer une fois la PR fusionnée).
-- **Sécurité.** HTTP avec jeton = l'utilisateur lui-même. Le lien `claude-notch://` peut être lancé par une page web : désactivé par défaut, texte seulement, durée de vie ≤ 30 s, cadence limitée, mention « via lien ».
+- **Sécurité.** HTTP avec jeton = l'utilisateur lui-même. Le lien `oriel://` peut être lancé par une page web : désactivé par défaut, texte seulement, durée de vie ≤ 30 s, cadence limitée, mention « via lien ».
 - **Tests.** Jeton refusé, validation, durée de vie, limites, `notch run` avec code de sortie ≠ 0.
 - **Raccourcis.** Pas d'App Intents : leurs métadonnées sont extraites par Xcode, et l'app est construite par `swift build` (non vérifié). L'action « Ouvrir l'URL » de Raccourcis suffit.
 
