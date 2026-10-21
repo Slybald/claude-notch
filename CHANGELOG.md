@@ -22,6 +22,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   hook only after you trust it with `/hooks`; the settings say so.
 - `docs/CODEX.md`: what is possible with Codex and why (hooks, `notify`, session files, app-server, approvals), measured on
   Codex 0.154.
+- Profiles: Developer, Student, Creative and Minimal. A profile is a starting point (which tabs, in which order, how
+  the panel opens, the ears) inside the same app: one update, one signature. The first step of the setup assistant
+  offers them (optional, nothing changes without a choice), and **Settings › General › Change Profile…** shows what a
+  profile will show and hide and changes nothing until you confirm. Your tab data and the hooks are never touched.
+  Claude and Codex are only offered when they are found on the Mac.
+- `docs/EDITIONS.md` compares three ways to make "editions" (profiles, separate builds, installable modules) and
+  explains why profiles come first.
 
 ### Not possible
 
