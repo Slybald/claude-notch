@@ -33,9 +33,9 @@ fois.
 
 ## Identité de l'app : un seul fichier
 
-`src/promo3/identity.ts` : nom (**Oriel**), version (1.9.0), slogan, lien (`github.com/Slybald/oriel`), mentions
-légales, icône. Le nom y est lu partout où il apparaît : carte finale, assistant (« Bienvenue dans … »), menu
-« Quitter … », ligne « Version … ». Un changement de nom = modifier ce fichier, puis `node scripts/render.mjs`
+`src/promo3/identity.ts` : nom (**Oriel**), slogan, lien (`github.com/Slybald/oriel`), mentions légales, icône. Le nom y
+est lu partout où il apparaît : carte finale, assistant (« Bienvenue dans … »), menu « Quitter … ». Aucun numéro de
+version dans le film : il serait faux dès la release suivante. Un changement de nom = modifier ce fichier, puis `node scripts/render.mjs`
 (EN et `--lang=fr`) et `node scripts/gif.mjs`. L'icône est le rectangle au tiers haut plein (celui de l'assistant de
 l'app) ; l'étoile orange (`"spark"`) est le logo de Claude et ne convient plus. Le lien suppose que le dépôt est
 renommé `Slybald/oriel` (étape 1 de la publication, `docs/RENAME.md` de la PR de renommage).
@@ -65,7 +65,7 @@ que si l'outil est sur le Mac.
 | 14 | 16,60 | **Glisse** l'icône vers la gauche (0,65 s), la dépose en 3ᵉ place (17,25) | L'icône suit le curseur à 115 %, chaque onglet s'écarte quand elle passe, elle se pose. | 15 Glisse pour réordonner (16,60) |
 | 15 | 17,60 | Clique « + » (17,60), « Messages » dans le menu (18,10), « OK » (18,60) | Le menu liste les onglets masqués ; **Messages** apparaît en bout de barre ; le mode édition se ferme. | 16 Ajoute ou masque (17,60) |
 | 16 | 19,00 | Clique **Messages**, la 1ʳᵉ conversation (19,65) | Conversations, pastille orange ; le champ de réponse s'ouvre, le texte se tape, Entrée (20,50). | 17 Messages (19,00) |
-| 17 | 21,10 | Clique « … », survole « Mises à jour automatiques » (21,50) | Le menu de l'app (réglages, masquer la notch, version, **✓ mises à jour automatiques**, quitter). | 18 Mises à jour automatiques (21,10) |
+| 17 | 21,10 | Clique « … », survole « Mises à jour automatiques » (21,50) | Le menu de l'app (réglages, afficher et masquer la notch, **✓ mises à jour automatiques**, quitter). | 18 Mises à jour automatiques (21,10) |
 | 18 | 22,20 | — | Le panneau se replie en notch : elle porte **cinq intercalaires** (Mail, lecture, Claude ✓, minuteur, Messages). | |
 | 19 | 23,05 | — | La notch **tombe** et devient la fenêtre de l'**assistant** : « Bienvenue dans Oriel », les quatre profils. | 19 Assistant de configuration (23,15) |
 | 20 | 24,25 | Clique le profil **Créatif** | Cadre orange, coche ; l'aperçu passe aux onglets du profil (Lecteur, Étagère, Presse-papiers : ni Claude ni Codex). Le curseur sort. | 20 Profils (24,25) |
@@ -100,7 +100,7 @@ Tout est recréé d'après le code et les captures de l'app (`Sources/ClaudeNotc
 | Lecteur + semaine du calendrier (choix d'un jour) | `MediaViews.swift` |
 | Messages : lignes, pastille, champ de réponse | `MessagesViews.swift` |
 | Mail : trois derniers mails, « Répondre » au survol, champ, « Envoyer » (PR « derniers mails et réponse », fusionnée dans main) | `MailViews.swift` |
-| Menu « … » : réglages, masquer, version, mises à jour automatiques, quitter | `NotchMoreMenu`, `UpdateMenuItems` |
+| Menu « … » : réglages, afficher et masquer la notch, mises à jour automatiques, quitter (la ligne « Version » est omise) | `NotchMoreMenu`, `UpdateMenuItems` |
 | Assistant : étape 1 avec les quatre profils (Développeur, Étudiant, Créatif, Minimal) et leurs onglets | `SetupAssistant.swift`, `ProfileViews.swift`, `Profiles.swift` |
 
 Les données affichées (morceau, fichiers, copies, conversations, mails) sont fictives, comme dans les captures de l'app.

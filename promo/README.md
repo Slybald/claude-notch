@@ -51,7 +51,7 @@ et le GIF prennent une demi-heure environ.
 
 ### Changer le nom de l'app
 
-Le nom actuel est **Oriel** (version 1.9.0). Pour le changer : modifier `src/promo3/identity.ts` (nom, version, slogan,
+Le nom actuel est **Oriel**. Pour le changer : modifier `src/promo3/identity.ts` (nom, slogan,
 lien, mentions, icône), puis relancer `node scripts/render.mjs`, `node scripts/render.mjs --lang=fr` et
 `node scripts/gif.mjs`. Les noms de fichiers (`notch-promo-*`) ne contiennent pas le nom de l'app. L'icône est celle de
 la notch (`icon: "notch"`) ; l'étoile orange (`"spark"`) est le logo de Claude. Le lien `github.com/Slybald/oriel`

@@ -447,7 +447,7 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
         )}
         {moreMenuP > 0.01 && (
           <div style={{ position: "absolute", left: 26 + 592 - 232, top: 58 }}>
-            <MacMenu p={moreMenuP} width={232} hover={t >= T.menuHover - 0.1 ? 7 : -1} entries={moreEntries(lang)} />
+            <MacMenu p={moreMenuP} width={232} hover={t >= T.menuHover - 0.1 ? 6 : -1} entries={moreEntries(lang)} />
           </div>
         )}
       </div>
@@ -469,7 +469,6 @@ const moreEntries = (lang: Lang): MenuEntry[] => {
     { label: tr("Hide the Notch", "Masquer la notch"), sub: true },
     { label: tr("Launch at Login", "Lancer à l'ouverture de session") },
     "sep",
-    { label: tr(`Version ${APP.version}`, `Version ${APP.version}`), disabled: true },
     { label: tr("Automatic Updates", "Mises à jour automatiques"), check: true },
     { label: tr("Check for Updates", "Rechercher les mises à jour") },
     "sep",
@@ -523,7 +522,7 @@ function keysFor(L: Layout3): Key[] {
     { arrive: T.messages - hold, ...tab("messages", T.messages) },
     { arrive: T.msgReply - hold, ...P(300, 87) },
     { arrive: T.more - hold, ...P(607, 44) },
-    { arrive: T.menuHover - hold, ...P(26 + 592 - 232 + 120, 58 + 148) },
+    { arrive: T.menuHover - hold, ...P(26 + 592 - 232 + 120, 58 + 126) },
     { arrive: T.profile - hold, x: L.cx + 0, y: 0 }, // remplacé plus bas (position de la carte « Créatif »)
     { arrive: T.profile + 0.9, x: L.cx + 0.3 * L.w, y: L.h + 70 },
   ];

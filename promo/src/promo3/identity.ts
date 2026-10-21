@@ -1,6 +1,7 @@
 // IDENTITÉ DE L'APP dans la vidéo : le seul fichier à modifier si l'app change de nom.
-// Nom, version, slogan, lien et mentions viennent d'ici partout : carte finale, assistant (« Bienvenue dans … »),
-// menu « Quitter … », message de mise à jour. Puis `node scripts/render.mjs` et `node scripts/gif.mjs`.
+// Nom, slogan, lien et mentions viennent d'ici partout : carte finale, assistant (« Bienvenue dans … »),
+// menu « Quitter … ». Aucun numéro de version dans le film : il serait faux dès la release suivante.
+// Après un changement : `node scripts/render.mjs` (EN et `--lang=fr`) puis `node scripts/gif.mjs`.
 //
 // `icon` : « notch » (le rectangle au tiers haut plein, l'icône de l'assistant de l'app) ou « spark » (l'étoile
 // orange, le logo de Claude : seulement si le nom de l'app le reprend).
@@ -9,7 +10,6 @@ type Pair = [string, string];
 
 export const APP = {
   name: "Oriel",
-  version: "1.9.0",
   icon: "notch" as "spark" | "notch",
   tagline: ["Your notch finally has a job.", "Ta notch a enfin un travail."] as Pair,
   link: "github.com/Slybald/oriel",
