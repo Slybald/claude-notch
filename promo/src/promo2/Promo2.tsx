@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { useFontsReady } from "../fonts";
 import { LangProvider, Lang, useLang } from "../i18n";
 import { C, FONT } from "../theme";
-import { CURSOR_EASE, FPS2, GROW, SHRINK, SNAP, clamp01, fr, lerp, outExpo, ramp2, sp2 } from "../motion2";
+import { BLUR_EASE, CURSOR_EASE, FPS2, GROW, SHRINK, SNAP, clamp01, fr, lerp, outExpo, ramp2, sp2 } from "../motion2";
 import { DEFAULT_ORDER, NotchBody, NOTCH_H, PanelInner, TabId, panelHeight } from "../ui/notch";
 import { ClipboardTab, FileGlyph, NotesTab, PlayerTab, QuickTab, SHELF_ITEMS, ShelfTab, TimerTab } from "../ui/tabs";
 import { PermissionReply, SessionCard, SessionCount } from "../ui/claude";
@@ -212,8 +212,9 @@ const Scene2: React.FC<{ format: Format2; lang: Lang }> = ({ format, lang }) => 
   const capsule = { x: left, w: right - left };
 
   // Contenu : l'ancien sort en 80 ms avec du flou, le nouveau entre en flou → net.
-  const outA = 1 - R(cur.at, cur.at + 0.08);
-  const inA = ti === 0 ? 1 : R(cur.at + 0.07, cur.at + 0.2);
+  const outA = 1 - R(cur.at, cur.at + 0.1, (v) => v);
+  // Ouverture : la barre d'onglets arrive d'abord, le contenu ensuite (comme la pochette de la référence, qui suit la forme).
+  const inA = ti === 0 ? R(T.open + 0.12, T.open + 0.26, BLUR_EASE) : R(cur.at + 0.07, cur.at + 0.2, BLUR_EASE);
   const titleOp = ti === 0 || p > 0.98 ? 1 : outA > 0.02 ? outA : inA;
   const titleTab = outA > 0.02 && ti > 0 ? prev.tab : cur.tab;
 
@@ -226,7 +227,7 @@ const Scene2: React.FC<{ format: Format2; lang: Lang }> = ({ format, lang }) => 
   const topR = lerp(6, 12, clamp01(oc));
   const botR = lerp(lerp(9, 12, earsAmt), 24, clamp01(oc));
   const bodyLeft = L.cx - (wPt * S) / 2;
-  const contentFade = t < T.collapse ? R(T.open + 0.12, T.open + 0.26) : 1 - R(T.collapse - 0.02, T.collapse + 0.1);
+  const contentFade = t < T.collapse ? R(T.open + 0.04, T.open + 0.16) : 1 - R(T.collapse - 0.02, T.collapse + 0.1);
   const earsFade = R(T.collapse + 0.22, T.collapse + 0.38) * (1 - R(T.ret - 0.05, T.ret + 0.05)) * (1 - clamp01(oc * 2));
 
   const endP = sp2(f, T.pill, GROW) - sp2(f, T.ret, SHRINK);
@@ -237,7 +238,7 @@ const Scene2: React.FC<{ format: Format2; lang: Lang }> = ({ format, lang }) => 
 
   // Ombres : mesurées sur la référence, en px puis converties dans le repère du panneau.
   const px = (v: number) => v / S;
-  const shadow = `drop-shadow(0 ${px(20)}px ${px(26)}px rgba(0,0,0,0.22)) drop-shadow(0 ${px(5)}px ${px(8)}px rgba(0,0,0,0.2))`;
+  const shadow = `drop-shadow(0 ${px(20)}px ${px(26)}px rgba(0,0,0,0.22)) drop-shadow(0 ${px(5)}px ${px(8)}px rgba(0,0,0,0.2)) drop-shadow(0 ${px(34)}px ${px(44)}px rgba(0,0,0,0.07))`;
 
   return (
     <AbsoluteFill style={{ background: "#EDEDE8", overflow: "hidden" }}>
@@ -415,7 +416,7 @@ const EndCards: React.FC<{ f: number; t: number; L: Layout2; lang: Lang; endP: n
   const lp = Math.max(0, sp2(f, T.link, GROW) - sp2(f, T.ret, SHRINK));
   const linkTop = e.top + e.cardH + e.gap;
   const legalIn = R(T.link + 0.2, T.link + 0.4) * out;
-  const shadow = "0 22px 30px rgba(0,0,0,0.22), 0 5px 8px rgba(0,0,0,0.2)";
+  const shadow = "0 22px 30px rgba(0,0,0,0.22), 0 5px 8px rgba(0,0,0,0.2), 0 34px 44px rgba(0,0,0,0.07)";
   return (
     <>
       <div
@@ -437,8 +438,8 @@ const EndCards: React.FC<{ f: number; t: number; L: Layout2; lang: Lang; endP: n
             inset: 0,
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: e.cardH * 0.2,
-            padding: `0 ${e.cardH * 0.42}px`,
             opacity: textIn,
             filter: textIn < 1 ? `blur(${(1 - textIn) * 8}px)` : undefined,
             fontFamily: FONT.ui,

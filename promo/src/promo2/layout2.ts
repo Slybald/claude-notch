@@ -23,7 +23,7 @@ export const layout2 = (f: Format2): Layout2 =>
         cx: 960,
         cursor: 32,
         lowY: 930,
-        end: { cardW: 820, cardH: 176, linkW: 700, linkH: 104, gap: 28, top: 386, title: 56, caption: 30, link: 33, legal: 19, legalY: 968 },
+        end: { cardW: 1100, cardH: 232, linkW: 960, linkH: 136, gap: 34, top: 339, title: 74, caption: 39, link: 41, legal: 19, legalY: 968 },
       }
     : {
         w: 1080,
@@ -32,5 +32,5 @@ export const layout2 = (f: Format2): Layout2 =>
         cx: 540,
         cursor: 40,
         lowY: 760,
-        end: { cardW: 900, cardH: 196, linkW: 820, linkH: 116, gap: 30, top: 770, title: 62, caption: 33, link: 31, legal: 21, legalY: 1810 },
+        end: { cardW: 940, cardH: 216, linkW: 860, linkH: 124, gap: 32, top: 760, title: 68, caption: 36, link: 33, legal: 21, legalY: 1810 },
       };

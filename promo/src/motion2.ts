@@ -21,6 +21,8 @@ export const sp2 = (frame: number, at: number, config = GROW) => spring({ frame:
 /** Course du curseur mesurée : pointe de vitesse à ≈ 46 % de la course, longue fin douce. */
 export const CURSOR_EASE = Easing.bezier(0.5, 0.1, 0.2, 1);
 export const outExpo = Easing.bezier(0.16, 1, 0.3, 1);
+/** Flou → net du contenu : mesuré sur la référence, netteté de 10 % à 99 % en 7 images, sans démarrage brutal. */
+export const BLUR_EASE = Easing.bezier(0.4, 0.1, 0.3, 1);
 
 export function ramp2(frame: number, fromS: number, toS: number, a = 0, b = 1, easing: (t: number) => number = outExpo) {
   return interpolate(frame, [fr(fromS), fr(toS)], [a, b], {

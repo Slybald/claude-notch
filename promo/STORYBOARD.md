@@ -41,7 +41,7 @@ segments, graphique, palette de commandes).
 
 Un seul ressort de raideur 460 pour tous les morphings (REFERENCE.md § 7.1) : amortissement **0,68** pour agrandir
 (dépassement de 5 %), **1** pour réduire. Le curseur suit `cubic-bezier(0.5, 0.1, 0.2, 1)`, 0,3 à 0,6 s selon la
-distance, arrêt de 0,1 s avant chaque clic, traînée au-dessus de 650 px/s. Le contenu d'un onglet sort en 80 ms avec
+distance, arrêt de 0,1 s avant chaque clic, traînée au-dessus de 650 px/s. Le contenu d'un onglet sort en 100 ms avec
 du flou ; le suivant entre en 130 ms de flou à net. La capsule de la barre d'onglets s'étire : bord avant d'abord,
 bord arrière 40 ms après.
 

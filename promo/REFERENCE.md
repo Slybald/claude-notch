@@ -99,8 +99,9 @@ Une seule teinte de fond du début à la fin : pas de scène sombre, pas de chan
 
 - **2D plat**, aucune perspective, aucune caméra, aucun parallaxe. La profondeur vient seulement de l'ombre.
 - Ombre portée **vers le bas**, large et douce, sans décalage latéral (mesure sous la pastille, en niveaux de gris
-  sur 237 : −48 à 8 px, −33 à 16 px, −16 à 32 px, −4 à 56 px, 0 à 64 px ; à gauche de la pastille : −15 à 8 px). Équivalent CSS retenu et recalé sur ce profil à la vérification : `0 24px 48px rgba(0,0,0,.28)` plus
-  `0 6px 12px rgba(0,0,0,.18)`, pour une pastille de 148 px de haut.
+  sur 237 : −48 à 8 px, −33 à 16 px, −16 à 32 px, −4 à 56 px, 0 à 64 px ; à gauche de la pastille : −15 à 8 px). Équivalent CSS retenu pour la v2 (trois ombres, mesuré sur son rendu : −65, −44, −22, −13, −4 à 8, 16, 32,
+  40, 48 px) : `0 22px 30px rgba(0,0,0,.22), 0 5px 8px rgba(0,0,0,.2), 0 34px 44px rgba(0,0,0,.07)`. Un peu plus dense que la
+  référence près du bord (écart ≤ 17 niveaux à 8 px).
 - Pastilles et curseurs : **rayon maximal** (pastille). Cartes : rayon ≈ 14 % de la hauteur.
 - Cartes blanches sur le fond gris, cartes noires sur le fond gris : le contraste noir / blanc / gris est la seule
   palette.
@@ -147,7 +148,7 @@ En pratique : amortissement entre 0,63 et 0,74 pour agrandir (0,68 retenu), 1 po
   ressort.
 - **Chiffres** qui montent de 40 616 à 84 320 en 0,55 s, sortie douce, chaque chiffre flou pendant le défilement.
 - **Courbe** qui se trace de gauche à droite en 0,4 s ; **infobulle** noire qui suit le curseur sur la courbe.
-- **Contenu qui change** : l'ancien contenu sort en 80 ms (flou + fondu), la forme se transforme pendant ce temps,
+- **Contenu qui change** : l'ancien contenu sort en ≈ 80 à 100 ms (flou + fondu, estimé), la forme se transforme pendant ce temps,
   le nouveau contenu entre en flou → net (120 ms) quand la forme est presque posée.
 - **Pression** (estimé) : le bouton se tasse (≈ ×0,96) à la première image de la réaction.
 - **Mise en cascade** (estimé) : les lignes de la palette entrent l'une après l'autre sur ≈ 0,25 s.
@@ -190,3 +191,38 @@ Et jamais d'artefact d'enregistrement : barre de lecture du navigateur, Centre d
 | Matière | Ombre courte de la notch | Ombre vers le bas, large (`0 24px 48px` pour une pastille de 148 px) | Même ombre, proportionnelle à l'échelle |
 | Fin | Titre géant + 3 pastilles + lien, plan fixe 2 s | La fin est un objet de plus, puis retour au début | Pastille noire du nom + tagline, pastille blanche du lien, retour à la notch fermée |
 | Son | Muet, calage à 120 BPM pour une musique éventuelle | Aucune piste | Muet ; pas de calage sur un tempo |
+
+## 11. Vérification de la v2 contre la référence
+
+Planches côte à côte (mêmes moments clés, référence à gauche, v2 à droite) : deux planches de six paires, hors dépôt.
+Mesures refaites sur le rendu avec les mêmes outils que sur la référence.
+
+| Point | Référence | v2 mesurée |
+|---|---|---|
+| Cadence, coupes | 60 i/s, 0 coupe | 60 i/s, 0 coupe ; saut isolé : pics de 0,8 et 1,1 sur 255 seulement (un autre, de 6, venait d'un flou de sortie trop sec : corrigé) |
+| Ouverture : dépassement de hauteur | +5,3 % de la hauteur finale | +4,7 % |
+| Ouverture : pic, calme | 0,19 s, 0,45 s | 0,20 s, 0,42 s |
+| Rythme moyen d'un temps fort | 1,55 s (0,95 à 2,5 s) | 1,4 s (0,8 à 2,15 s) |
+| Ombre sous la pastille (niveaux de gris) | −48, −33, −16, −11, −7 à 8, 16, 32, 40, 48 px | −65, −44, −22, −13, −4 |
+| Boucle | retour à l'état initial | écart de 0,1 sur 255 entre la première et la dernière image du GIF |
+| GIF | — | 330 images, 20 i/s, 960 × 540, 2,5 Mo |
+
+Ce qui colle : fond, noir, blanc et halo ; un seul objet à la fois ; morphing continu sans coupe ; ressorts (agrandir
+avec dépassement, réduire sans) ; flou → net du contenu ; capsule élastique ; curseur qui arrive, s'arrête puis
+déclenche la réaction ; carte finale qui porte le message ; retour à l'état initial.
+
+Ce qui diffère encore :
+
+- **Composition** : la référence centre l'objet, la notch pend du bord haut (voulu, c'est le produit). Au repos la
+  notch ne fait que 23 % de la largeur, contre 44 % pour la pastille de la référence ; le bas du cadre reste vide, et
+  plus encore en 9:16 (panneau à 998 px de large sur 1 080, haut du cadre seulement).
+- **Densité** : l'interface réelle porte plus de texte et de contrôles que les cartes de la référence ; le texte y est
+  donc plus petit par rapport à l'objet.
+- **Pochette** : la référence a un élément coloré qui suit la forme pendant le morphing ; la v2 n'a que la barre
+  d'onglets, qui arrive avant le contenu.
+- **Accent** : la référence n'a aucune couleur vive, la v2 garde l'orange et l'ambre de la vraie interface.
+- **Ombre** : un peu plus dense près du bord (voir tableau).
+- **Durée** : 15,8 s pour 14 s ; la carte finale tient 2,3 s, la référence boucle après 2 s de repos.
+- **Traînées** : trois copies du curseur à vitesse haute ; la référence en laisse aussi sur les chiffres et le pouce du
+  curseur, pas ici.
+- **Format** : la référence est carrée, la v2 est en 16:9 et 9:16 (pas de 1:1).
