@@ -1,10 +1,10 @@
-# Vidéo de présentation de Claude Notch
+# Vidéo de présentation d'Oriel (ex-Claude Notch)
 
 Vidéo en motion design codée avec [Remotion](https://www.remotion.dev) (composition React, rendu déterministe).
 
 - **Version 3 (courante)** : toutes les fonctions de l'app (intercalaires, Claude, Codex, lecteur et calendrier,
   réglages rapides, étagère, presse-papiers, minuteur, notes, Mail, Messages, déplacement des onglets par appui long,
-  mises à jour automatiques, assistant et profils), 27,9 s, même style que la v2, avec une **roue de noms** qui lit
+  mises à jour automatiques, assistant et profils), 28,25 s, même style que la v2, avec une **roue de noms** qui lit
   chaque fonction pendant le geste. Plan par plan : [STORYBOARD.md](STORYBOARD.md). Code : `src/promo3/`.
   **Le nom, le slogan, le lien et l'icône de l'app sont dans un seul fichier : `src/promo3/identity.ts`.**
 - **Version 2** : refaite dans le style d'une vidéo de référence fournie par l'utilisateur. Un seul objet noir, un
@@ -38,22 +38,24 @@ master, `-crf 17` pour le 1080p, `-movflags +faststart`.
 
 | Fichier (`out/v3/`) | Contenu |
 |---|---|
-| `notch-promo-16x9.mp4` | 1920 × 1080, 27,9 s, 60 i/s |
+| `notch-promo-16x9.mp4` | 1920 × 1080, 28,25 s, 60 i/s |
 | `notch-promo-16x9-4k.mp4` | 3840 × 2160 (master) |
 | `notch-promo-9x16.mp4` | 1080 × 1920 : mise en page verticale refaite, pas un zoom |
 | `notch-promo-9x16-4k.mp4` | 2160 × 3840 (master) |
 | `*-fr.mp4` | mêmes fichiers, textes en français |
-| `../docs/media/claude-notch.gif` | boucle de 28,6 s pour le README, 16 i/s, 960 × 540 (versionnée, moins de 5 Mo) |
+| `../docs/media/claude-notch.gif` | boucle de 28,95 s pour le README, 16 i/s, 960 × 540 (versionnée, moins de 5 Mo) |
 
-`out/` et `tmp/` ne sont pas versionnés. La vidéo MP4 s'arrête sur la carte finale (image 1674) ; le GIF va jusqu'à
-l'image 1715, où la notch redevient fermée, pour que la boucle soit sans saut. Un rendu 4K complet (EN + FR, 2 formats)
+`out/` et `tmp/` ne sont pas versionnés. La vidéo MP4 s'arrête sur la carte finale (image 1695) ; le GIF va jusqu'à
+l'image 1736, où la notch redevient fermée, pour que la boucle soit sans saut. Un rendu 4K complet (EN + FR, 2 formats)
 et le GIF prennent une demi-heure environ.
 
 ### Changer le nom de l'app
 
-Modifier `src/promo3/identity.ts` (nom, version, slogan, lien, mentions, icône), puis relancer `node scripts/render.mjs`,
-`node scripts/render.mjs --lang=fr` et `node scripts/gif.mjs`. Les noms de fichiers (`notch-promo-*`) ne contiennent pas
-le nom de l'app. Sans « Claude » dans le nom, mettre `icon: "notch"` : l'étoile orange est le logo de Claude.
+Le nom actuel est **Oriel** (version 1.9.0). Pour le changer : modifier `src/promo3/identity.ts` (nom, version, slogan,
+lien, mentions, icône), puis relancer `node scripts/render.mjs`, `node scripts/render.mjs --lang=fr` et
+`node scripts/gif.mjs`. Les noms de fichiers (`notch-promo-*`) ne contiennent pas le nom de l'app. L'icône est celle de
+la notch (`icon: "notch"`) ; l'étoile orange (`"spark"`) est le logo de Claude. Le lien `github.com/Slybald/oriel`
+suppose le dépôt renommé.
 
 Le panneau est accroché au bord haut du cadre, comme la vraie notch : dans le 9:16, la zone haute peut être recouverte
 par l'interface des réseaux sociaux (Reels, TikTok, Shorts).
