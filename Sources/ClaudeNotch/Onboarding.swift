@@ -10,7 +10,7 @@ final class HookSetup: ObservableObject {
         case none
         /// Hooks d'une version précédente que la mise à jour silencieuse n'a pas pu remplacer.
         case update
-        /// Premier lancement : la notch présentée, avec la section Claude Code ou non.
+        /// Premier lancement : l'assistant de configuration (`claude` : Claude Code détecté, onglet proposé).
         case welcome(claude: Bool)
     }
 
@@ -18,6 +18,7 @@ final class HookSetup: ObservableObject {
     @Published private(set) var status: HookInstaller.Status = .notInstalled
     let installer: HookInstaller
     private var onboarding: OnboardingWindowController?
+    private var assistant: OnboardingWindowController?
 
     init(installer: HookInstaller = .standard) {
         self.installer = installer
@@ -33,22 +34,23 @@ final class HookSetup: ObservableObject {
     /// Au lancement. Onglet Claude activé : des hooks déjà posés par une version précédente (entrées ou script) sont
     /// mis à jour sans rien demander, l'accord a été donné à l'installation (sauvegarde horodatée de settings.json,
     /// comme toujours). Onglet désactivé : `~/.claude` n'est même pas lu. Puis la fenêtre éventuelle.
-    func showOnboardingIfNeeded(claudeEnabled: Bool, prefs: Preferences) {
+    func showOnboardingIfNeeded(claudeEnabled: Bool, prefs: Preferences, registry: ModuleRegistry?) {
         if claudeEnabled {
             refresh()
             silentUpdate()
         }
         let window = Self.launchWindow(claudeEnabled: claudeEnabled, status: status, welcomeShown: prefs.welcomeShown)
-        // La bienvenue ne vient qu'une fois ; une mise à jour ratée la repousse au lancement suivant.
+        // L'assistant ne vient qu'une fois ; une mise à jour ratée le repousse au lancement suivant.
         if window != .update { prefs.welcomeShown = true }
         switch window {
         case .none: break
         case .update: showOnboarding()
-        case .welcome(let claude): present(welcome: true, hooks: claude)
+        case .welcome(let claude):
+            if let registry { showSetupAssistant(registry: registry, prefs: prefs, claudeDetected: claude, firstRun: true) }
         }
     }
 
-    /// Mise à jour silencieuse ratée : on la propose. Sinon, la bienvenue au premier lancement, sauf après une mise à
+    /// Mise à jour silencieuse ratée : on la propose. Sinon, l'assistant au premier lancement, sauf après une mise à
     /// jour depuis une version qui avait posé les hooks (ce n'est pas un premier lancement).
     static func launchWindow(claudeEnabled: Bool, status: HookInstaller.Status, welcomeShown: Bool) -> LaunchWindow {
         if claudeEnabled, status == .outdated || status == .scriptOutdated { return .update }
@@ -72,36 +74,62 @@ final class HookSetup: ObservableObject {
 
     // MARK: - Fenêtre
 
-    /// Installer ou mettre à jour les hooks (Réglages › Claude, menu « … », mise à jour ratée).
-    func showOnboarding() {
-        present(welcome: false, hooks: true)
+    /// Assistant de configuration : au premier lancement (`firstRun`), ou relancé depuis Réglages › Général, auquel
+    /// cas il part des réglages actuels. `~/.claude` n'est lu que si l'onglet Claude est proposé.
+    func showSetupAssistant(registry: ModuleRegistry, prefs: Preferences,
+                            claudeDetected: Bool = HookInstaller.claudeCodeOnThisMac, firstRun: Bool = false) {
+        DispatchQueue.main.async { [self] in
+            if let assistant {
+                assistant.showWindow(nil)
+                Self.activateApp()
+                return
+            }
+            let claudeOffered = claudeDetected || registry.isClaudeEnabled
+            if claudeOffered { refresh() }
+            let model = SetupAssistantModel(
+                registry: registry, prefs: prefs, claudeDetected: claudeDetected,
+                hookStatus: claudeOffered ? status : .notInstalled, firstRun: firstRun, inApplications: isInApplications,
+                installHooks: { [weak self] in self?.installHooks() },
+                applyLaunchAtLogin: { [weak self] in self?.applyLaunchAtLogin($0) },
+                close: { [weak self] in self?.assistant?.close() })
+            let controller = OnboardingWindowController(rootView: SetupAssistantView(model: model))
+            controller.onClose = { [weak self] in self?.assistant = nil }
+            assistant = controller
+            controller.window?.center()
+            controller.showWindow(nil)
+            Self.activateApp()
+        }
     }
 
-    /// `hooks` : section des hooks Claude Code (sinon, seulement où activer l'onglet Claude).
-    private func present(welcome: Bool, hooks: Bool) {
+    /// nil si les hooks sont posés, sinon le message d'erreur (assistant de configuration).
+    private func installHooks() -> String? {
+        defer { refresh() }
+        do {
+            try installer.install()
+        } catch {
+            return error.localizedDescription
+        }
+        return nil
+    }
+
+    /// Installer ou mettre à jour les hooks (Réglages › Claude, menu « … », mise à jour ratée).
+    func showOnboarding() {
         DispatchQueue.main.async { [self] in
-            if hooks { refresh() }
+            refresh()
             if let onboarding {
                 onboarding.showWindow(nil)
                 Self.activateApp()
                 return
             }
             var error: String?
-            if hooks, case .unreadable(let message) = status { error = message }
-            let mode: OnboardingView.Mode = welcome ? .welcome
-                : status == .outdated || status == .scriptOutdated ? .update : .install
+            if case .unreadable(let message) = status { error = message }
             let view = OnboardingView(
-                mode: mode,
-                showsHooks: hooks,
+                mode: status == .outdated || status == .scriptOutdated ? .update : .install,
                 inApplications: isInApplications,
                 launchAtLogin: status == .notInstalled || Preferences.shared.launchAtLogin,
                 error: error,
                 onInstall: { [weak self] launchAtLogin in self?.installFromWindow(launchAtLogin: launchAtLogin) },
-                onClose: { [weak self] launchAtLogin in
-                    // La bienvenue applique la case quel que soit le bouton ; ailleurs, seule l'installation compte.
-                    if welcome { self?.applyLaunchAtLogin(launchAtLogin) }
-                    self?.onboarding?.close()
-                }
+                onClose: { [weak self] _ in self?.onboarding?.close() }
             )
             let controller = OnboardingWindowController(rootView: view)
             controller.onClose = { [weak self] in self?.onboarding = nil }
@@ -256,9 +284,9 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 // MARK: - Vue
 
 struct OnboardingView: View {
-    /// `welcome` : premier lancement (présentation, hooks proposés seulement si Claude Code est là). `install` et
-    /// `update` : hooks seuls, depuis les réglages ou après une mise à jour ratée.
-    enum Mode { case welcome, install, update }
+    /// Hooks seuls, depuis les réglages (`install`) ou après une mise à jour ratée (`update`). Le premier lancement
+    /// passe par l'assistant de configuration (`SetupAssistant`).
+    enum Mode { case install, update }
 
     private enum Phase: Equatable {
         case idle
@@ -267,8 +295,6 @@ struct OnboardingView: View {
     }
 
     let mode: Mode
-    /// Section des hooks Claude Code ; sans elle, une ligne dit où activer l'onglet Claude.
-    let showsHooks: Bool
     let inApplications: Bool
     /// nil si tout s'est bien passé, sinon le message d'erreur.
     let onInstall: (_ launchAtLogin: Bool) -> String?
@@ -278,10 +304,9 @@ struct OnboardingView: View {
     @State private var launchAtLogin: Bool
     @State private var phase: Phase
 
-    init(mode: Mode, showsHooks: Bool = true, inApplications: Bool, launchAtLogin: Bool, error: String? = nil,
+    init(mode: Mode, inApplications: Bool, launchAtLogin: Bool, error: String? = nil,
          onInstall: @escaping (_ launchAtLogin: Bool) -> String?, onClose: @escaping (_ launchAtLogin: Bool) -> Void) {
         self.mode = mode
-        self.showsHooks = showsHooks
         self.inApplications = inApplications
         self.onInstall = onInstall
         self.onClose = onClose
@@ -292,9 +317,8 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
-            if !inApplications { applicationsWarning }
-            if mode == .welcome { tour }
-            if showsHooks { changes } else { claudeHint }
+            if !inApplications { ApplicationsWarning() }
+            changes
             loginToggle
             switch phase {
             case .idle: EmptyView()
@@ -328,75 +352,29 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(mode == .update ? L("Mettre à jour Claude Notch") : L("Bienvenue dans Claude Notch"))
                         .font(.system(size: 17, weight: .semibold))
-                    Text(mode == .welcome ? L("Des onglets utiles, dans la notch.")
-                         : L("Tes sessions Claude Code, d'un coup d'œil."))
+                    Text("Tes sessions Claude Code, d'un coup d'œil.")
                         .font(.system(size: 12))
                         .foregroundColor(Palette.secondary)
                 }
             }
-            if mode != .welcome {
-                Text(mode == .update
-                     ? L("Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch "
-                        + "continue de suivre tes sessions.")
-                     : L("Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son "
-                        + "état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac."))
-                    .font(.system(size: 12.5))
-                    .foregroundColor(.white.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(mode == .update
+                 ? L("Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch "
+                    + "continue de suivre tes sessions.")
+                 : L("Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son "
+                    + "état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac."))
+                .font(.system(size: 12.5))
+                .foregroundColor(.white.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// Bienvenue : comment ouvrir la notch, ses onglets, ses réglages.
-    private var tour: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            InfoRow(icon: "cursorarrow.rays", title: L("Ouvrir la notch"),
-                    detail: L("Survole-la. Ouverture au clic et raccourci clavier se règlent dans les réglages."))
-            InfoRow(icon: "rectangle.split.3x1", title: L("Onglets"),
-                    detail: L("Lecteur et calendrier, réglages rapides, étagère, presse-papiers, minuteur et notes. "
-                        + "Choisis-les et range-les dans Réglages › Onglets."))
-            InfoRow(icon: "gearshape", title: L("Réglages"),
-                    detail: L("Menu « … » du panneau, ou rouvre Claude Notch. Clic droit sur la notch pour la masquer."))
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.card))
-    }
-
-    private var applicationsWarning: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 14))
-                .foregroundColor(Palette.amber)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Glisse d'abord Claude Notch dans Applications")
-                    .font(.system(size: 12.5, weight: .semibold))
-                Text(L("L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier "
-                       + "Applications, puis rouvre-la depuis là."))
-                    .font(.system(size: 11.5))
-                    .foregroundColor(Palette.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.amber.opacity(0.12)))
-    }
-
-    /// Hooks : ce qui sera modifié. Dans la bienvenue, présentés comme l'intégration Claude Code, en option.
+    /// Hooks : ce qui sera modifié.
     private var changes: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(mode == .welcome ? L("INTÉGRATION CLAUDE CODE") : L("CE QUI SERA MODIFIÉ"))
+            Text("CE QUI SERA MODIFIÉ")
                 .font(.system(size: 10.5, weight: .semibold))
                 .tracking(0.6)
                 .foregroundColor(Palette.secondary)
-            if mode == .welcome {
-                Text(L("Claude Code est installé sur ce Mac. Avec ses hooks, l'onglet Claude suit tes sessions : état, "
-                       + "outil en cours, tâches, permissions."))
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             InfoRow(icon: "doc.text", title: "~/.claude/settings.json", monospaced: true,
                     detail: L("Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée "
                         + "est faite à côté."))
@@ -406,19 +384,6 @@ struct OnboardingView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.card))
-    }
-
-    /// Bienvenue sans Claude Code : rien n'est proposé, seulement où trouver l'onglet.
-    private var claudeHint: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(verbatim: "✻")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(Palette.accent)
-            Text("Tu utilises Claude Code ? Active l'onglet Claude dans Réglages › Onglets.")
-                .font(.system(size: 12))
-                .foregroundColor(Palette.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     private var loginToggle: some View {
@@ -444,7 +409,6 @@ struct OnboardingView: View {
 
     private var installTitle: String {
         switch mode {
-        case .welcome: return L("Installer les hooks")
         case .install: return L("Installer les hooks Claude Code")
         case .update: return L("Mettre à jour les hooks")
         }
@@ -468,11 +432,6 @@ struct OnboardingView: View {
             if phase == .done {
                 Button("Fermer") { onClose(launchAtLogin) }
                     .keyboardShortcut(.defaultAction)
-            } else if !showsHooks {
-                Button("Commencer") { onClose(launchAtLogin) }
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Palette.accent)
             } else {
                 Button("Plus tard") { onClose(launchAtLogin) }
                     .keyboardShortcut(.cancelAction)
@@ -492,8 +451,31 @@ struct OnboardingView: View {
     }
 }
 
-/// Ligne icône + titre + détail (présentation des onglets, fichiers modifiés par les hooks).
-private struct InfoRow: View {
+/// « Glisse d'abord Claude Notch dans Applications » : l'app tourne depuis l'image disque ou une copie temporaire.
+struct ApplicationsWarning: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14))
+                .foregroundColor(Palette.amber)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Glisse d'abord Claude Notch dans Applications")
+                    .font(.system(size: 12.5, weight: .semibold))
+                Text(L("L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier "
+                       + "Applications, puis rouvre-la depuis là."))
+                    .font(.system(size: 11.5))
+                    .foregroundColor(Palette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.amber.opacity(0.12)))
+    }
+}
+
+/// Ligne icône + titre + détail (fichiers modifiés par les hooks, où retrouver les réglages).
+struct InfoRow: View {
     let icon: String
     let title: String
     var monospaced = false

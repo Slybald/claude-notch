@@ -155,7 +155,9 @@ struct SettingsView: View {
     @ViewBuilder
     private var detail: some View {
         switch selection ?? .general {
-        case .general: GeneralSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled)
+        case .general:
+            GeneralSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled,
+                            runAssistant: { HookSetup.shared.showSetupAssistant(registry: registry, prefs: prefs) })
         case .tabs: TabsSettings(prefs: prefs, registry: registry)
         case .appearance: AppearanceSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled)
         case .privacy: PrivacySettings(prefs: prefs)
@@ -195,6 +197,7 @@ struct SettingsNote: View {
 private struct GeneralSettings: View {
     @ObservedObject var prefs: Preferences
     let claudeEnabled: Bool
+    let runAssistant: () -> Void
     @ObservedObject var hotKeys: HotKeyCenter = .shared
     @State private var confirmReset = false
 
@@ -262,6 +265,14 @@ private struct GeneralSettings: View {
                     }
                 }
                 SettingsNote(L("Sans encoche, une encoche virtuelle est dessinée en haut au centre."))
+            }
+            Section {
+                HStack {
+                    Spacer()
+                    Button("Relancer l'assistant de configuration") { runAssistant() }
+                }
+            } footer: {
+                SettingsNote(L("Rechoisis tes onglets, l'ouverture de la notch et le raccourci clavier."))
             }
             Section {
                 HStack {
