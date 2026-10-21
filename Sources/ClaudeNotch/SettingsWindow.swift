@@ -358,7 +358,7 @@ private struct GeneralSettings: View {
                               slot: HotKeyCenter.Slot) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Picker(title, selection: selection) {
-                ForEach(HotKeyChoice.allCases) { choice in
+                ForEach(HotKeyChoice.pickable) { choice in
                     Text(choice.title).tag(choice)
                 }
             }

@@ -65,3 +65,7 @@
 "Autorise une action, réponds à une question ou écris à Claude depuis ici. Rien ne part sans ton clic ; le terminal ou Claude Desktop gardent toujours la main." = "Autorise une action, réponds à une question ou écris à Claude depuis ici. Rien ne part sans ton clic ; le terminal ou Claude Desktop gardent toujours la main.";
 "Activer" = "Activer";
 "Plus tard" = "Plus tard";
+"1 sur %d" = "1 sur %d";
+"Approuver au clavier" = "Approuver au clavier";
+"⌃⌥Y autorise et ⌃⌥N refuse la plus ancienne demande, Claude et Codex ensemble. Une touche ne décide que si sa carte est ouverte dans la notch depuis plus d'une seconde ; sinon le premier appui montre la carte." = "⌃⌥Y autorise et ⌃⌥N refuse la plus ancienne demande, Claude et Codex ensemble. Une touche ne décide que si sa carte est ouverte dans la notch depuis plus d'une seconde ; sinon le premier appui montre la carte.";
+"Ces touches ne sont prises que tant qu'une demande attend. Une demande à la fois, jamais de « toujours autoriser »." = "Ces touches ne sont prises que tant qu'une demande attend. Une demande à la fois, jamais de « toujours autoriser ».";
