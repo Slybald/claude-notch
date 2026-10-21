@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Command bar.** A field in the notch with five one-key prefixes: `t 25` starts a timer (also `t 1h30`, or `25 min`
+  without the prefix; `t` alone offers 25, 5 and 10 minutes and the Pomodoro), `n idea` creates a quick note,
+  `c link` searches the clipboard history and copies the chosen entry again, `s presentation` applies a Quick Settings
+  scene, `> message` writes to a Claude session (only with "Reply from the notch" on). The prefixes are shown under the
+  field and can be clicked; typing one turns it into a pill, Backspace brings it back. ↑ ↓ choose, ⏎ runs, Esc closes;
+  nothing runs before ⏎ (or a click on the row). The panel opens with the bar and closes with it.
+  Settings › General › Shortcuts has a new "Command bar" shortcut (none by default, ⌥⌘K is offered), and
+  **…** › **Command Bar…** opens it without a shortcut. Fuzzy search ignores case and accents.
+- `NotchModule` gets two optional members, `commandVerb` and `commands(for:)` (empty by default): a module offers its
+  own actions to the bar, nothing is hard-coded in the bar. A stopped or hidden tab is never woken by a search.
+
 ## [1.9.0] - 2026-10-21
 
 ### Added
@@ -19,16 +34,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   - one request at a time: once it is settled, the next one starts its one second again, so a repeated press never
     settles two requests; questions and plans still need the mouse;
   - same deciders as a click: nothing is ever "always allowed", the timeouts and "first answer wins" are unchanged.
-- **Command bar.** A field in the notch with five one-key prefixes: `t 25` starts a timer (also `t 1h30`, or `25 min`
-  without the prefix; `t` alone offers 25, 5 and 10 minutes and the Pomodoro), `n idea` creates a quick note,
-  `c link` searches the clipboard history and copies the chosen entry again, `s presentation` applies a Quick Settings
-  scene, `> message` writes to a Claude session (only with "Reply from the notch" on). The prefixes are shown under the
-  field and can be clicked; typing one turns it into a pill, Backspace brings it back. ↑ ↓ choose, ⏎ runs, Esc closes;
-  nothing runs before ⏎ (or a click on the row). The panel opens with the bar and closes with it.
-  Settings › General › Shortcuts has a new "Command bar" shortcut (none by default, ⌥⌘K is offered), and
-  **…** › **Command Bar…** opens it without a shortcut. Fuzzy search ignores case and accents.
-- `NotchModule` gets two optional members, `commandVerb` and `commands(for:)` (empty by default): a module offers its
-  own actions to the bar, nothing is hard-coded in the bar. A stopped or hidden tab is never woken by a search.
 
 ## [1.8.0] - 2026-10-21
 
