@@ -869,7 +869,7 @@ struct NotchMoreMenu: View {
             Divider()
             UpdateMenuItems(updater: .shared, prefs: prefs)
             Divider()
-            Button("Quitter Claude Notch", action: actions.quit)
+            Button("Quitter Oriel", action: actions.quit)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 12, weight: .semibold))

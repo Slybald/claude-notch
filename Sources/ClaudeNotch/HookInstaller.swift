@@ -37,8 +37,11 @@ struct HookInstaller {
     /// Attente `asyncRewake` d'un message : 24 h.
     static let inboxTimeout = "86400"
     /// Lus par Claude avec le message (même texte que hooks_config.py).
-    static let rewakeMessage = "Message from the user, sent from Claude Notch:"
-    static let rewakeSummary = "Message from Claude Notch"
+    static let rewakeMessage = "Message from the user, sent from Oriel:"
+    static let rewakeSummary = "Message from Oriel"
+    /// Textes d'avant le renommage : une session ouverte avant la mise à jour garde ses hooks d'alors.
+    static let legacyRewakeMessage = "Message from the user, sent from Claude Notch:"
+    static let legacyRewakeSummary = "Message from Claude Notch"
 
     enum Status: Equatable {
         case notInstalled

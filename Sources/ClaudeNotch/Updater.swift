@@ -16,7 +16,8 @@ import SwiftUI
 final class Updater: ObservableObject, @unchecked Sendable {
     static let shared = Updater()
 
-    static let latestReleaseURL = URL(string: "https://api.github.com/repos/Slybald/claude-notch/releases/latest")!
+    /// Dépôt renommé (docs/RENAME.md) : les versions jusqu'à 1.9.0 lisent encore claude-notch, que GitHub redirige ici.
+    static let latestReleaseURL = URL(string: "https://api.github.com/repos/Slybald/oriel/releases/latest")!
     /// Clé publique Ed25519 (base64). La privée signe les DMG dans la CI (scripts/update-signing.swift).
     static let publicKey = "KKwGDnHEGrzmG6F26Dco+/RUrliwrPPztW0ceaG5/UA="
     static let channelKey = "ClaudeNotchUpdateChannel"
@@ -215,7 +216,7 @@ final class Updater: ObservableObject, @unchecked Sendable {
             try Self.spawnRelaunch(of: app, waitingFor: ProcessInfo.processInfo.processIdentifier)
         } catch {
             UserDefaults.standard.removeObject(forKey: Self.installedVersionKey)
-            let message = String(format: L("Version %@ installée : quitte et rouvre Claude Notch pour l'utiliser."),
+            let message = String(format: L("Version %@ installée : quitte et rouvre Oriel pour l'utiliser."),
                                  release.version)
             NSLog("ClaudeNotch : relance impossible (%@). %@", String(describing: error), message)
             status = .failed(message)
@@ -335,9 +336,10 @@ extension Updater {
         return busy && !atLaunch ? .wait : .install
     }
 
-    /// « ClaudeNotch-<v>.dmg » et sa signature « .dmg.sig », en HTTPS.
-    static func updateAssets(in release: Release) throws -> (dmg: URL, signature: URL) {
-        let name = "ClaudeNotch-\(release.version).dmg"
+    /// « Oriel-<v>.dmg » et sa signature « .dmg.sig », en HTTPS. Les versions jusqu'à 1.9.0 prennent
+    /// « ClaudeNotch-<v>.dmg », publiée à côté (`appName` les simule dans les tests).
+    static func updateAssets(in release: Release, appName: String = AppIdentity.name) throws -> (dmg: URL, signature: URL) {
+        let name = "\(appName)-\(release.version).dmg"
         func url(_ assetName: String) -> URL? {
             release.assets.first { $0.name == assetName && $0.browserDownloadUrl.scheme == "https" }?.browserDownloadUrl
         }
@@ -382,7 +384,7 @@ extension Updater {
     private static func request(_ url: URL, accept: String, userAgentVersion: String) -> URLRequest {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue(accept, forHTTPHeaderField: "Accept")
-        request.setValue("ClaudeNotch/\(userAgentVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("\(AppIdentity.name)/\(userAgentVersion)", forHTTPHeaderField: "User-Agent")
         return request
     }
 
@@ -391,8 +393,8 @@ extension Updater {
         guard code == 200 else { throw UpdateError.http(code) }
     }
 
-    static func fetchLatestRelease(userAgentVersion: String) async throws -> Release {
-        let request = request(latestReleaseURL, accept: "application/vnd.github+json", userAgentVersion: userAgentVersion)
+    static func fetchLatestRelease(from url: URL = latestReleaseURL, userAgentVersion: String) async throws -> Release {
+        let request = request(url, accept: "application/vnd.github+json", userAgentVersion: userAgentVersion)
         let (data, response) = try await session.data(for: request)
         try checkHTTP(response)
         return try decodeRelease(data)
@@ -407,7 +409,7 @@ extension Updater {
         try manager.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? manager.removeItem(at: folder) }
 
-        let dmg = folder.appendingPathComponent("ClaudeNotch-\(release.version).dmg")
+        let dmg = folder.appendingPathComponent("\(AppIdentity.name)-\(release.version).dmg")
         let accept = "application/octet-stream"
         let (downloaded, response) = try await session.download(
             for: request(assets.dmg, accept: accept, userAgentVersion: userAgentVersion))
@@ -425,16 +427,18 @@ extension Updater {
     }
 
     /// Monte le DMG, copie l'app à côté de l'app installée (même volume), démonte, puis échange les deux apps.
-    static func installUpdate(dmg: URL, version: String, over app: URL, bundleId: String = AppIdentity.bundleId) throws {
+    /// L'app garde son chemin : une ClaudeNotch.app prend le nom Oriel.app à son lancement (`AppIdentity`).
+    static func installUpdate(dmg: URL, version: String, over app: URL, bundleId: String = AppIdentity.bundleId,
+                              bundleName: String = AppIdentity.bundleName) throws {
         let manager = FileManager.default
         let staging = app.deletingLastPathComponent().appendingPathComponent(".ClaudeNotch-update")
         try? manager.removeItem(at: staging)
         try manager.createDirectory(at: staging, withIntermediateDirectories: false)
         defer { try? manager.removeItem(at: staging) }
 
-        let staged = staging.appendingPathComponent("ClaudeNotch.app")
+        let staged = staging.appendingPathComponent(bundleName)
         try withMountedImage(dmg) { volume in
-            let source = volume.appendingPathComponent("ClaudeNotch.app")
+            let source = volume.appendingPathComponent(bundleName)
             try validateBundle(source, bundleId: bundleId, version: version)
             // --noqtn : signature déjà vérifiée ; une quarantaine ferait bloquer la relance par Gatekeeper.
             try run("/usr/bin/ditto", ["--noqtn", source.path, staged.path])

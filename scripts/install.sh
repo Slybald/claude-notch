@@ -32,10 +32,11 @@ while pgrep -x ClaudeNotch >/dev/null 2>&1 && [ "$i" -lt 20 ]; do
     sleep 0.1
     i=$((i + 1))
 done
-rm -rf "$DEST/ClaudeNotch.app"
-ditto "$ROOT/build/ClaudeNotch.app" "$DEST/ClaudeNotch.app"
-"$LSREGISTER" -f "$DEST/ClaudeNotch.app" 2>/dev/null || true
-echo "App installée : $DEST/ClaudeNotch.app"
+# Ancien nom du bundle (avant Oriel) : retiré, l'app ne doit exister qu'une fois.
+rm -rf "$DEST/Oriel.app" "$DEST/ClaudeNotch.app"
+ditto "$ROOT/build/Oriel.app" "$DEST/Oriel.app"
+"$LSREGISTER" -f "$DEST/Oriel.app" 2>/dev/null || true
+echo "App installée : $DEST/Oriel.app"
 
 # 2. Script de hook
 mkdir -p "$CONFIG_DIR/hooks"
@@ -56,7 +57,7 @@ cat > "$AGENT" <<EOF
 	<string>$LABEL</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>$DEST/ClaudeNotch.app/Contents/MacOS/ClaudeNotch</string>
+		<string>$DEST/Oriel.app/Contents/MacOS/ClaudeNotch</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

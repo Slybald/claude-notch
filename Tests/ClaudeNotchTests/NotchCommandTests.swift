@@ -142,14 +142,14 @@ final class NotchCommandTests: XCTestCase {
         let refused = try notch(["show", "--title", "x"], off)
         XCTAssertEqual(refused.status, 1)
         XCTAssertEqual(refused.stderr,
-                       "notch: the local API is off or Claude Notch is not running (Settings, Scripts).\n")
+                       "notch: the local API is off or Oriel is not running (Settings, Scripts).\n")
 
         let closed = try LocalAPIServerFixture(self)
         closed.server.stop()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         let unreachable = try notch(["show", "--title", "x"], closed)
         XCTAssertEqual(unreachable.status, 1)
-        XCTAssertEqual(unreachable.stderr, "notch: Claude Notch is not running.\n")
+        XCTAssertEqual(unreachable.stderr, "notch: Oriel is not running.\n")
     }
 
     /// `notch run` : sablier pendant la commande, puis ✓ ou ✗ avec la durée ; sort avec le code de la commande.

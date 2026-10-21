@@ -1,5 +1,6 @@
 #!/bin/sh
-# Compile en release (binaire universel arm64 + x86_64) et assemble build/ClaudeNotch.app.
+# Compile en release (binaire universel arm64 + x86_64) et assemble build/Oriel.app (exécutable ClaudeNotch,
+# identifiant io.github.slybald.claudenotch : voir docs/RENAME.md).
 #
 # Signature : ad hoc par défaut (le cdhash change à chaque build, macOS redemande alors les autorisations).
 # SIGN_KEYCHAIN=<trousseau> SIGN_IDENTITY=<nom ou empreinte du certificat> scripts/build.sh → signature avec ce
@@ -48,7 +49,7 @@ for arch in arm64 x86_64; do
     fi
 done
 
-APP="$ROOT/build/ClaudeNotch.app"
+APP="$ROOT/build/Oriel.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ClaudeNotch"

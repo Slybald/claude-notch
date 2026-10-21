@@ -23,7 +23,7 @@ done
 # Règle sudo de l'économie d'énergie, posée par l'app à la demande de l'utilisateur : root seul peut la retirer.
 LOWPOWER_RULE=/etc/sudoers.d/claude-notch-lowpower
 if [ -e "$LOWPOWER_RULE" ]; then
-    echo "Règle sudo de Claude Notch trouvée ($LOWPOWER_RULE) : retrait avec sudo, ton mot de passe est demandé."
+    echo "Règle sudo d'Oriel trouvée ($LOWPOWER_RULE) : retrait avec sudo, ton mot de passe est demandé."
     sudo /bin/rm -f "$LOWPOWER_RULE" || echo "Règle non retirée. Pour la retirer : sudo rm $LOWPOWER_RULE"
 fi
 
@@ -33,14 +33,17 @@ FAN_HELPER=/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl
 FAN_RULE=/etc/sudoers.d/claude-notch-fans
 pkill -x ClaudeNotch 2>/dev/null || true
 if [ -e "$FAN_HELPER" ] || [ -e "$FAN_RULE" ]; then
-    echo "Outil des ventilateurs de Claude Notch trouvé : retrait avec sudo, ton mot de passe est demandé."
+    echo "Outil des ventilateurs d'Oriel trouvé : retrait avec sudo, ton mot de passe est demandé."
     sudo /bin/sh -c "[ -x $FAN_HELPER ] && $FAN_HELPER auto; /bin/rm -f $FAN_RULE $FAN_HELPER" \
         || echo "Outil non retiré. Pour le retirer : sudo rm $FAN_RULE $FAN_HELPER"
 fi
+# Nom actuel, puis celui d'avant le renommage.
 for dir in /Applications "$HOME/Applications"; do
-    if [ -d "$dir/ClaudeNotch.app" ]; then
-        rm -rf "$dir/ClaudeNotch.app"
-        echo "App supprimée : $dir/ClaudeNotch.app"
-    fi
+    for app in Oriel.app ClaudeNotch.app; do
+        if [ -d "$dir/$app" ]; then
+            rm -rf "${dir:?}/$app"
+            echo "App supprimée : $dir/$app"
+        fi
+    done
 done
-echo "Claude Notch désinstallé."
+echo "Oriel désinstallé."

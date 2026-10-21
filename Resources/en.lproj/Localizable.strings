@@ -3,11 +3,11 @@
 /* Panel menu */
 "Lancer à l'ouverture de session" = "Open at Login";
 "Effacer les sessions terminées" = "Clear Ended Sessions";
-"Quitter Claude Notch" = "Quit Claude Notch";
+"Quitter Oriel" = "Quit Oriel";
 "Hooks Claude Code installés ✓" = "Claude Code Hooks Installed ✓";
 "Mettre à jour les hooks Claude Code" = "Update Claude Code Hooks";
 "Installer les hooks Claude Code" = "Install Claude Code Hooks";
-"Désinstaller Claude Notch…" = "Uninstall Claude Notch…";
+"Désinstaller Oriel…" = "Uninstall Oriel…";
 
 /* Panel */
 "Aucune session en cours" = "No active sessions";
@@ -92,19 +92,19 @@
 "%d non suivis" = "%d untracked";
 
 /* First launch window */
-"Bienvenue dans Claude Notch" = "Welcome to Claude Notch";
-"Mettre à jour Claude Notch" = "Update Claude Notch";
+"Bienvenue dans Oriel" = "Welcome to Oriel";
+"Mettre à jour Oriel" = "Update Oriel";
 "Tes sessions Claude Code, d'un coup d'œil." = "Your Claude Code sessions at a glance.";
 "Des onglets utiles, dans la notch." = "Handy tabs, right in the notch.";
 "Ouvrir la notch" = "Open the notch";
 "Réglages" = "Settings";
 "Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac." = "Hover over the notch: each Claude Code session (terminal, editor or Claude Desktop) shows its state, current tool, tasks and any permissions waiting for you. Everything stays on your Mac.";
 "Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch continue de suivre tes sessions." = "The installed hooks come from an earlier version of the app. Update them so the notch keeps tracking your sessions.";
-"Glisse d'abord Claude Notch dans Applications" = "First, drag Claude Notch to Applications";
+"Glisse d'abord Oriel dans Applications" = "First, drag Oriel to Applications";
 "L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier Applications, puis rouvre-la depuis là." = "The app is running from the disk image or a temporary copy. Quit it, drag it to the Applications folder, then reopen it from there.";
 "CE QUI SERA MODIFIÉ" = "WHAT WILL CHANGE";
 "Tu utilises Claude Code ? Active l'onglet Claude dans Réglages › Onglets." = "Using Claude Code? Turn on the Claude tab in Settings › Tabs.";
-"Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté." = "Adds Claude Notch’s hooks. Your own hooks stay in place; a timestamped backup is saved next to the file.";
+"Ajout des hooks d'Oriel. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté." = "Adds Oriel’s hooks. Your own hooks stay in place; a timestamped backup is saved next to the file.";
 "Petit script qui relaie chaque événement à l'app, en local (127.0.0.1)." = "A small script that relays each event to the app, locally (127.0.0.1).";
 "Disponible une fois l'app dans Applications." = "Available once the app is in Applications.";
 "Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks installed. Sessions already open will show up after their next message.";
@@ -116,15 +116,15 @@
 
 /* Alerts */
 "Mise à jour des hooks impossible" = "Couldn’t update the hooks";
-"Désinstaller Claude Notch ?" = "Uninstall Claude Notch?";
-"Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh et le lancement à l'ouverture de session. L'app se fermera ensuite." = "Claude Notch’s hooks will be removed from ~/.claude/settings.json (a timestamped backup is kept next to it, and your other hooks stay in place), along with ~/.claude/hooks/claude-notch-hook.sh and the login item. The app will then quit.";
+"Désinstaller Oriel ?" = "Uninstall Oriel?";
+"Les hooks d'Oriel seront retirés de ~/.claude/settings.json (sauvegarde horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh et le lancement à l'ouverture de session. L'app se fermera ensuite." = "Oriel’s hooks will be removed from ~/.claude/settings.json (a timestamped backup is kept next to it, and your other hooks stay in place), along with ~/.claude/hooks/claude-notch-hook.sh and the login item. The app will then quit.";
 "Le lancement à l'ouverture de session sera retiré. L'app se fermera ensuite." = "The login item will be removed. The app will then quit.";
 "Désinstaller" = "Uninstall";
 "Annuler" = "Cancel";
 "Désinstallation interrompue" = "Uninstall interrupted";
-"Claude Notch est désinstallé" = "Claude Notch has been uninstalled";
-"Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage." = "All that’s left is to move Claude Notch from the Applications folder to the Trash. Claude Code sessions already open will forget it when they restart.";
-"Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications." = "All that’s left is to move Claude Notch from the Applications folder to the Trash.";
+"Oriel est désinstallé" = "Oriel has been uninstalled";
+"Il ne reste qu'à jeter Oriel à la Corbeille, depuis le dossier Applications. Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage." = "All that’s left is to move Oriel from the Applications folder to the Trash. Claude Code sessions already open will forget it when they restart.";
+"Il ne reste qu'à jeter Oriel à la Corbeille, depuis le dossier Applications." = "All that’s left is to move Oriel from the Applications folder to the Trash.";
 "Afficher dans le Finder" = "Show in Finder";
 "Quitter" = "Quit";
 
@@ -168,7 +168,7 @@
 "Mises à jour automatiques" = "Automatic Updates";
 "Rechercher les mises à jour" = "Check for Updates";
 "Build de développement : mises à jour désactivées" = "Development build: updates disabled";
-"Version %@ installée : quitte et rouvre Claude Notch pour l'utiliser." = "Version %@ installed: quit and reopen Claude Notch to use it.";
+"Version %@ installée : quitte et rouvre Oriel pour l'utiliser." = "Version %@ installed: quit and reopen Oriel to use it.";
 "Mise à jour impossible (%@)." = "Couldn’t update (%@).";
 "Mise à jour impossible : GitHub a répondu %d." = "Couldn’t update: GitHub answered %d.";
 "Mise à jour impossible : réponse de GitHub illisible." = "Couldn’t update: unreadable answer from GitHub.";
@@ -185,7 +185,7 @@
 "+ %d autres sessions" = "+ %d more sessions";
 
 /* Settings window */
-"Réglages de Claude Notch" = "Claude Notch Settings";
+"Réglages d'Oriel" = "Oriel Settings";
 "Général" = "General";
 "Onglets" = "Tabs";
 "Apparence" = "Appearance";
@@ -254,18 +254,18 @@
 "Jusqu'à réactivation" = "Until I Turn It Back On";
 "Notch masquée jusqu'à réactivation" = "Notch hidden until you turn it back on";
 "Notch masquée jusqu'à demain, %@" = "Notch hidden until tomorrow, %@";
-"Pour la réafficher : rouvrir Claude Notch" = "To show it again: open Claude Notch again";
-"Pour la réafficher : %@ ou rouvrir Claude Notch" = "To show it again: %@ or open Claude Notch again";
+"Pour la réafficher : rouvrir Oriel" = "To show it again: open Oriel again";
+"Pour la réafficher : %@ ou rouvrir Oriel" = "To show it again: %@ or open Oriel again";
 "Notch masquée jusqu'à %@" = "Notch hidden until %@";
 "Aucun" = "None";
 "⌃⌥Espace" = "⌃⌥Space";
 "Visibilité" = "Visibility";
 "La notch reste toujours à l'écran." = "The notch always stays on screen.";
 "Tant que Claude Desktop ou une session Claude Code est ouverte." = "While Claude Desktop or a Claude Code session is open.";
-"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "When Claude is working or waiting for you, or a tab reports something (timer, playback). When idle, open Claude Notch again to get back to these settings.";
-"Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Claude Notch pour retrouver ces réglages." = "When a tab reports something (timer, playback). When idle, open Claude Notch again to get back to these settings.";
+"Quand Claude travaille ou t'attend, ou qu'un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Oriel pour retrouver ces réglages." = "When Claude is working or waiting for you, or a tab reports something (timer, playback). When idle, open Oriel again to get back to these settings.";
+"Quand un onglet signale quelque chose (minuteur, lecture). Au repos, rouvre Oriel pour retrouver ces réglages." = "When a tab reports something (timer, playback). When idle, open Oriel again to get back to these settings.";
 "Réafficher" = "Show Again";
-"Aussi par le raccourci, ou en rouvrant Claude Notch." = "Also with the shortcut, or by opening Claude Notch again.";
+"Aussi par le raccourci, ou en rouvrant Oriel." = "Also with the shortcut, or by opening Oriel again.";
 "Masquer" = "Hide";
 "Ouverture" = "Opening";
 "Ouvrir le panneau" = "Open the Panel";
@@ -329,7 +329,7 @@
 "Appliquer" = "Apply";
 "C'est parti" = "Let’s Go";
 "En trois étapes, choisis ce qui t'intéresse. Tu pourras tout changer ensuite." = "In three steps, pick what you need. You can change everything afterwards.";
-"Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, presse-papiers et plus encore." = "Claude Notch turns your Mac’s notch into a toolbox: music, calendar, notes, clipboard and more.";
+"Oriel transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, presse-papiers et plus encore." = "Oriel turns your Mac’s notch into a toolbox: music, calendar, notes, clipboard and more.";
 "Choisis tes onglets" = "Choose Your Tabs";
 "Chaque onglet est une fonction de la notch. Garde ceux qui t'intéressent : les autres ne font rien, même en arrière-plan." = "Each tab is a feature of the notch. Keep the ones you want: the others do nothing, even in the background.";
 "Tes sessions Claude Code : état, tâches et permissions." = "Your Claude Code sessions: status, tasks and permissions.";

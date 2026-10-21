@@ -3,6 +3,10 @@
 For contributors. The [README](../README.md) describes the product; this page explains how the code is
 organised and why some choices were made, so they are not undone by accident.
 
+The product is called Oriel (formerly Claude Notch). Internal names keep the old one on purpose: the Swift module
+and `Sources/ClaudeNotch`, the executable `ClaudeNotch`, the bundle identifier, the data folder, the hook scripts.
+The list and the reasons are in [RENAME.md](RENAME.md).
+
 ## Commands
 
 - `swift build`: must produce **zero warnings** (the only tolerated one is the toolchain's
@@ -255,7 +259,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   this wrong (visibility "when Claude is open", Claude tab that could not be disabled, hooks pushed at every
   launch); 1.2.1 fixed it.
   - **Detection** (`HookInstaller.claudeCodePresent`): `~/.claude` or `$CLAUDE_CONFIG_DIR` is a folder. Hooks
-    already installed by Claude Notch live in `~/.claude`, so they count. Never real under XCTest
+    already installed by Oriel live in `~/.claude`, so they count. Never real under XCTest
     (`claudeCodeOnThisMac` checks `NSClassFromString("XCTestCase")`).
   - **Decided once** (`Preferences.decideClaudeTab`, `AppCore.start`): at the first launch of 1.2.1 or later, the
     Claude tab is enabled only if Claude Code is detected, and the result is saved in `tabs.enabled`. It never
@@ -365,7 +369,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     in place (other keys such as `padding` and the key order stay, timestamped backup, `HookInstaller.loadSettings` / `save`),
     keeps the old command in `claude-notch-statusline.previous` (0600, next to the script) and the script runs it again with
     the same JSON (`sh -c`, as Claude Code does). Not a plain command (`type` other than `command`, no `command`): refused,
-    nothing touched. Uninstall (the switch, or Uninstall Claude Notch) puts the exact old command back; a `statusLine` the user
+    nothing touched. Uninstall (the switch, or Uninstall Oriel) puts the exact old command back; a `statusLine` the user
     changed since is left alone. The script POSTs to `/claude/status` only when the JSON has `rate_limits`, never fails the
     status line (`curl` 1 s at most, app closed = nothing), and `ClaudeUsage.parse` keeps only the percentages and reset times,
     in memory. `HookServer.isPaused` (Claude tab off) answers 204 without reading. The figure is the account's, so the last one
@@ -531,7 +535,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **Localization**: the French strings are the keys, English lives in `Resources/en.lproj`; any user-visible
   `String` goes through `L()`; `LocalizationTests` checks coverage.
 - **Code signature**: release builds are signed with a self-signed certificate (CN `Claude Notch Self-Signed`,
-  extended key usage `codeSigning`, 10 years), not ad hoc. The designated requirement of an ad hoc signature is
+  extended key usage `codeSigning`, 10 years; the name is kept after the rename to Oriel, it is shown nowhere), not ad hoc. The designated requirement of an ad hoc signature is
   the build's `cdhash`, which changes with every build, so macOS (TCC) sees each update as a new app and asks
   again for calendar, Bluetooth, Automation and protected folders. With the certificate the requirement is
   `identifier "<bundle id>" and certificate leaf = H"<SHA-1 of the certificate>"`, the same for every build
@@ -564,17 +568,30 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   release`, set by the release workflow) checks for updates; local builds and `scripts/install.sh` never do.
   The signal is a GitHub release (`/releases/latest`, drafts and pre-releases ignored), not a commit.
   Checks run 60 s after launch, then every 6 h (low-frequency timers with tolerance, ~0 % CPU).
-- **Signed updates**: a DMG is installed only if its Ed25519 signature (`ClaudeNotch-<v>.dmg.sig`, base64 of
+- **Signed updates**: a DMG is installed only if its Ed25519 signature (`Oriel-<v>.dmg.sig`, base64 of
   the signature of every byte of the DMG) matches the public key in `Updater.swift`. The CI signs with the
   `UPDATE_SIGNING_KEY` secret and checks the result against that public key, so a wrong secret fails the release
   instead of shipping an update nobody can install. The private key also lives in the maintainer's keychain;
-  losing it breaks automatic updates for every existing installation.
-- **Install**: `hdiutil attach` on a private mount point, the volume's `ClaudeNotch.app` must have our bundle
+  losing it breaks automatic updates for every existing installation. Each release carries two signed images of
+  the same app: `Oriel-<v>.dmg` (volume "Oriel", with `Oriel.app`) and `ClaudeNotch-<v>.dmg` (with `ClaudeNotch.app`),
+  because the Updater of 1.1.0 to 1.9.0 only looks for the old file name and the old bundle name. Keep the second
+  one as long as such versions can still be installed (see [RENAME.md](RENAME.md)).
+- **Install**: `hdiutil attach` on a private mount point, the volume's `Oriel.app` must have our bundle
   identifier and the announced version, `ditto` into a hidden folder next to the installed app (same volume),
-  detach, then two renames (current → `.ClaudeNotch-old.app`, new → current path) with a rollback if the second
-  fails: never a half-replaced app. Only from `/Applications` or `~/Applications` with a writable folder;
+  detach, then two renames (current → a hidden `-old.app` backup next to it, new → current path) with a rollback if
+  the second fails: never a half-replaced app. Only from `/Applications` or `~/Applications` with a writable folder;
   otherwise the menu links to the release page. `hdiutil` prints a deprecation notice on recent macOS; it stays
   because the app supports macOS 13.
+- **Rename `ClaudeNotch.app` → `Oriel.app`**: the Updater of 1.1.0 to 1.9.0 replaces `ClaudeNotch.app`, so the
+  new version first runs under that name. At launch it renames its own bundle to `Oriel.app` in place (a rename,
+  nothing is copied), points the LaunchAgent to the new path and relaunches from `Oriel.app` once it has quit
+  (one instance only). Neighbouring cases: an older `ClaudeNotch.app` next to an `Oriel.app` (same identifier,
+  lower or equal version) is quit and moved to the Trash, and the LaunchAgent is repointed; a newer
+  `ClaudeNotch.app` takes the place of the `Oriel.app`; an `Oriel.app` from another publisher is left alone and the
+  app keeps its `ClaudeNotch.app` folder. The repository rename relies on GitHub's 301 on `/releases/latest`, which
+  URLSession follows. Covered by `UpdaterTests.testLegacyUpdaterInstallsTheRenamedApp` and
+  `testLatestReleaseFollowsRepositoryRename`. What is kept (bundle identifier, certificate, executable name, data
+  folder, hook scripts…) and why: [RENAME.md](RENAME.md).
 - **When to install**: at launch, as soon as a version is found; later, only when no session is working or
   waiting (`SessionStore.hasBusySessions`), retried every 10 min. With the preference off, the version is only
   announced in the menu.

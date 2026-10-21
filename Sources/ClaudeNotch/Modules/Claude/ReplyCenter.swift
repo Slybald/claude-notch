@@ -415,7 +415,7 @@ final class ReplyCenter: ObservableObject {
     // MARK: - Sortie du hook
 
     /// Messages lus par Claude (et affichés dans sa session), pas par l'interface : en anglais.
-    static let defaultDenyMessage = "The user denied this from Claude Notch."
+    static let defaultDenyMessage = "The user denied this from Oriel."
     static let defaultReviseMessage = "The user wants changes to the plan. Keep planning."
 
     /// JSON écrit par le hook sur sa sortie standard ; nil si la décision ne correspond pas à la demande.
