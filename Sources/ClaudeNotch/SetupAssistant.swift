@@ -431,7 +431,7 @@ struct SetupAssistantView: View {
                 Text("Raccourci clavier (facultatif)")
                     .font(.system(size: 13, weight: .semibold))
                 Picker("Ouvrir ou fermer le panneau", selection: $model.choices.toggleHotKey) {
-                    ForEach(HotKeyChoice.allCases) { choice in
+                    ForEach(HotKeyChoice.pickable) { choice in
                         Text(choice.title).tag(choice)
                     }
                 }
