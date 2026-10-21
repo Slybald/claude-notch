@@ -839,6 +839,7 @@ final class WiggleView: NSView {
 
     init(_ content: AnyView) {
         hosting = NSHostingView(rootView: content)
+        hosting.sizingOptions = []
         super.init(frame: .zero)
         wantsLayer = true
         hosting.wantsLayer = true
