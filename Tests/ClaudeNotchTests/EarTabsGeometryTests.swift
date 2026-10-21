@@ -25,19 +25,16 @@ final class EarTabsGeometryTests: XCTestCase {
         }, showEars: true)
     }
 
-    /// Le premier intercalaire de chaque côté a exactement la hauteur de la notch (aucune marche entre elles), puis
-    /// l'escalier descend vers l'extérieur sans passer sous la hauteur de l'icône.
-    func testFirstTabHasTheNotchHeightThenStepsDown() {
+    /// Tous les intercalaires, à tout rang, ont exactement la hauteur de la notch : même haut, même bas, aucune marche
+    /// ni décalage vertical entre eux (la superposition de l'éventail est seulement horizontale).
+    func testEveryTabHasTheNotchHeight() {
         for (size, _) in Self.notches {
             for mode in [EarTabsMode.visible, .retracted] {
                 let layout = EarTabsLayout(tabs: tabs(6), notch: size, mode: mode)
-                for side in [layout.left, layout.right] {
-                    XCTAssertEqual(side[0].height, size.height, "\(size) \(mode) : rang 0 de la hauteur de la notch")
-                    XCTAssertEqual(side[0].frame.maxY, size.height, accuracy: 0.001)
-                    for (near, far) in zip(side, side.dropFirst()) {
-                        XCTAssertLessThan(far.height, near.height, "\(size) rang \(far.rank)")
-                    }
-                    XCTAssertGreaterThanOrEqual(side.last!.height, 16, "assez haut pour l'icône")
+                for item in layout.items {
+                    XCTAssertEqual(item.height, size.height, "\(size) \(mode) rang \(item.rank)")
+                    XCTAssertEqual(item.frame.minY, 0)
+                    XCTAssertEqual(item.frame.maxY, size.height, accuracy: 0.001)
                 }
             }
         }
@@ -111,7 +108,7 @@ final class EarTabsGeometryTests: XCTestCase {
         }
     }
 
-    private enum Tabs { case claudeOnly, claudeAndTimer }
+    private enum Tabs { case claudeOnly, claudeAndTimer, six }
 
     private func scene(_ tabs: Tabs, notch: CGSize, hasNotch: Bool, mode: EarTabsMode = .visible,
                        hovered: String? = nil) -> Scene {
@@ -121,8 +118,13 @@ final class EarTabsGeometryTests: XCTestCase {
         harness.model.hasNotch = hasNotch
         harness.model.hoveredTab = hovered
         let timer = FakeModule(id: "timer", ears: ModuleEars(symbol: "timer", text: "4:59", priority: 5), keepsRunning: true)
-        let registry = ModuleRegistry(modules: [harness.claude] + (tabs == .claudeAndTimer ? [timer] : []),
-                                      prefs: harness.prefs)
+        let others = [("media", "music.note", "", 1), ("messages", "message.fill", "3", 0), ("mail", "envelope.fill", "12", -1),
+                      ("quicksettings", "cup.and.saucer.fill", "1h00", -10)].map { id, symbol, text, priority in
+            FakeModule(id: id, ears: ModuleEars(symbol: symbol, text: text, priority: priority, bars: id == "media"),
+                       keepsRunning: true)
+        }
+        let modules: [FakeModule] = tabs == .claudeOnly ? [] : tabs == .claudeAndTimer ? [timer] : [timer] + others
+        let registry = ModuleRegistry(modules: [harness.claude] + modules, prefs: harness.prefs)
         registry.reconcile()
         return Scene(harness: harness, registry: registry)
     }
@@ -147,6 +149,31 @@ final class EarTabsGeometryTests: XCTestCase {
                 }
                 XCTAssertTrue(uncovered.isEmpty, "\(label) : points de l'encoche ou de son prolongement non dessinés : "
                               + uncovered.prefix(6).joined(separator: " "))
+            }
+        }
+    }
+
+    /// Éventail au repos (six intercalaires) : la base est continue de la tranche la plus à gauche à la plus à droite, au
+    /// même niveau que le bas de la notch, et rien ne dépasse dessous (ni ombre, ni marche) ni au-dessus ; ouverts ou non,
+    /// toutes tailles d'encoche. Seuls les deux coins extérieurs sont arrondis.
+    func testFanBaseIsContinuousAndFlushWithTheNotch() throws {
+        for (size, hasNotch) in Self.notches {
+            for mode in [EarTabsMode.visible, .retracted] {
+                let fan = scene(.six, notch: size, hasNotch: hasNotch, mode: mode)
+                let layout = fan.registry.earLayout(claude: fan.harness.store.indicator, claudeEars: fan.harness.store.ears,
+                                                    notch: size)
+                let sil = try silhouette(fan)
+                let label = "\(size) \(mode)"
+                XCTAssertEqual(layout.left.count, 3, label)
+                let left = layout.left.last!.frame.minX + EarTabs.restRadius + 0.5
+                let right = layout.right.last!.frame.maxX - EarTabs.restRadius - 0.5
+                var bad: [String] = []
+                for x in stride(from: left, through: right, by: 0.5) {
+                    if !sil.covered(x, size.height - 0.3) { bad.append("base (\(x))") }
+                    if sil.covered(x, size.height + 0.4) { bad.append("sous la base (\(x))") }
+                    if !sil.covered(x, 0.3) { bad.append("haut (\(x))") }
+                }
+                XCTAssertTrue(bad.isEmpty, "\(label) : " + bad.prefix(6).joined(separator: " "))
             }
         }
     }
@@ -191,6 +218,10 @@ final class EarTabsGeometryTests: XCTestCase {
             ("un-intercalaire", scene(.claudeOnly, notch: Self.measured, hasNotch: true)),
             ("retractes", scene(.claudeAndTimer, notch: Self.measured, hasNotch: true, mode: .retracted)),
             ("deploye", scene(.claudeAndTimer, notch: Self.measured, hasNotch: true, hovered: "claude")),
+            ("eventail", scene(.six, notch: Self.measured, hasNotch: true)),
+            ("eventail-retractes", scene(.six, notch: Self.measured, hasNotch: true, mode: .retracted)),
+            ("eventail-ouvert-rang-1", scene(.six, notch: Self.measured, hasNotch: true, hovered: "media")),
+            ("eventail-virtuel", scene(.six, notch: CGSize(width: 200, height: 24), hasNotch: false)),
             ("encoche-virtuelle", scene(.claudeAndTimer, notch: CGSize(width: 200, height: 24), hasNotch: false)),
             ("encoche-haute", scene(.claudeAndTimer, notch: CGSize(width: 178, height: 38), hasNotch: true)),
         ]

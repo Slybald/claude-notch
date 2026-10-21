@@ -32,9 +32,11 @@ Interface available in English and French (follows the system language). Screens
   its own small tab against the notch, on the left and the right, the most important one closest to it (up to three
   per side, then a "+N"). Claude's tab shows its state (a raised hand when a session needs you, a spinner while Claude
   works, a check mark when a turn ends) and `active sessions·running subagents`, for example `1·6`, or the progress
-  of the task list (`2/5`). Hover a tab and it unfolds with its details (the track and its controls, the timer, the
-  sessions and their state); click it to open the panel on that tab. Settings › Appearance: always visible, or
-  retracted to a thin sliver until you hover (an alert, like Claude waiting for you, always stays visible).
+  of the task list (`2/5`). The tabs fan out like cards spread on a table: the most important one on top, against the
+  notch, each of the others slid under the previous one and showing only its slice with its icon. Hover a tab and it
+  opens wide with its details (the track and its controls, the timer, the sessions and their state); click it to open
+  the panel on that tab. Settings › Appearance: always visible, or retracted to a thin sliver each until you hover (an
+  alert, like Claude waiting for you, always stays visible).
 - **Permissions**: the card shows what Claude is asking for (`Terminal · rm -rf build`, the file to edit,
   the question asked).
 - **Reply from the notch** (off by default; a card at the top of the Claude tab offers to turn it on, and so does
@@ -620,9 +622,11 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
   lus…) a son petit onglet contre la notch, à gauche et à droite, le plus important au plus près d'elle (trois par
   côté au plus, puis un « +N »). Celui de Claude montre son état (main levée quand une session t'attend, un spinner
   pendant que Claude travaille, une coche à la fin d'un tour) et `sessions actives·sous-agents en cours`, par exemple
-  `1·6`, ou l'avancement de la liste de tâches (`2/5`). Passe la souris sur un intercalaire : il se déploie avec son
-  détail (le morceau et ses commandes, le minuteur, les sessions et leur état) ; un clic ouvre le panneau sur son
-  onglet. Réglages › Apparence : toujours visibles, ou rétractés en fine languette jusqu'au survol (une alerte, comme
+  `1·6`, ou l'avancement de la liste de tâches (`2/5`). Les intercalaires s'étalent en éventail, comme des cartes
+  décalées sur une table : le plus important au-dessus, contre la notch, chacun des autres glissé sous le précédent et
+  n'en montrant que la tranche avec son icône. Passe la souris sur un intercalaire : il s'ouvre en grand avec son détail
+  (le morceau et ses commandes, le minuteur, les sessions et leur état) ; un clic ouvre le panneau sur son onglet.
+  Réglages › Apparence : toujours visibles, ou rétractés en fine languette chacun jusqu'au survol (une alerte, comme
   Claude qui attend ta réponse, reste toujours visible).
 - **Permissions** : la carte montre ce que Claude demande (`Terminal · rm -rf build`, le fichier à modifier,
   la question posée).

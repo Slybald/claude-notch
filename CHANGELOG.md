@@ -84,6 +84,14 @@ renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). E
 
 ### Changed
 
+- **Index tabs fan out like cards on a table.** At rest the tabs of each side overlap: the most important one is on
+  top, against the notch, with its icon and short text; each of the others slides under the previous one and shows a
+  regular slice with its icon only, with a thin light edge and a soft shade so the stack reads. Every tab is exactly as
+  tall as the notch (same top, same bottom, one continuous base, no staircase): the overlap is only horizontal. Hover a
+  slice and the tab opens wide with its details, with the usual spring; the tabs closer to the notch stay where they are
+  and the ones further out go under it, so nothing slides under a still pointer. Click a tab to open the panel on it, as
+  before. *Always Visible* is the half-closed fan, *Retracted* the tight one (a thin sliver per tab); an alert still
+  stays open. Nothing runs at rest and the hover zones are the exact shapes.
 - **Renamed to Oriel.** The app, its menus, settings, setup assistant, alerts and macOS permission prompts now say
   Oriel. The bundle is `Oriel.app`, the disk image `Oriel-<v>.dmg` (volume "Oriel"). The repository is now
   `github.com/Slybald/oriel`; the old address redirects.
