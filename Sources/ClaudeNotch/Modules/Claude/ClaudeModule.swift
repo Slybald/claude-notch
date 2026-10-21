@@ -397,7 +397,7 @@ struct ClaudeSettingsView: View {
                         Button("Installer les hooks Claude Code", action: setup.showOnboarding)
                     }
                     Spacer()
-                    Button("Désinstaller Claude Notch…", action: setup.confirmAndUninstall)
+                    Button("Désinstaller Oriel…", action: setup.confirmAndUninstall)
                 }
             } header: {
                 Text("Hooks Claude Code")

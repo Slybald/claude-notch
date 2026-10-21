@@ -68,11 +68,14 @@ struct HookEvent {
     /// Le résultat d'un agent d'arrière-plan revient comme un faux prompt `<task-notification>…`.
     var isTaskNotification: Bool { prompt?.hasPrefix("<task-notification>") ?? false }
     /// Message envoyé depuis la notch (hook `asyncRewake`) : il revient aussi en `<task-notification>`, avec notre
-    /// résumé, le texte venant après `rewakeMessage`. Chaîne vide si le texte est introuvable.
+    /// résumé, le texte venant après `rewakeMessage`. Chaîne vide si le texte est introuvable. Les textes d'avant le
+    /// renommage comptent aussi (session ouverte avant la mise à jour).
     var notchMessage: String? {
         guard isTaskNotification, let prompt,
-              prompt.contains("<summary>\(HookInstaller.rewakeSummary)</summary>") else { return nil }
-        guard let start = prompt.range(of: HookInstaller.rewakeMessage) else { return "" }
+              let marker = [(HookInstaller.rewakeSummary, HookInstaller.rewakeMessage),
+                            (HookInstaller.legacyRewakeSummary, HookInstaller.legacyRewakeMessage)]
+                .first(where: { prompt.contains("<summary>\($0.0)</summary>") })?.1 else { return nil }
+        guard let start = prompt.range(of: marker) else { return "" }
         var text = prompt[start.upperBound...]
         if let end = text.range(of: "</system-reminder>") { text = text[..<end.lowerBound] }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)

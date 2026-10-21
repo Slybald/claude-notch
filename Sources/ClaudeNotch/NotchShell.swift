@@ -134,8 +134,8 @@ enum HiddenNotice {
 
     /// Comment la réafficher, en pied des menus « Masquer la notch » (sans icône, rien d'autre ne le dit).
     static func howToShowAgain(hotKey: HotKeyChoice) -> String {
-        hotKey == .none ? L("Pour la réafficher : rouvrir Claude Notch")
-            : String(format: L("Pour la réafficher : %@ ou rouvrir Claude Notch"), hotKey.title)
+        hotKey == .none ? L("Pour la réafficher : rouvrir Oriel")
+            : String(format: L("Pour la réafficher : %@ ou rouvrir Oriel"), hotKey.title)
     }
 }
 

@@ -66,7 +66,7 @@
 "hooks.json illisible" = "hooks.json illisible";
 "Corrige-le ou ouvre les réglages pour voir pourquoi." = "Corrige-le ou ouvre les réglages pour voir pourquoi.";
 "À approuver dans Codex" = "À approuver dans Codex";
-"Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex)." = "Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex).";
+"Codex ignore les hooks d'Oriel tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex)." = "Codex ignore les hooks d'Oriel tant que tu ne les as pas approuvés.\n1. Clique sur « Approuver dans Codex ».\n2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex).";
 "Approuver dans Codex" = "Approuver dans Codex";
 "Ouvre une nouvelle conversation dans l'app ChatGPT ou lance codex dans un terminal. Les conversations déjà ouvertes ne sont pas suivies." = "Ouvre une nouvelle conversation dans l'app ChatGPT ou lance codex dans un terminal. Les conversations déjà ouvertes ne sont pas suivies.";
 
@@ -78,7 +78,7 @@
 "1. Clique sur « Approuver dans Codex »." = "1. Clique sur « Approuver dans Codex ».";
 "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex) : les conversations déjà ouvertes ne sont pas suivies." = "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex) : les conversations déjà ouvertes ne sont pas suivies.";
 "Vérifier" = "Vérifier";
-"Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché." = "Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché.";
+"Oriel n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché." = "Oriel n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais touché.";
 "« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml (la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : « Review hooks » dans l'app, /hooks dans le terminal." = "« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml (la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : « Review hooks » dans l'app, /hooks dans le terminal.";
 
 /* Demandes à Codex */
@@ -89,6 +89,6 @@
 "Un réglage plus prioritaire (administrateur, projet) impose l'état de ces hooks." = "Un réglage plus prioritaire (administrateur, projet) impose l'état de ces hooks.";
 "réponse inattendue" = "réponse inattendue";
 "Codex s'est arrêté" = "Codex s'est arrêté";
-"Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé)." = "Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé).";
+"Codex ne voit pas les hooks d'Oriel (hooks.json non chargé)." = "Codex ne voit pas les hooks d'Oriel (hooks.json non chargé).";
 "Hooks approuvés. Ouvre une nouvelle conversation Codex pour les voir à l'œuvre." = "Hooks approuvés. Ouvre une nouvelle conversation Codex pour les voir à l'œuvre.";
 "Codex n'a pas approuvé %d hooks." = "Codex n'a pas approuvé %d hooks.";

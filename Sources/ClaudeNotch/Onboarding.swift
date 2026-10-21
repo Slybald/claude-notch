@@ -199,9 +199,9 @@ final class HookSetup: ObservableObject {
             let codexHooks = [.installed, .outdated, .scriptOutdated].contains(codexInstaller.status())
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = L("Désinstaller Claude Notch ?")
+            alert.messageText = L("Désinstaller Oriel ?")
             alert.informativeText = hooks
-                ? L("Les hooks de Claude Notch seront retirés de ~/.claude/settings.json (sauvegarde "
+                ? L("Les hooks d'Oriel seront retirés de ~/.claude/settings.json (sauvegarde "
                     + "horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh "
                     + "et le lancement à l'ouverture de session. L'app se fermera ensuite.")
                 : L("Le lancement à l'ouverture de session sera retiré. L'app se fermera ensuite.")
@@ -240,11 +240,11 @@ final class HookSetup: ObservableObject {
 
     private static func finishUninstall(hooks: Bool) {
         let done = NSAlert()
-        done.messageText = L("Claude Notch est désinstallé")
+        done.messageText = L("Oriel est désinstallé")
         done.informativeText = hooks
-            ? L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications. "
+            ? L("Il ne reste qu'à jeter Oriel à la Corbeille, depuis le dossier Applications. "
                 + "Les sessions Claude Code déjà ouvertes l'oublieront à leur redémarrage.")
-            : L("Il ne reste qu'à jeter Claude Notch à la Corbeille, depuis le dossier Applications.")
+            : L("Il ne reste qu'à jeter Oriel à la Corbeille, depuis le dossier Applications.")
         done.addButton(withTitle: L("Afficher dans le Finder"))
         done.addButton(withTitle: L("Quitter"))
         if done.runModal() == .alertFirstButtonReturn {
@@ -283,7 +283,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         hosting.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable, .fullSizeContentView]
-        window.title = "Claude Notch"
+        window.title = "Oriel"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
@@ -371,7 +371,7 @@ struct OnboardingView: View {
                 }
                 .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(mode == .update ? L("Mettre à jour Claude Notch") : L("Bienvenue dans Claude Notch"))
+                    Text(mode == .update ? L("Mettre à jour Oriel") : L("Bienvenue dans Oriel"))
                         .font(.system(size: 17, weight: .semibold))
                     Text("Tes sessions Claude Code, d'un coup d'œil.")
                         .font(.system(size: 12))
@@ -397,7 +397,7 @@ struct OnboardingView: View {
                 .tracking(0.6)
                 .foregroundColor(Palette.secondary)
             InfoRow(icon: "doc.text", title: "~/.claude/settings.json", monospaced: true,
-                    detail: L("Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée "
+                    detail: L("Ajout des hooks d'Oriel. Tes hooks restent en place ; une sauvegarde horodatée "
                         + "est faite à côté."))
             InfoRow(icon: "terminal", title: "~/.claude/hooks/claude-notch-hook.sh", monospaced: true,
                     detail: L("Petit script qui relaie chaque événement à l'app, en local (127.0.0.1)."))
@@ -480,7 +480,7 @@ struct ApplicationsWarning: View {
                 .font(.system(size: 14))
                 .foregroundColor(Palette.amber)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Glisse d'abord Claude Notch dans Applications")
+                Text("Glisse d'abord Oriel dans Applications")
                     .font(.system(size: 12.5, weight: .semibold))
                 Text(L("L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier "
                        + "Applications, puis rouvre-la depuis là."))
@@ -539,6 +539,6 @@ struct HookMenuItems: View {
                 Button("Installer les hooks Claude Code", action: setup.showOnboarding)
             }
         }
-        Button("Désinstaller Claude Notch…", action: setup.confirmAndUninstall)
+        Button("Désinstaller Oriel…", action: setup.confirmAndUninstall)
     }
 }

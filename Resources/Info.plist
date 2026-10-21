@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Claude Notch</string>
+	<string>Oriel</string>
 	<key>CFBundleExecutable</key>
 	<string>ClaudeNotch</string>
 	<key>CFBundleIdentifier</key>
@@ -18,7 +18,7 @@
 		<string>fr</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>ClaudeNotch</string>
+	<string>Oriel</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -30,21 +30,21 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Claude Notch sends commands to other apps, for example to control music playback, only when you use a feature that needs it.</string>
+	<string>Oriel sends commands to other apps, for example to control music playback, only when you use a feature that needs it.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Claude Notch uses Bluetooth to show the status of your connected devices, only if you turn this feature on.</string>
+	<string>Oriel uses Bluetooth to show the status of your connected devices, only if you turn this feature on.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
+	<string>Oriel reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
+	<string>Oriel reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Claude Notch reads your contacts to show their names in the Messages tab, only if you turn this feature on.</string>
+	<string>Oriel reads your contacts to show their names in the Messages tab, only if you turn this feature on.</string>
 	<key>NSDesktopFolderUsageDescription</key>
-	<string>Claude Notch runs optional companion tools that read files on your Desktop.</string>
+	<string>Oriel runs optional companion tools that read files on your Desktop.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
-	<string>Claude Notch runs optional companion tools that read files in your Documents folder.</string>
+	<string>Oriel runs optional companion tools that read files in your Documents folder.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
-	<string>Claude Notch runs optional companion tools that sort files from your Downloads folder.</string>
+	<string>Oriel runs optional companion tools that sort files from your Downloads folder.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>

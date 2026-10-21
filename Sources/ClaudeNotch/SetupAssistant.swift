@@ -303,8 +303,8 @@ struct SetupAssistantView: View {
                         .foregroundColor(Palette.accent)
                 }
                 .frame(width: 44, height: 44)
-                header(L("Bienvenue dans Claude Notch"),
-                       L("Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, "
+                header(L("Bienvenue dans Oriel"),
+                       L("Oriel transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, "
                          + "presse-papiers et plus encore."))
             }
             Text("En trois étapes, choisis ce qui t'intéresse. Tu pourras tout changer ensuite.")

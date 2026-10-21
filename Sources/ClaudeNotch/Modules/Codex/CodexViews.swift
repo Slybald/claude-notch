@@ -173,7 +173,7 @@ struct CodexSetupState: View {
                            action: .settings)
         case .pendingApproval:
             return Content(symbol: "hand.raised.fill", title: L("À approuver dans Codex", table: "Codex"),
-                           detail: L("Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n"
+                           detail: L("Codex ignore les hooks d'Oriel tant que tu ne les as pas approuvés.\n"
                                      + "1. Clique sur « Approuver dans Codex ».\n"
                                      + "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex).", table: "Codex"),
                            warning: true, action: .approve)
@@ -527,7 +527,7 @@ struct CodexSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 2) {
                     SettingsNote(L("Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1).", table: "Codex"))
-                    SettingsNote(L("Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais "
+                    SettingsNote(L("Oriel n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais "
                                    + "touché.", table: "Codex"))
                     SettingsNote(L("« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml "
                                    + "(la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : "

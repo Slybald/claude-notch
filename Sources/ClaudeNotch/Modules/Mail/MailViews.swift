@@ -32,19 +32,19 @@ struct MailPanel: View {
             case .notRunning:
                 ModuleEmptyState(
                     symbol: "envelope", title: L("Mail n'est pas ouvert", table: "Mail"),
-                    detail: L("Claude Notch ne lance jamais Mail tout seul. Ouvre-le pour voir tes derniers mails ici.", table: "Mail"),
+                    detail: L("Oriel ne lance jamais Mail tout seul. Ouvre-le pour voir tes derniers mails ici.", table: "Mail"),
                     action: ModuleAction(title: L("Ouvrir Mail", table: "Mail"), symbol: "arrow.up.forward.app", run: module.openMail))
                     .padding(.vertical, 12)
             case .needsPermission:
                 ModuleEmptyState(
                     symbol: "lock", title: L("Autoriser l'accès à Mail", table: "Mail"),
-                    detail: L("Claude Notch lit tes derniers mails avec AppleScript et n'envoie une réponse que quand tu cliques sur Envoyer. macOS va te demander ton accord ; la lecture reste sur ton Mac.", table: "Mail"),
+                    detail: L("Oriel lit tes derniers mails avec AppleScript et n'envoie une réponse que quand tu cliques sur Envoyer. macOS va te demander ton accord ; la lecture reste sur ton Mac.", table: "Mail"),
                     action: ModuleAction(title: L("Autoriser", table: "Mail"), style: .prominent, run: module.authorize))
                     .padding(.vertical, 8)
             case .denied:
                 ModuleEmptyState(
                     symbol: "lock.slash", tint: Palette.amber, title: L("Accès à Mail refusé", table: "Mail"),
-                    detail: L("Autorise Claude Notch à contrôler Mail dans Réglages Système › Confidentialité et sécurité › Automatisation.", table: "Mail"),
+                    detail: L("Autorise Oriel à contrôler Mail dans Réglages Système › Confidentialité et sécurité › Automatisation.", table: "Mail"),
                     action: ModuleAction(title: L("Ouvrir les Réglages", table: "Mail"), symbol: "gearshape", style: .prominent) {
                         module.openPrivacy(.automation)
                     })
@@ -290,7 +290,7 @@ private struct MailReplyBar: View {
     static func message(_ failure: MailReplyFailure) -> String {
         switch failure {
         case .notRunning: return L("Mail n'est pas ouvert. Ouvre-le, puis réessaie : ton texte est gardé.", table: "Mail")
-        case .notAuthorized: return L("Autorisation refusée : Claude Notch ne peut pas piloter Mail.", table: "Mail")
+        case .notAuthorized: return L("Autorisation refusée : Oriel ne peut pas piloter Mail.", table: "Mail")
         case .timedOut: return L("Mail n'a pas confirmé l'envoi. Regarde dans Mail si la réponse est partie avant de réessayer.", table: "Mail")
         case .notFound: return L("Ce mail n'est plus parmi les derniers reçus. Ouvre-le dans Mail pour répondre.", table: "Mail")
         case .failed: return L("L'envoi a échoué. Ton texte est gardé.", table: "Mail")
@@ -355,7 +355,7 @@ struct MailSettingsView: View {
             } header: {
                 Text("Mail", tableName: "Mail")
             } footer: {
-                SettingsNote(L("Apple Mail seulement. Claude Notch ne lance jamais Mail, ne relit les compteurs que tant que Mail est ouvert, et n'enregistre rien ailleurs. Une réponse ne part que sur ton clic sur Envoyer (ou Entrée). Gmail et Outlook ne sont pas lus directement : ajoute-les à Mail.", table: "Mail"))
+                SettingsNote(L("Apple Mail seulement. Oriel ne lance jamais Mail, ne relit les compteurs que tant que Mail est ouvert, et n'enregistre rien ailleurs. Une réponse ne part que sur ton clic sur Envoyer (ou Entrée). Gmail et Outlook ne sont pas lus directement : ajoute-les à Mail.", table: "Mail"))
             }
             Section {
                 LabeledContent {

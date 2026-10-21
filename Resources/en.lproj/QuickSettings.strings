@@ -96,7 +96,7 @@
 "Autorisation : %@" = "Authorization: %@";
 "Autorisation : installation impossible." = "Authorization: can't install the rule.";
 "Autorisation : retrait impossible." = "Authorization: can't remove the rule.";
-"Claude Notch veut changer l'économie d'énergie." = "Claude Notch wants to change Low Power Mode.";
-"Claude Notch veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage." = "Claude Notch wants to change Low Power Mode. Your password will not be asked again for this setting.";
+"Oriel veut changer l'économie d'énergie." = "Oriel wants to change Low Power Mode.";
+"Oriel veut changer l'économie d'énergie. Ton mot de passe ne sera plus demandé pour ce réglage." = "Oriel wants to change Low Power Mode. Your password will not be asked again for this setting.";
 "Touch ID ou ton mot de passe une seule fois, au premier changement." = "Touch ID or your password once, on the first change.";
 "Mot de passe demandé une seule fois, au premier changement" = "Password asked once, on the first change";

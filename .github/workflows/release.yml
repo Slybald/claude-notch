@@ -36,10 +36,11 @@ jobs:
             echo "::error::Secrets SIGNING_CERT_P12 et SIGNING_CERT_PASSWORD absents : release annulée (une app signée ad hoc ferait redemander toutes les autorisations)."
             exit 1
           fi
-          KEYCHAIN="$RUNNER_TEMP/claude-notch-signing.keychain-db"
+          KEYCHAIN="$RUNNER_TEMP/oriel-signing.keychain-db"
           KEYCHAIN_PASSWORD=$(uuidgen)
           echo "::add-mask::$KEYCHAIN_PASSWORD"
           echo "SIGN_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          # Nom du certificat d'avant le renommage, à garder : un autre certificat ferait perdre les autorisations.
           echo "SIGN_IDENTITY=Claude Notch Self-Signed" >> "$GITHUB_ENV"
           printf '%s' "$SIGNING_CERT_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
@@ -55,20 +56,30 @@ jobs:
       - name: Test
         run: swift test
 
+      # L'Updater de l'app lit les releases de ce dépôt : une app publiée ailleurs ne verrait jamais ses mises à jour
+      # (renommage du dépôt : docs/RENAME.md).
+      - name: Check update repository
+        run: |
+          REPOSITORY=$(sed -n 's|.*static let latestReleaseURL = URL(string: "https://api.github.com/repos/\([^/]*/[^/]*\)/releases/latest").*|\1|p' Sources/ClaudeNotch/Updater.swift)
+          if [ "$REPOSITORY" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::Updater.swift lit les releases de « $REPOSITORY », la release part sur « $GITHUB_REPOSITORY »."
+            exit 1
+          fi
+
       # RELEASE_CHANNEL=1 : seule cette app se met à jour seule depuis les releases (Updater.swift).
       - name: Build universal app
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           RELEASE_CHANNEL=1 VERSION="$VERSION" scripts/build.sh
-          lipo -archs build/ClaudeNotch.app/Contents/MacOS/ClaudeNotch
-          test "$(/usr/libexec/PlistBuddy -c 'Print :ClaudeNotchUpdateChannel' build/ClaudeNotch.app/Contents/Info.plist)" = release
+          lipo -archs build/Oriel.app/Contents/MacOS/ClaudeNotch
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ClaudeNotchUpdateChannel' build/Oriel.app/Contents/Info.plist)" = release
 
       # Une exigence désignée « certificate leaf = H"…" » ne dépend que du certificat ; « cdhash » voudrait dire
       # que la signature est ad hoc (autorisations perdues à chaque mise à jour).
       - name: Check code signature
         run: |
-          APP=build/ClaudeNotch.app
+          APP=build/Oriel.app
           codesign --verify --deep --strict --verbose=2 "$APP"
           # Une signature ad hoc s'affiche « # designated => cdhash … » (exigence calculée, pas intégrée).
           REQUIREMENT=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/^[# ]*designated => //p')
@@ -81,28 +92,34 @@ jobs:
       - name: Build DMG
         run: scripts/make-dmg.sh
 
-      # Signature Ed25519 du DMG, vérifiée avec la clé publique intégrée à l'app : un secret absent ou qui ne
+      # Signature Ed25519 des deux DMG, vérifiée avec la clé publique intégrée à l'app : un secret absent ou qui ne
       # correspond pas à cette clé fait échouer le job (les installations existantes refuseraient la mise à jour).
+      # ClaudeNotch-<v>.dmg sert la mise à jour automatique des versions 1.1.0 à 1.8.0 (docs/RENAME.md).
       - name: Sign DMG
         env:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
         run: |
-          DMG="build/ClaudeNotch-$VERSION.dmg"
-          swift scripts/update-signing.swift sign "$DMG" > "$DMG.sig"
-          test -s "$DMG.sig"
           PUBLIC_KEY=$(sed -n 's/.*static let publicKey = "\([^"]*\)".*/\1/p' Sources/ClaudeNotch/Updater.swift)
           test -n "$PUBLIC_KEY"
-          swift scripts/update-signing.swift verify "$DMG" "$(cat "$DMG.sig")" "$PUBLIC_KEY"
+          for DMG in "build/Oriel-$VERSION.dmg" "build/ClaudeNotch-$VERSION.dmg"; do
+            swift scripts/update-signing.swift sign "$DMG" > "$DMG.sig"
+            test -s "$DMG.sig"
+            swift scripts/update-signing.swift verify "$DMG" "$(cat "$DMG.sig")" "$PUBLIC_KEY"
+          done
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
+            "build/Oriel-$VERSION.dmg" \
+            "build/Oriel-$VERSION.dmg.sha256" \
+            "build/Oriel-$VERSION.dmg.sig" \
             "build/ClaudeNotch-$VERSION.dmg" \
             "build/ClaudeNotch-$VERSION.dmg.sha256" \
             "build/ClaudeNotch-$VERSION.dmg.sig" \
-            --title "Claude Notch $VERSION" \
+            --title "Oriel $VERSION" \
+            --notes "Download **Oriel-$VERSION.dmg**. \`ClaudeNotch-$VERSION.dmg\` is the same app, kept for the automatic update of Claude Notch 1.8.0 and earlier." \
             --generate-notes
 
       - name: Remove signing keychain

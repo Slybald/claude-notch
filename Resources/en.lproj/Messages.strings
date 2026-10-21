@@ -6,11 +6,11 @@
 "Afficher le texte des messages" = "Show message text";
 "Afficher les noms de tes contacts ?" = "Show your contacts' names?";
 "Aucune conversation récente" = "No recent conversations";
-"Autorisation refusée : Claude Notch ne peut pas piloter Messages." = "Permission denied: Claude Notch cannot control Messages.";
+"Autorisation refusée : Oriel ne peut pas piloter Messages." = "Permission denied: Oriel cannot control Messages.";
 "Autorisations" = "Permissions";
 "Autoriser" = "Allow";
 "Autorisé" = "Allowed";
-"Cette version de macOS range les conversations autrement : Claude Notch ne peut pas les lire pour l'instant." = "This version of macOS stores conversations differently: Claude Notch cannot read them for now.";
+"Cette version de macOS range les conversations autrement : Oriel ne peut pas les lire pour l'instant." = "This version of macOS stores conversations differently: Oriel cannot read them for now.";
 "Contacts refusés : on voit les numéros." = "Contacts denied: numbers are shown instead of names.";
 "Conversations (Accès complet au disque)" = "Conversations (Full Disk Access)";
 "Envoi…" = "Sending…";
@@ -26,7 +26,7 @@
 "Lecture seule de la base de Messages sur ce Mac. Rien n'est enregistré ni envoyé ailleurs." = "Read-only access to the Messages database on this Mac. Nothing is stored or sent elsewhere.";
 "Les nouveaux messages apparaissent ici." = "New messages show up here.";
 "Messages" = "Messages";
-"Messages garde ses conversations dans un fichier protégé. Autorise Claude Notch dans Réglages Système › Confidentialité et sécurité › Accès complet au disque, puis relance l'app. Tout reste sur ton Mac." = "Messages keeps its conversations in a protected file. Allow Claude Notch in System Settings › Privacy & Security › Full Disk Access, then relaunch the app. Everything stays on your Mac.";
+"Messages garde ses conversations dans un fichier protégé. Autorise Oriel dans Réglages Système › Confidentialité et sécurité › Accès complet au disque, puis relance l'app. Tout reste sur ton Mac." = "Messages keeps its conversations in a protected file. Allow Oriel in System Settings › Privacy & Security › Full Disk Access, then relaunch the app. Everything stays on your Mac.";
 "Messages n'est pas configuré" = "Messages is not set up";
 "Messages ne répond pas." = "Messages is not responding.";
 "Noms des contacts" = "Contact names";

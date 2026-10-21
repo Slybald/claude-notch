@@ -141,7 +141,7 @@ final class CodexHookSetup: ObservableObject {
     private func apply(_ hooks: [CodexListedHook], installer: CodexHookInstaller, approved: Bool) {
         let ours = hooks.filter(installer.isOurs)
         if ours.isEmpty {
-            message = L("Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé).", table: "Codex")
+            message = L("Codex ne voit pas les hooks d'Oriel (hooks.json non chargé).", table: "Codex")
             messageIsError = true
             return
         }

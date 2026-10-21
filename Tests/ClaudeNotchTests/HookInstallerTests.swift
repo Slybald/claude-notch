@@ -157,7 +157,7 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(text.contains("\"command\": \"\\\"\(installer.hookURL.path)\\\"\",\n"))
         XCTAssertTrue(text.contains("\"command\": \"\\\"\(installer.hookURL.path)\\\" permission\",\n"))
         XCTAssertTrue(text.contains("\"async\": true,\n            \"timeout\": 10\n"))
-        XCTAssertTrue(text.contains("\"rewakeSummary\": \"Message from Claude Notch\"\n"))
+        XCTAssertTrue(text.contains("\"rewakeSummary\": \"Message from Oriel\"\n"))
         XCTAssertTrue(text.hasSuffix("}\n"))
 
         // Script copié, exécutable, identique à celui de l'app.
@@ -481,6 +481,15 @@ final class HookInstallerTests: XCTestCase {
         settings["hooks"] = hooks
         try write(String(decoding: settings.serialized(), as: UTF8.self))
         XCTAssertEqual(installer.status(), .outdated)
+
+        // Hooks posés avant le renommage (« Message from Claude Notch ») : à réécrire, en silence au lancement.
+        try write(String(decoding: installed, as: UTF8.self)
+            .replacingOccurrences(of: HookInstaller.rewakeSummary, with: HookInstaller.legacyRewakeSummary)
+            .replacingOccurrences(of: HookInstaller.rewakeMessage, with: HookInstaller.legacyRewakeMessage))
+        XCTAssertEqual(installer.status(), .outdated)
+        XCTAssertTrue(try installer.install().settingsChanged)
+        XCTAssertEqual(try settingsData(), installed)
+        XCTAssertFalse(try installer.install().settingsChanged, "idempotent")
 
         // Ordre des clés différent : toujours à jour.
         settings = try OrderedJSON.parse(installed)
