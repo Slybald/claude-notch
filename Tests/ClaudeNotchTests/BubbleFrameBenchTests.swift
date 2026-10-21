@@ -99,8 +99,9 @@ final class BubbleFrameBenchTests: XCTestCase {
         ])
     }
 
-    /// Le décollage, pièce par pièce : phase publiée, réglage rangé, notch qui se replie, bulle affichée pour la première
-    /// fois (fenêtre neuve) ou préparée d'avance.
+    /// Le décollage, rangé par moment comme `BubbleController` le fait : au lancement (vues préparées), au premier
+    /// glisser (la goutte paraît, la bulle se dessine transparente), dans l'image du décollage, au lâcher (réglage
+    /// rangé, notch repliée). Avant ce découpage, tout tombait dans l'image du décollage (79 ms en release).
     func testDetachHitch() throws {
         guard Self.enabled else { throw XCTSkip("CLAUDE_NOTCH_BENCH non défini") }
         _ = NSApplication.shared
@@ -111,34 +112,86 @@ final class BubbleFrameBenchTests: XCTestCase {
         for _ in 0..<5 { notchBench.frame(notch.root) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         notchBench.frame()
+
+        // Au lancement : vues de la bulle et fenêtre de la goutte construites, pas affichées.
+        let bubble = BubbleModel()
+        let root = BubbleRootView(model: notch.model, bubble: bubble, store: notch.store, registry: notch.registry,
+                                  prefs: notch.prefs, actions: NotchActions(), input: BubbleInput())
+        let goo = GooModel()
+        let (panel, handle) = pullGeometry(notch.prefs)
+        let gooFrame = BubbleController.gooFrame(
+            covering: BubbleController.pullCover(panel: panel, notch: Self.notch, handle: handle),
+            screenTop: Self.screen.maxY)
+        let t0 = CACurrentMediaTime()
+        let bubbleBench = Offscreen(root, size: BubbleController.bubbleWindowSize)
+        bubbleBench.hosting.layoutSubtreeIfNeeded()
+        let gooBench = Offscreen(GooView(goo: goo, color: .black), size: gooFrame.size)
+        gooBench.hosting.layoutSubtreeIfNeeded()
+        let launch = (CACurrentMediaTime() - t0) * 1000
+
+        // Premier glisser : la notch s'efface sous la goutte, la bulle se dessine transparente.
         notch.model.gooActive = true
         let fade = notchBench.frame()
+        let local = GooCoordinates(gooFrame)
+        goo.state = GooState(panel: local.body(panel), notch: local.body(Self.notch), handle: local.point(handle),
+                             drop: local.point(handle))
+        let gooFirst = gooBench.frame()
+        bubble.scale = 0.72
+        let bubbleFirst = bubbleBench.frame()
+
+        // Image du décollage : la phase change, la bulle (déjà dessinée) devient opaque et rebondit.
         notch.model.bubble = .bubble
         let phase = notchBench.frame()
+        bubble.scale = 0.8
+        let bounce = bubbleBench.frame()
+
+        // Au lâcher : réglage rangé, notch repliée (cachée sous la goutte).
         notch.prefs.bubbleDetached = true
         let saved = notchBench.frame()
         notch.model.isExpanded = false
         let collapse = notchBench.frame()
 
+        report("decollage", [
+            String(format: "Au lancement (une fois) : vues de la bulle et fenêtre de la goutte : %.2f ms", launch),
+            String(format: "Premier glisser : notch effacée %.2f + goutte %.2f + bulle transparente %.2f = %.2f ms",
+                   fade, gooFirst, bubbleFirst, fade + gooFirst + bubbleFirst),
+            String(format: "Image du décollage : phase publiée %.2f + bulle %.2f = %.2f ms", phase, bounce,
+                   phase + bounce),
+            String(format: "Au lâcher : réglage rangé %.2f + notch repliée %.2f = %.2f ms", saved, collapse,
+                   saved + collapse),
+        ])
+    }
+
+    /// Retour aimanté : une image par position, de la portée de l'aimant jusqu'à l'aspiration, dans la fenêtre agrandie
+    /// au champ de la notch (bulle déplacée dans la fenêtre, contour et pointes recalculés).
+    func testFerroFrameTime() throws {
+        guard Self.enabled else { throw XCTSkip("CLAUDE_NOTCH_BENCH non défini") }
+        _ = NSApplication.shared
+        let notch = NotchHarness(self, store: .working(2))
+        notch.model.bubble = .bubble
+        let field = Ferro.fieldFrame(notch: Self.notch)
+        let local = GooCoordinates(field)
         let bubble = BubbleModel()
+        func place(gap: CGFloat) {
+            let wanted = CGPoint(x: Self.notch.midX + 60, y: Self.notch.minY - BubbleGeometry.radius - gap)
+            let pulled = Ferro.attract(wanted, notch: Self.notch)
+            bubble.ferro = FerroState(notch: local.rect(Self.notch), center: local.point(pulled.center),
+                                      strength: pulled.strength)
+            bubble.layout(center: local.point(pulled.center), window: field.size)
+        }
+        place(gap: Ferro.reach)
         let root = BubbleRootView(model: notch.model, bubble: bubble, store: notch.store, registry: notch.registry,
                                   prefs: notch.prefs, actions: NotchActions(), input: BubbleInput())
-        let side = BubbleController.bubbleWindowSize
-        let t0 = CACurrentMediaTime()
-        let bubbleBench = Offscreen(root, size: side)
-        let cold = bubbleBench.frame() + (CACurrentMediaTime() - t0) * 1000
-        var warm: [Double] = []
-        for step in 0..<30 {
-            bubble.scale = 0.72 + 0.28 * CGFloat(step) / 29
-            warm.append(bubbleBench.frame())
+        let bench = Offscreen(root, size: field.size)
+        for _ in 0..<10 { bench.frame() }
+        var times: [Double] = []
+        for step in 0..<120 {
+            place(gap: Ferro.reach - CGFloat(step) * (Ferro.reach - Ferro.captureGap) / 119)
+            times.append(bench.frame())
         }
-        report("decollage", [
-            String(format: "Décollage, notch qui s'efface sous la goutte : %.2f ms", fade),
-            String(format: "Décollage, phase publiée (notch redessinée) : %.2f ms", phase),
-            String(format: "Décollage, réglage « bulle détachée » rangé (notch redessinée) : %.2f ms", saved),
-            String(format: "Décollage, notch qui se replie : %.2f ms", collapse),
-            String(format: "Bulle, première image (fenêtre et vue neuves) : %.2f ms", cold),
-            "Bulle déjà prête, une image du rebond : \(Stats(samples: warm))",
+        report("ferro", [
+            String(format: "Champ de la notch : %.0f × %.0f pt", field.width, field.height),
+            "Ferrofluide, une image de l'approche : \(Stats(samples: times))",
         ])
     }
 }

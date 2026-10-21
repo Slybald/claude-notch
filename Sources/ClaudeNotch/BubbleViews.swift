@@ -299,7 +299,8 @@ struct BubbleRootView: View {
                                fill: prefs.panelColor, nearNotch: bubble.nearNotch, reduceMotion: model.reduceMotion,
                                input: input, outline: shapes.map { Self.outline($0) },
                                contentScale: shapes?.contentScale ?? 1,
-                               contentOpacity: Double(shapes?.contentOpacity ?? 1))
+                               contentOpacity: Double(shapes?.contentOpacity ?? 1),
+                               rimOpacity: Double(shapes?.rimOpacity ?? 1))
                     .scaleEffect(bubble.scale)
                     .opacity(bubble.ghost ? 0.55 : 1)
                     .position(shapes?.center ?? bubble.centerInWindow)
@@ -443,6 +444,7 @@ struct RevolverBubble: View {
     var outline: Path?
     var contentScale: CGFloat = 1
     var contentOpacity: Double = 1
+    var rimOpacity: Double = 1
 
     private enum Drag {
         case pending(Revolver.Zone)
@@ -494,7 +496,7 @@ struct RevolverBubble: View {
             .opacity(contentOpacity)
             // Bord dans la forme, comme `strokeBorder` : deux fois plus épais, coupé par le contour.
             if let outline {
-                outline.stroke(rimColor, lineWidth: 2 * rimWidth).clipShape(outline)
+                outline.stroke(rimColor, lineWidth: 2 * rimWidth).clipShape(outline).opacity(rimOpacity)
             } else {
                 Circle().strokeBorder(rimColor, lineWidth: rimWidth)
             }

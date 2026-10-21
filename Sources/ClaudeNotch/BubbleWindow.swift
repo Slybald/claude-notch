@@ -256,6 +256,7 @@ final class BubbleController {
         window.orderOut(nil)
         window.alphaValue = 1
         window.ignoresMouseEvents = false
+        bubble.scale = 1
         clearField()
         if notchPending {
             notchPending = false
@@ -313,10 +314,11 @@ final class BubbleController {
     }
 
     /// Bulle préparée pendant le glisser : fenêtre affichée transparente, sans souris, pour que sa première image soit
-    /// dessinée avant le décollage. Au décollage, il ne reste qu'à la rendre opaque.
+    /// dessinée avant le décollage, déjà à la taille de la goutte. Au décollage, il ne reste qu'à la rendre opaque.
     private func prepareBubble(at point: CGPoint) {
         guard !isSuppressed else { return }
         center = point
+        bubble.scale = 0.72
         fitWindowToBubble()
         window.alphaValue = 0
         window.ignoresMouseEvents = true
@@ -411,7 +413,8 @@ final class BubbleController {
         goo.state?.drop = drop
         goo.state?.mode = .snap(start: Date())
         snapEnd = Date().addingTimeInterval(Goo.snapDuration)
-        bubble.scale = 0.72
+        // Déjà à 0,72 si elle a été préparée : sinon le ressort n'aurait rien à animer (même valeur à l'écran).
+        if !window.isVisible { bubble.scale = 0.72 }
         showBubble()
         withAnimation(.spring(response: 0.36, dampingFraction: 0.7)) { bubble.scale = 1 }
         restGoo(after: Goo.snapDuration)
@@ -438,6 +441,7 @@ final class BubbleController {
         window.orderOut(nil)
         window.alphaValue = 1
         window.ignoresMouseEvents = false
+        bubble.scale = 1
         if model.reduceMotion {
             bubble.ghost = false
             return
@@ -595,9 +599,12 @@ final class BubbleController {
         let local = enterField()
         relaxWork?.cancel()
         relaxWork = nil
-        bubble.ferro?.center = local.point(center)
-        bubble.ferro?.strength = pulled.strength
-        bubble.ferro?.mode = .approach
+        if var ferro = bubble.ferro {
+            ferro.center = local.point(center)
+            ferro.strength = pulled.strength
+            ferro.mode = .approach
+            bubble.ferro = ferro
+        }
         bubble.layout(center: local.point(center), window: local.frame.size)
     }
 
@@ -892,8 +899,8 @@ final class BubbleController {
         let local = enterField()
         relaxWork?.cancel()
         relaxWork = nil
+        // La souris reste à la fenêtre : un glisser en cours sur la bulle doit recevoir son relâchement.
         bubble.ferro?.mode = .aspirate(start: Date(), from: local.point(center))
-        window.ignoresMouseEvents = true
         DispatchQueue.main.asyncAfter(deadline: .now() + Ferro.aspirateDuration) { [weak self] in
             self?.haptic(.levelChange)
         }

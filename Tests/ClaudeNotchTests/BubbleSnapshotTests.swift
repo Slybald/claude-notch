@@ -106,7 +106,8 @@ final class BubbleSnapshotTests: XCTestCase {
                 if !shapes.outline.isEmpty {
                     RevolverBubble(tabs: tabs(6), turn: 0, activity: [], claudeEars: nil, fill: fill,
                                    nearNotch: state.strength > 0.5, outline: BubbleRootView.outline(shapes),
-                                   contentScale: shapes.contentScale, contentOpacity: Double(shapes.contentOpacity))
+                                   contentScale: shapes.contentScale, contentOpacity: Double(shapes.contentOpacity),
+                                   rimOpacity: Double(shapes.rimOpacity))
                         .position(shapes.center)
                 }
             }

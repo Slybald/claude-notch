@@ -616,7 +616,7 @@ enum Ferro {
         let cone = cone(notch: notch, toward: center, length: coneLength * positive * positive,
                         halfWidth: coneHalfWidth * (0.6 + 0.4 * positive))
         return FerroShapes(center: center, radius: BubbleGeometry.radius, outline: outline, cone: cone, bridge: [],
-                           swell: 0, contentScale: 1, contentOpacity: 1)
+                           swell: 0, contentScale: 1, contentOpacity: 1, rimOpacity: 1)
     }
 
     /// Aspiration (`t` de 0 à 1) depuis `from`, puis rebond de la notch (`t` au-delà de 1, en durées d'aspiration) :
@@ -628,7 +628,7 @@ enum Ferro {
             let settle = (t - 1) * CGFloat(aspirateDuration)
             let swell = settle < CGFloat(settleDuration) ? swellHeight * exp(-6 * settle) * cos(16 * settle) : 0
             return FerroShapes(center: CGPoint(x: baseX, y: notch.maxY), radius: 0, outline: [], cone: [], bridge: [],
-                               swell: max(0, swell), contentScale: 0, contentOpacity: 0)
+                               swell: max(0, swell), contentScale: 0, contentOpacity: 0, rimOpacity: 0)
         }
         let t = max(t, 0)
         let travel = pow(t, 2.2)
@@ -643,7 +643,7 @@ enum Ferro {
         let arriving = max(0, (t - 0.55) / 0.45)
         return FerroShapes(center: center, radius: radius, outline: outline, cone: [], bridge: bridge,
                            swell: swellHeight * arriving * arriving, contentScale: radius / BubbleGeometry.radius,
-                           contentOpacity: max(0, 1 - t / 0.35))
+                           contentOpacity: max(0, 1 - t / 0.35), rimOpacity: min(1, max(0, (0.85 - t) / 0.5)))
     }
 }
 
@@ -662,6 +662,8 @@ struct FerroShapes: Equatable {
     /// Barillet : il rapetisse avec la bulle et s'efface au début de l'aspiration.
     var contentScale: CGFloat
     var contentOpacity: CGFloat
+    /// Bord de la bulle : il s'efface avant qu'elle se fonde dans la notch.
+    var rimOpacity: CGFloat
 }
 
 /// Retour aimanté en cours dans la fenêtre de la bulle (y vers le bas). Formes recalculées à chaque image d'après
