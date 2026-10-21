@@ -72,6 +72,10 @@ needs you.
   Codex-related runs.
 - **Player**: the track playing in Music, Spotify or your browser, with artwork, progress (drag to seek) and
   controls. Below it, a week view of your calendar: click an event to open it in Calendar.
+- **Agenda**: your next appointment, large, with a **Join** button that opens its Zoom, Meet, Teams, Webex or FaceTime
+  link, and the rest of the day below. On the collapsed notch it becomes an index tab that counts down (discreet from
+  15 minutes before, amber at 5, green `now` while it runs); no polling, nothing runs between two thresholds. A link is
+  only opened when you click **Join**.
 - **Quick Settings**: Wi-Fi, Bluetooth, Focus, Low Power Mode, caffeine (keeps the Mac awake for 1 h, 2 h or
   without limit), the battery of the Mac and of your AirPods, and three scenes: Battery, Normal and Presentation.
 - **Shelf**: files and folders to keep at hand. Drop them on the notch, even when it is collapsed, and drag them
@@ -202,7 +206,7 @@ On first launch, a setup assistant lets you pick what you need, in four short st
 changes nothing; nothing is written before you click **Apply**.
 
 1. **Welcome and profile**: what the notch is, and an optional profile: Developer (Claude and Codex if found,
-   clipboard, timer, notes), Student (player and calendar, timer, notes, quick settings), Creative (player and
+   clipboard, timer, notes), Student (agenda, player and calendar, timer, notes, quick settings), Creative (player and
    calendar, shelf, clipboard) or Minimal (player and calendar, quick settings). It ticks the tabs, sets how the
    panel opens and the ears; the next steps start from it, and everything stays editable. Without a choice,
    nothing changes.
@@ -287,8 +291,9 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
 
 Claude Notch asks for a permission only when you use the feature that needs it. Nothing is requested at launch.
 
-- **Calendars** (full access): your week and events in the Player tab. Asked when you press the calendar's button
-  or turn the option on.
+- **Calendars** (full access): your week and events in the Player tab, and the next appointment of the Agenda tab
+  (including its countdown on the collapsed notch). Asked when you press the calendar's button, **Allow Calendar
+  Access** or turn the option on.
 - **Automation: Calendar** (Apple Events): to open a day or an event in Calendar. macOS asks the first time.
 - **Bluetooth**: to read the state of Bluetooth and switch it from Quick Settings. Asked when you first use the
   Bluetooth tile, or a scene that changes it.
@@ -503,7 +508,7 @@ Its notice is listed in **About › Licenses**.
 
 App macOS native qui vit dans la notch du MacBook et suit les sessions Claude Code, dans un terminal ou un
 éditeur (CLI) comme dans l'onglet Code de Claude Desktop. Survole la notch : le panneau se déplie et résume
-chaque session (état, outil en cours, liste de tâches, sous-agents). Six autres onglets l'accompagnent : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et
+chaque session (état, outil en cours, liste de tâches, sous-agents). Sept autres onglets l'accompagnent : Lecteur, Agenda, Réglages rapides, Étagère, Presse-papiers, Minuteur et
 Notes rapides. Interface disponible en anglais et en
 français (suit la langue du système). Les captures ci-dessus utilisent des données fictives.
 
@@ -541,7 +546,7 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **Claude Desktop** : une ligne indique si Claude Desktop est ouvert, avec un bouton pour le ramener devant.
 - **Section outils (optionnelle)** : fichiers récemment écrits par Claude, état Git de tes dépôts, usage du
   jour. Elle n'apparaît que si ses fichiers de données existent (voir [Section outils](#section-outils)).
-- **Six autres onglets** : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
+- **Sept autres onglets** : Lecteur, Agenda, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
 - Marche aussi sur un écran sans notch (écran externe, capot fermé) : une petite notch est dessinée en haut
   au centre de l'écran.
 
@@ -561,6 +566,10 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
 - **Lecteur** : le morceau en cours dans Musique, Spotify ou ton navigateur, avec la pochette, la progression
   (glisse pour avancer) et les commandes. Dessous, une vue de la semaine de ton calendrier : un clic sur un
   événement l'ouvre dans Calendrier.
+- **Agenda** : ton prochain rendez-vous en grand, avec un bouton **Rejoindre** qui ouvre son lien Zoom, Meet, Teams,
+  Webex ou FaceTime, et le reste de la journée dessous. Notch repliée, il devient un intercalaire qui compte à rebours
+  (discret à 15 minutes, ambre à 5, « en cours » en vert pendant le rendez-vous) ; aucun sondage, rien ne tourne entre
+  deux échéances. Un lien ne s'ouvre que sur un clic sur **Rejoindre**.
 - **Réglages rapides** : Wi-Fi, Bluetooth, Concentration, Économie d'énergie, caféine (empêche la mise en veille
   pendant 1 h, 2 h ou sans limite), batterie du Mac et des AirPods, et trois scènes : Autonomie, Normal et
   Présentation.
@@ -696,7 +705,7 @@ Au premier lancement, un assistant de configuration te laisse choisir ce qui t'i
 étapes. **Passer** est toujours possible et ne change rien ; rien n'est écrit avant **Appliquer**.
 
 1. **Bienvenue et profil** : ce qu'est la notch, et un profil facultatif : Développeur (Claude et Codex s'ils sont
-   trouvés, presse-papiers, minuteur, notes), Étudiant (lecteur et calendrier, minuteur, notes, réglages rapides),
+   trouvés, presse-papiers, minuteur, notes), Étudiant (agenda, lecteur et calendrier, minuteur, notes, réglages rapides),
    Créatif (lecteur et calendrier, étagère, presse-papiers) ou Minimal (lecteur et calendrier, réglages rapides). Il
    coche les onglets, règle l'ouverture du panneau et les oreilles ; les étapes suivantes partent de lui et tout reste
    modifiable. Sans choix, rien ne change.
@@ -788,8 +797,9 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
 Claude Notch ne demande une autorisation que lorsque tu utilises la fonction qui en a besoin. Rien n'est demandé au
 lancement.
 
-- **Calendriers** (accès complet) : ta semaine et tes événements dans l'onglet Lecteur. Demandé quand tu appuies sur
-  le bouton du calendrier ou que tu actives l'option.
+- **Calendriers** (accès complet) : ta semaine et tes événements dans l'onglet Lecteur, et le prochain rendez-vous de
+  l'onglet Agenda (avec son compte à rebours sur la notch repliée). Demandé quand tu appuies sur le bouton du
+  calendrier ou sur **Autoriser l'accès au calendrier**, ou que tu actives l'option.
 - **Automatisation : Calendrier** (Apple Events) : pour ouvrir un jour ou un événement dans Calendrier. macOS le
   demande la première fois.
 - **Bluetooth** : pour lire l'état du Bluetooth et le couper ou le rallumer depuis Réglages rapides. Demandé quand tu

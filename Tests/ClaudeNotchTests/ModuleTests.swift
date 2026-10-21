@@ -199,8 +199,8 @@ final class ModuleTests: XCTestCase {
         prefs.lastTab = "claude"
         prefs.defaultTab = Preferences.lastTabChoice
         settle()
-        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: true), "quicksettings", "Claude désactivé")
-        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: false), "quicksettings")
+        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: true), "agenda", "Claude désactivé")
+        XCTAssertEqual(registry.initialTab(claudeNeedsAttention: false), "agenda")
     }
 
     /// Le module Claude n'active la section outils que panneau ouvert, et oublie ses volets à la fermeture.

@@ -32,7 +32,7 @@ struct AgendaPanel: View {
             case .denied:
                 ModuleEmptyState(symbol: "calendar.badge.exclamationmark", tint: Palette.amber,
                                  title: L("Accès au calendrier refusé", table: "Agenda"),
-                                 detail: L("Autorise Claude Notch dans Réglages Système › Confidentialité › Calendriers.",
+                                 detail: L("Autorise l'app dans Réglages Système › Confidentialité et sécurité › Calendriers.",
                                            table: "Agenda"),
                                  action: ModuleAction(title: L("Ouvrir Réglages Système", table: "Agenda"),
                                                       style: .warning, run: module.openPrivacySettings))
@@ -74,7 +74,7 @@ struct AgendaPanel: View {
                             }
                         }
                     }
-                    .frame(maxHeight: next == nil ? 190 : 120)
+                    .frame(maxHeight: next == nil ? 230 : 150)
                 }
             }
         }

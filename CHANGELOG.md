@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Agenda tab and a live countdown on the collapsed notch.** The next appointment becomes an index tab that counts
+  down: a discreet calendar icon and `14 min` from 15 minutes before, amber with a camera and `4 min` from 5 minutes
+  before, green `now` during the meeting, then it goes away. An amber tab stays unfolded even in *Retracted* mode, and
+  ranks above the timer. Hover it to see the title, the time and the place, with a **Join** button.
+- **Join.** When the event holds a Zoom, Google Meet, Microsoft Teams, Webex or FaceTime link (in its URL, its location or
+  its notes), **Join** opens it in one click, from the tab, the unfolded index tab or the full-screen summary. The text
+  of an event comes from a third party (an invitation), so only an `https` link on the service's own domain is kept
+  (never `zoom.us.other.com`, nor an address with an account in it), plus a `facetime:` link from the event's URL field;
+  the link is re-checked just before opening and never opens on its own. No link: no button, **View in Calendar** stays.
+- **Agenda tab**: the week, the next appointment large (amber frame at 5 minutes, green while it runs) and the rest of the
+  day below, past ones dimmed, with the place under each title. Settings › Agenda: the tab before a meeting (on by
+  default) and the calendars to read. The tab is on by default and is part of the *Student* profile. It reads the
+  Calendars permission the Player tab already uses, asked only when you press **Allow Calendar Access**.
+- Nothing is polled: once access is granted the tab listens to the calendar database (a change, a day change, the clock,
+  waking from sleep) and plans ONE wake-up at the next threshold (start − 15 min, − 5 min, start, end), one per minute
+  during the 15-minute countdown. Between two wake-ups the CPU is at zero. Many changes in a row (an iCloud sync) cost a
+  single re-read.
+
 ## [1.8.0] - 2026-10-21
 
 ### Changed

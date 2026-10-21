@@ -57,7 +57,11 @@ organised and why some choices were made, so they are not undone by accident.
     `CodexProcess` (Codex process and host app from the hook's `$PPID`), `CodexViews`. See [CODEX.md](CODEX.md).
   - `Media/` (`media`): `MediaModule` (life cycle, settings), `NowPlaying` (state rebuilt from the
     `mediaremote-adapter` JSON lines; `MediaRemoteAdapter` runs the helper and restarts it with a growing delay),
-    `MediaCalendar` (EventKit and the Calendar opener), `MediaViews`.
+    `MediaCalendar` (week maths and the Calendar opener), `MediaViews`.
+  - `Agenda/` (`agenda`): `AgendaModule` (calendar access, one planned wake-up, ears), `AgendaModels` (pure: `MeetingLink`,
+    `AgendaMath.focus` / `nextWake`, texts), `AgendaViews` (tab, unfolded index tab, compact line, settings).
+    `Modules/CalendarSource.swift` (shared with Media): `CalendarSource`, `EventKitCalendar`, `MediaEvent` (with `location`
+    and `meeting`). See "Agenda: a live index tab" below.
   - `QuickSettings/` (`quicksettings`): `QuickSettingsModule` (tiles, scenes, caffeine, automatic switch),
     `QuickSettingsBackends` (the system accesses, behind protocols: CoreWLAN, IOBluetooth loaded at runtime,
     `pmset`, IOPS, IOPMAssertion, `shortcuts run`), `QuickSettingsModels` (pure parsers and state), `QuickSettingsViews`.
@@ -109,7 +113,8 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   compact mode has its summaries.
 - **Running while collapsed** (`keepsRunningWhenCollapsed`): Clipboard while its capture is not suspended (the
   history must not have holes); Player while its tab and its ears are on; Quick Settings while a caffeine is
-  active or the automatic switch is on; Timer while a timer counts, is paused, or shows its "Done" ears.
+  active or the automatic switch is on; Timer while a timer counts, is paused, or shows its "Done" ears; Agenda while
+  Calendar access is granted and its ears are on (see "Agenda" below).
 - **Views** are built on demand (shown tab, compact mode, settings) and thrown away: state that must survive a
   tab switch lives in the module (`@Published`). Content width and maximum height come from the environment
   (`\.notchContentWidth`, `\.notchContentMaxHeight`): the whole panel must stay under 460 pt.
@@ -144,7 +149,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **Ears = index tabs** (collapsed notch; Claude only while its tab is on; Codex is an ordinary module here, see
   "Codex" below). Every activity that has ears gets its own tab against the notch: Claude (waiting for you >
   working > just finished, 5 s) first, then the running modules by decreasing priority (timer 5, Codex 9 while it waits
-  and 6 otherwise, player 1, caffeine −10; tab order breaks ties). The first goes on the left against the notch, the second
+  and 6 otherwise, agenda 6 five minutes before an appointment and 2 otherwise, player 1, caffeine −10; tab order breaks ties). The first goes on the left against the notch, the second
   on the right against it, then each side one step further (`EarTabs.distribute`, pure): at most three per side, and with
   more than six the sixth place becomes "+N" (the activities left out). "Show the ears" off: the collapsed notch is exactly
   the notch. Module ears also keep the notch window on screen. This replaced the 1.2.2 rotation (Claude and the other
@@ -478,6 +483,30 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
 - **The shelf keeps bookmarks, not copies**: `URL.bookmarkData` in `shelf.json` (0600) finds a moved file again and
   marks a missing one. Dragging items out offers copy or alias, never a move; the optional "remove after drag"
   only drops the reference from the shelf.
+
+- **Agenda: a live index tab, with one planned wake-up and no polling.** Once Calendar access is granted (asked only on a
+  click, never at launch) and the ears are on, the module runs collapsed too (`keepsRunningWhenCollapsed`). It listens to
+  `EKEventStoreChanged`, the day change, `NSSystemClockDidChange` and waking from sleep (a re-read each), and plans ONE
+  wake-up through `ModuleScheduler`: `AgendaMath.nextWake` returns the nearest of start − 15 min, start − 5 min, start,
+  end of any timed event, plus the next minute change while a countdown is shown (so one wake-up per minute during the
+  15-minute window, none the rest of the time). A wake-up reads the clock again and plans the next one; a re-read
+  replaces it. A re-read in flight swallows the changes that arrive meanwhile and costs one more read (an iCloud sync
+  sends dozens of notifications). The module could stop when nothing is left today, but then nothing could see an
+  event added later: it stays on the notification, not on a timer.
+  - **What shows** (`AgendaMath.focus`, pure): a timed event that ends in the future and lasts at most 12 hours (a trip
+    is not an appointment). From 15 min before: soon (calendar icon, grey), from 5 min: imminent (amber, camera when the
+    event has a link, `ModuleEars.alert` so it stays unfolded in *Retracted*, priority 6 above the timer), running
+    (green, `now`), then nothing. Imminent beats running (a double booking), the earliest wins a tie. The state colour
+    is `ModuleEars.accentHex`, which overrides the module's discreet accent.
+  - **Meeting link** (`MeetingLink.find`, pure): the event text is third-party input. Only `https` on the service's own
+    domain (Zoom `/j/` and `/my/`, Meet code `abc-defg-hij`, Teams `meetup-join` and `meet`, Webex, FaceTime `join`) is
+    kept, found in the URL field, then the location, then the notes (50 000 characters read at most, 2 048 per link). No
+    account in the address, no port, no `http`; `facetime:` only from the URL field. `AgendaModule.join` re-checks with
+    `MeetingLink.isOpenable` before `NSWorkspace.open`, and nothing opens without a click on **Join**.
+  - **Shared calendar code**: `CalendarSource`, `EventKitCalendar` and `MediaEvent` (now with `location` and `meeting`; the
+    notes are not kept) moved to `Modules/CalendarSource.swift`; the Player tab still reads its own week on demand.
+  - Tests: `AgendaTests` (links and look-alikes, thresholds, the whole countdown, a fake calendar changing, clock and
+    scheduler by hand) and `AgendaSnapshotTests` (`agenda-*.png`, `settings-agenda.png`).
 
 ## Conventions
 
