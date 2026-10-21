@@ -302,7 +302,9 @@ enum Goo {
     /// Cercles du col.
     static let neckCount = 14
     /// Flou avant le seuil : arrondit les jonctions comme un liquide.
-    static let blur: CGFloat = 9
+    static let blur: CGFloat = 7
+    /// Rayon du col au plus fin, juste avant la rupture : plus fin, le seuil l'effacerait (≈ 0,7 × le flou).
+    static let neckFloor: CGFloat = 5.5
     static let snapDuration: TimeInterval = 0.32
     static let cancelDuration: TimeInterval = 0.28
     static let mergeDuration: TimeInterval = 0.48
@@ -326,16 +328,16 @@ enum Goo {
     }
 
     /// Rayon du cercle `t` du col (0 côté corps, 1 côté goutte) : épais aux deux bouts, pincé au milieu, de plus en plus
-    /// fin à mesure que `p` monte ; nul au seuil (la goutte se détache).
+    /// fin à mesure que `p` monte, jusqu'à `neckFloor` au seuil ; la rupture vient ensuite (`snap`).
     static func neckRadius(t: CGFloat, progress p: CGFloat, start: CGFloat, end: CGFloat) -> CGFloat {
-        let base = start + (end - start) * t
-        let pinch = 1 - 0.92 * pow(p, 0.7) * sin(.pi * t)
-        return max(0, base * pinch * (1 - pow(p, 6)))
+        let base = max(0, start + (end - start) * t)
+        let thin = pow(min(max(p, 0), 1), 0.8) * sin(.pi * t)
+        return base + (min(neckFloor, base) - base) * thin
     }
 
-    /// Corps qui se replie du panneau vers la notch quand `p` monte.
+    /// Corps qui se replie du panneau vers la notch quand `p` monte : à moitié au seuil, le reste au décollage.
     static func body(from panel: CGRect, to notch: CGRect, progress p: CGFloat) -> CGRect {
-        let e = 1 - pow(1 - p, 2)
+        let e = 0.55 * pow(min(max(p, 0), 1), 1.3)
         func mix(_ a: CGFloat, _ b: CGFloat) -> CGFloat { a + (b - a) * e }
         return CGRect(x: mix(panel.minX, notch.minX), y: mix(panel.minY, notch.minY),
                       width: mix(panel.width, notch.width), height: mix(panel.height, notch.height))
@@ -375,9 +377,17 @@ enum Goo {
                              width: from.width + (notch.width - from.width) * k,
                              height: from.height + (notch.height - from.height) * k)
         shapes.drop.radius = 0
-        // Un reste du col remonte dans le corps.
-        let tail = max(0, 1 - t * 2.2)
-        shapes.neck = shapes.neck.prefix(4).map { .init(center: $0.center, radius: 16 * tail) }
+        // Un reste du col pend sous le corps qui remonte, puis rentre dedans.
+        let tail = max(0, 1 - t * 1.8)
+        let anchor = anchor(body: shapes.body, inset: shapes.bodyRadius, toward: drop)
+        let dx = drop.x - anchor.x, dy = drop.y - anchor.y
+        let length = max(hypot(dx, dy), 1)
+        shapes.neck = (0..<6).map { index -> GooShapes.Circle in
+            let s = CGFloat(index) / 5
+            let reach = 46 * tail * s
+            return .init(center: CGPoint(x: anchor.x + dx / length * reach, y: anchor.y + dy / length * reach),
+                         radius: (12 - 5 * s) * tail)
+        }
         return shapes
     }
 
@@ -402,11 +412,14 @@ enum Goo {
         var grown = notch.insetBy(dx: -swell, dy: 0)
         grown.size.height += swell
         let anchor = Goo.anchor(body: grown, inset: 8, toward: point)
+        // Le col se forme quand la goutte approche, puis s'épaissit jusqu'à se fondre.
         let p = max(0, 1 - t * 2.4)
+        let forming = min(1, t * 4)
         let neck = (0..<neckCount).map { index -> GooShapes.Circle in
             let s = CGFloat(index) / CGFloat(neckCount - 1)
             let center = CGPoint(x: anchor.x + (point.x - anchor.x) * s, y: anchor.y + (point.y - anchor.y) * s)
-            return .init(center: center, radius: neckRadius(t: s, progress: p, start: 14 + swell, end: radius * 0.8))
+            return .init(center: center,
+                         radius: neckRadius(t: s, progress: p, start: 14 + swell, end: radius * 0.8) * forming)
         }
         return GooShapes(body: grown, bodyRadius: 10, drop: .init(center: point, radius: radius), neck: neck)
     }

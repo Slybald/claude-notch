@@ -279,11 +279,12 @@ final class BubbleTests: XCTestCase {
 
     // MARK: - Goutte
 
-    func testNeckThinsThenBreaks() {
+    func testNeckThinsUntilItSnaps() {
         func middle(_ p: CGFloat) -> CGFloat { Goo.neckRadius(t: 0.5, progress: p, start: 30, end: 40) }
         XCTAssertGreaterThan(middle(0.1), middle(0.5))
         XCTAssertGreaterThan(middle(0.5), middle(0.9))
-        XCTAssertEqual(middle(1), 0, "au seuil, le col est rompu")
+        XCTAssertEqual(middle(1), Goo.neckFloor, accuracy: 0.001, "au seuil, le col est au plus fin, encore visible")
+        XCTAssertGreaterThanOrEqual(Goo.neckFloor, Goo.blur * 0.7, "plus fin, le seuil l'effacerait avant la rupture")
         // Pincé au milieu, épais aux bouts.
         XCTAssertLessThan(Goo.neckRadius(t: 0.5, progress: 0.6, start: 30, end: 30),
                           Goo.neckRadius(t: 0.05, progress: 0.6, start: 30, end: 30))

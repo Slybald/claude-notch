@@ -89,13 +89,13 @@ final class EarTabsSnapshotTests: XCTestCase {
 
         // Réglages › Apparence, défilé jusqu'à « Notch repliée » : le choix Rétractés / Toujours visibles.
         let settings = scene(Array(activities.prefix(2)))
-        try renderScrolledToBottom(SettingsView(prefs: settings.harness.prefs, registry: settings.registry,
+        try Self.renderScrolledToBottom(SettingsView(prefs: settings.harness.prefs, registry: settings.registry,
                                                 updater: Updater(), selection: .appearance),
                                    "ear-tabs-settings-appearance", dir)
     }
 
     /// Rendu d'une fenêtre dont la liste défilante est descendue tout en bas.
-    private func renderScrolledToBottom<V: View>(_ view: V, _ name: String, _ dir: URL) throws {
+    static func renderScrolledToBottom<V: View>(_ view: V, _ name: String, _ dir: URL) throws {
         let size = SettingsWindow.size
         let hosting = NSHostingView(rootView: view)
         hosting.frame = CGRect(origin: .zero, size: size)

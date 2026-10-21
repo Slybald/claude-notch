@@ -93,7 +93,7 @@ struct DetachGrip: View {
             let radius = cornerRadius - 6
             var arc = Path()
             arc.addArc(center: center, radius: radius, startAngle: .degrees(8), endAngle: .degrees(82), clockwise: false)
-            let color = lit ? Palette.accent : Color.white.opacity(0.32)
+            let color = lit ? Palette.accent : Color.white.opacity(0.45)
             context.stroke(arc, with: .color(color), style: StrokeStyle(lineWidth: pressed ? 3 : 2.2, lineCap: .round))
             let dot = CGPoint(x: center.x + radius * cos(.pi / 4), y: center.y + radius * sin(.pi / 4))
             let dotRadius: CGFloat = pressed ? 3.4 : 2.6
@@ -126,6 +126,20 @@ struct GooCanvas: View {
     let shapes: GooShapes
     let color: Color
 
+    /// Col continu : une bande dont la largeur suit les cercles (des cercles seuls s'égrèneraient une fois fins).
+    static func neckPath(_ neck: [GooShapes.Circle]) -> Path {
+        var path = Path()
+        guard let first = neck.first, let last = neck.last, neck.count > 1 else { return path }
+        let length = hypot(last.center.x - first.center.x, last.center.y - first.center.y)
+        guard length > 0 else { return path }
+        let normal = CGPoint(x: -(last.center.y - first.center.y) / length, y: (last.center.x - first.center.x) / length)
+        let left = neck.map { CGPoint(x: $0.center.x + normal.x * $0.radius, y: $0.center.y + normal.y * $0.radius) }
+        let right = neck.map { CGPoint(x: $0.center.x - normal.x * $0.radius, y: $0.center.y - normal.y * $0.radius) }
+        path.addLines(left + right.reversed())
+        path.closeSubpath()
+        return path
+    }
+
     var body: some View {
         Canvas { context, _ in
             // Ajoutés dans cet ordre, appliqués dans l'ordre inverse : flou, puis seuil.
@@ -134,6 +148,7 @@ struct GooCanvas: View {
             context.drawLayer { layer in
                 layer.fill(Path(roundedRect: shapes.body, cornerRadius: shapes.bodyRadius, style: .continuous),
                            with: .color(.black))
+                layer.fill(Self.neckPath(shapes.neck), with: .color(.black))
                 for circle in shapes.neck + [shapes.drop] where circle.radius > 0.5 {
                     layer.fill(Path(ellipseIn: CGRect(x: circle.center.x - circle.radius,
                                                       y: circle.center.y - circle.radius,
