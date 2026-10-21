@@ -42,7 +42,7 @@ final class LocalizationTests: XCTestCase {
     /// Une table par module, les mêmes en anglais et en français.
     func testModuleTablesExist() throws {
         let tables = try Self.tables()
-        for table in ["Localizable", "Media", "QuickSettings", "Shelf", "Clipboard", "Timer", "Notes", "Messages", "Mail"] {
+        for table in ["Localizable", "Media", "Agenda", "QuickSettings", "Shelf", "Clipboard", "Timer", "Notes", "Messages", "Mail"] {
             XCTAssertTrue(tables.contains(table), table)
         }
         XCTAssertEqual(try Self.tables("fr"), tables)

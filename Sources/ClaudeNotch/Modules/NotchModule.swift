@@ -16,6 +16,8 @@ struct ModuleEars: Equatable {
     var bars = false
     /// Le module attend l'utilisateur : son intercalaire reste déployé, même en mode « Rétractés ».
     var alert = false
+    /// Couleur de l'activité (hex) quand elle change avec son état (agenda : discret, ambre, vert) ; nil = celle du module.
+    var accentHex: String? = nil
 }
 
 /// Notice d'un composant tiers, affichée dans Réglages › À propos › Licences.
