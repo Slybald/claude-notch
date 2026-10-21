@@ -3,7 +3,7 @@ import Darwin
 import XCTest
 @testable import ClaudeNotch
 
-/// Renommage Claude Notch → Oriel (docs/RENAME.md) : une app 1.8.0 installée reçoit Oriel par sa mise à jour
+/// Renommage Claude Notch → Oriel : une app 1.8.0 installée reçoit Oriel par sa mise à jour
 /// automatique, sans doublon, sans perdre son LaunchAgent ni les messages des sessions déjà ouvertes.
 final class RenameTests: XCTestCase {
     private static let legacyName = "ClaudeNotch"

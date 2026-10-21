@@ -192,6 +192,7 @@ final class Preferences: ObservableObject {
         static let bubbleDetached = "bubble.detached"
         static let bubbleScreen = "bubble.screen"
         static let bubblePositions = "bubble.positions"
+        static let bubbleHandleHints = "bubble.handleHints"
 
         /// Réglages de la notch remis à zéro par « Rétablir les réglages par défaut » : ni les onglets, ni les
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
@@ -309,6 +310,21 @@ final class Preferences: ObservableObject {
     /// Dernier écran de la bulle (nom de `NotchScreenPicker.labels`).
     @Published var bubbleScreen: String? {
         didSet { defaults.set(bubbleScreen, forKey: Key.bubbleScreen) }
+    }
+
+    /// Fois où l'angle du panneau a montré comment détacher la notch (pas publié : rien à redessiner).
+    var bubbleHandleHints: Int {
+        didSet { defaults.set(bubbleHandleHints, forKey: Key.bubbleHandleHints) }
+    }
+
+    /// L'angle montre comment détacher la notch aux premières ouvertures du panneau, puis plus jamais.
+    static let handleHintCount = 3
+
+    /// Vrai (et compté) tant que l'indice de l'angle reste à montrer.
+    func takeHandleHint() -> Bool {
+        guard bubbleHandleHints < Self.handleHintCount else { return false }
+        bubbleHandleHints += 1
+        return true
     }
 
     /// Position de la bulle par écran : décalage [x, y] depuis l'origine de l'écran.
@@ -462,6 +478,7 @@ final class Preferences: ObservableObject {
         bubbleDetached = defaults.bool(forKey: Key.bubbleDetached)
         bubbleScreen = defaults.string(forKey: Key.bubbleScreen)
         bubblePositions = defaults.dictionary(forKey: Key.bubblePositions) as? [String: [Double]] ?? [:]
+        bubbleHandleHints = defaults.integer(forKey: Key.bubbleHandleHints)
         tabOrder = defaults.stringArray(forKey: Key.tabOrder) ?? []
         tabEnabled = defaults.dictionary(forKey: Key.tabEnabled) as? [String: Bool] ?? [:]
         defaultTab = defaults.string(forKey: Key.defaultTab) ?? Self.lastTabChoice

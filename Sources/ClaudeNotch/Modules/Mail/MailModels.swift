@@ -169,7 +169,7 @@ enum MailScript {
     /// - Si une étape échoue après la création de la réponse, on la supprime avant de relancer l'erreur : pas de
     ///   message sortant orphelin.
     /// - Le script se compile. Il n'a JAMAIS été exécuté sur une vraie boîte (une exécution crée une réponse, donc
-    ///   peut déposer un brouillon chez l'utilisateur) : à essayer à la main, voir docs/MESSAGES-MAIL.md.
+    ///   peut déposer un brouillon chez l'utilisateur) : à essayer à la main avant une version.
     static let replySource = """
     on run argv
         set wantedID to item 1 of argv

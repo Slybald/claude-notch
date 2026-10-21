@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Onglet « Mail » : le nombre de messages non lus d'Apple Mail et les 3 à 5 derniers mails reçus (expéditeur, objet,
 /// début du texte, heure), avec une réponse rapide. Désactivé par défaut. Textes dans Resources/{en,fr}.lproj/Mail.strings ; réglages dans UserDefaults sous
-/// « mail.… ». Voir docs/MESSAGES-MAIL.md.
+/// « mail.… ».
 ///
 /// - Mail n'a pas d'API de lecture hors AppleScript (autorisation « Automatisation », demandée par macOS au premier
 ///   script). Claude Notch ne lance JAMAIS Mail : le script vérifie d'abord que Mail tourne, et le module ne lance
