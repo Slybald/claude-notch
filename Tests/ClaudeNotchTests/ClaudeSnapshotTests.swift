@@ -18,9 +18,12 @@ final class ClaudeSnapshotTests: XCTestCase {
         let claude: ClaudeModule
         let registry: ModuleRegistry
         let model = NotchViewModel()
-        private let context = ProcessContext(source: .cli, hostName: "iTerm2", hostBundleId: "com.googlecode.iterm2")
+        private let context: ProcessContext
 
-        init(_ testCase: XCTestCase) {
+        init(_ testCase: XCTestCase, desktop: Bool = false) {
+            context = desktop
+                ? ProcessContext(source: .desktop, hostName: "Claude", hostBundleId: "com.anthropic.claudefordesktop")
+                : ProcessContext(source: .cli, hostName: "iTerm2", hostBundleId: "com.googlecode.iterm2")
             _ = NSApplication.shared
             prefs = Preferences(defaults: makeEphemeralDefaults(testCase))
             prefs.replyFromNotch = true
@@ -161,6 +164,63 @@ final class ClaudeSnapshotTests: XCTestCase {
         try render(SettingsView(prefs: settings.prefs, registry: settings.registry, updater: Updater(),
                                 selection: .module("claude")),
                    name: "reply-settings", to: outputDir, size: SettingsWindow.size, background: nil)
+    }
+
+    /// Conversation d'une session : ce que Claude vient de dire, le champ pour répondre, le repli quand la notch ne
+    /// peut pas écrire, et la carte qui propose d'activer les réponses.
+    func testRenderConversation() throws {
+        guard let outputDir else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
+        let streamJSON = ["claude", "--output-format", "stream-json", "--input-format", "stream-json"]
+        let answer = "J'ai réécrit la section **installation** du `README.md` :\n\n- les prérequis passent en tête\n"
+            + "- la commande `scripts/install.sh` remplace l'ancienne procédure\n- un lien vers la FAQ est ajouté\n\n"
+            + "Il reste deux points à trancher : garde-t-on la version anglaise dans le même fichier, et faut-il "
+            + "documenter le désinstallateur ?"
+
+        // Claude Desktop, attente tenue : on lui écrit, le message part tout de suite.
+        let connected = Scene(self, desktop: true)
+        connected.replies.processArguments = { _ in streamJSON }
+        connected.done("site", answer)
+        connected.replies.wait(sessionId: "site", pid: getpid(), desktop: true, atStop: true) { _ in }
+        connected.working("api")
+        connected.claude.drafts.composing = "site"
+        connected.claude.drafts.messages["site"] = "Garde l'anglais dans le même fichier"
+        try render(connected.root, name: "conversation-desktop", to: outputDir)
+
+        // Plusieurs répliques, dont un sous-agent et ton message, la dernière dépliée à six lignes.
+        let history = Scene(self, desktop: true)
+        history.replies.processArguments = { _ in streamJSON }
+        history.send("UserPromptSubmit", "site", ["prompt": "Mets à jour le README"])
+        history.send("SubagentStop", "site", ["agent_type": "Explore", "last_assistant_message": "README.md : 3 sections à revoir"])
+        history.send("Stop", "site", ["last_assistant_message": answer])
+        history.send("UserPromptSubmit", "site", ["prompt": "Garde l'anglais dans le même fichier"])
+        history.send("Stop", "site", ["last_assistant_message": "Compris, je garde les deux langues dans le README."])
+        history.replies.wait(sessionId: "site", pid: getpid(), desktop: true, atStop: true) { _ in }
+        history.claude.drafts.composing = "site"
+        try render(history.root, name: "conversation-history", to: outputDir)
+
+        // Aucune voie vers la session (ancien script, SDK) : « Réponds dans Claude Desktop » et le bouton qui l'ouvre.
+        let fallback = Scene(self, desktop: true)
+        fallback.replies.processArguments = { _ in streamJSON }
+        fallback.done("site", "Le README est à jour.")
+        fallback.replies.wait(sessionId: "site", pid: getpid(), desktop: false, atStop: true) { _ in }
+        fallback.claude.drafts.composing = "site"
+        try render(fallback.root, name: "conversation-fallback", to: outputDir)
+
+        // Une question que la notch ne tient pas (carte pas ouverte à temps) : la même invitation sous la carte.
+        let unheld = Scene(self, desktop: true)
+        unheld.send("UserPromptSubmit", "site", ["prompt": "Choisis le thème"])
+        unheld.send("PreToolUse", "site", ["tool_name": "AskUserQuestion", "tool_use_id": "q1", "tool_input": ["questions": [
+            ["question": "Quelle couleur d'accent ?", "options": [["label": "Orange"], ["label": "Bleu"]]]]]])
+        try render(unheld.root, name: "conversation-question-elsewhere", to: outputDir)
+
+        // Réponses coupées : la carte du haut les propose ; la conversation se lit, et invite à les activer.
+        let off = Scene(self, desktop: true)
+        off.prefs.replyFromNotch = false
+        off.done("site", "Le README est à jour.")
+        off.working("api")
+        try render(off.root, name: "conversation-prompt", to: outputDir)
+        off.claude.drafts.composing = "site"
+        try render(off.root, name: "conversation-off", to: outputDir)
     }
 
     /// Fenêtre hors écran + rendu de l'arbre de calques, comme SnapshotTests.

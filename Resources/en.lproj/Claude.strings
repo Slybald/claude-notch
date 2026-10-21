@@ -15,8 +15,6 @@
 "Réponds dans %@" = "Answer in %@";
 
 /* Message */
-"Écrire" = "Message";
-"Envoyer un message à Claude" = "Send a message to Claude";
 "Message à Claude…" = "Message to Claude…";
 "Envoyer (Entrée)" = "Send (Return)";
 "Fermer (Échap)" = "Close (Esc)";
@@ -48,3 +46,19 @@
 "Hooks à mettre à jour pour répondre depuis la notch" = "Hooks need an update to reply from the notch";
 "Réponses" = "Replies";
 "Redémarre les sessions ouvertes avant la mise à jour des hooks." = "Restart sessions opened before the hooks update.";
+
+/* Conversation */
+"Converser" = "Chat";
+"Voir la conversation et écrire à Claude" = "See the conversation and write to Claude";
+"Rien de dit pour l'instant" = "Nothing said yet";
+"Afficher tout" = "Show all";
+"Réduire" = "Collapse";
+"Toi" = "You";
+"Agent" = "Agent";
+"Agent %@" = "Agent %@";
+"Ouvrir" = "Open";
+"Active les réponses pour écrire à Claude d'ici" = "Turn on replies to write to Claude from here";
+"Réponds à Claude sans quitter la notch" = "Reply to Claude without leaving the notch";
+"Autorise une action, réponds à une question ou écris à Claude depuis ici. Rien ne part sans ton clic ; le terminal ou Claude Desktop gardent toujours la main." = "Allow an action, answer a question or write to Claude from here. Nothing is sent without your click; the terminal or Claude Desktop always keep control.";
+"Activer" = "Turn On";
+"Plus tard" = "Later";

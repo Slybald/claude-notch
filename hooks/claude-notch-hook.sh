@@ -6,7 +6,8 @@
 #                    standard. Sans décision, app arrêtée ou réglage coupé : rien, le dialogue du terminal garde
 #                    la main (jamais d'autorisation par défaut).
 #   inbox            attente `asyncRewake` (SessionStart, Stop) d'un message envoyé depuis la notch : le texte
-#                    part sur stderr avec le code 2, ce qui réveille Claude. Sinon 0.
+#                    part sur stderr avec le code 2, ce qui réveille Claude. Sinon 0. L'identifiant de session
+#                    de Claude Desktop accompagne la requête : seul l'onglet Code est tenu sur Stop sans terminal.
 # Une décision ou un message n'est appliqué que s'il porte la preuve de l'app (second fichier 0600, jamais
 # envoyé) : un autre programme qui occuperait le port, app fermée, ne décide rien.
 
@@ -30,6 +31,7 @@ permission | inbox)
         -H 'Content-Type: application/json' \
         -H 'Expect:' \
         -H "X-Claude-PPID: $PPID" \
+        -H "X-Host-Session-Id: ${CLAUDE_CODE_HOST_SESSION_ID:-}" \
         --data-binary @"$WORK/in" \
         "$URL/$1" &
     CURL=$!

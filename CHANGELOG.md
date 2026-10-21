@@ -27,6 +27,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 - Writing a message to a running Codex session and answering Codex's own questions: Codex offers no safe way (no hook).
 
+## [1.5.0] - 2026-10-21
+
+### Added
+
+- Talk to Claude from the notch: hover a session card and click **Chat** to see what Claude just said (and what
+  your subagents reported), what you wrote, and a field to write to it. It works for the CLI and for the Code tab
+  of Claude Desktop (checked with Claude Code 2.1.304: permissions, questions and messages that wake Claude).
+- A card at the top of the Claude tab offers to turn on "Reply from the notch" (**Turn On** / **Later**) instead
+  of leaving it in Settings › Claude. Nothing is decided without your click, and the terminal or Claude Desktop
+  keep control.
+- When the notch cannot write to a session (`claude -p`, the Agent SDK, an IDE, a session opened before the hook
+  script was updated), the conversation says "Answer in *app*" with an **Open** button.
+
+### Changed
+
+- The hook script sends the Claude Desktop session ID with its waiting requests (`inbox`), so the Code tab of
+  Claude Desktop is held at the end of a turn only. Held at the start of a session, the hook would delay the first
+  prompt.
+
 ## [1.4.0] - 2026-10-21
 
 ### Added

@@ -64,6 +64,30 @@ struct ActiveTool: Equatable {
     let description: ToolDescriber.Description
 }
 
+/// Une réplique de la conversation, telle que les hooks la rapportent (UserPromptSubmit, Stop, SubagentStop).
+/// En mémoire seulement : ni sur disque, ni dans `/state`.
+struct Utterance: Equatable, Identifiable {
+    enum Speaker: Equatable {
+        case you
+        case claude
+        /// Sous-agent, avec son type (« Explore »…), vide s'il est inconnu.
+        case agent(String)
+    }
+
+    let id = UUID()
+    let speaker: Speaker
+    let text: String
+    let date: Date
+
+    static let maxCount = 6
+    static let maxLength = 6000
+
+    /// Même réplique : le texte seul compte (un hook relancé ne la double pas).
+    static func == (lhs: Utterance, rhs: Utterance) -> Bool {
+        lhs.speaker == rhs.speaker && lhs.text == rhs.text
+    }
+}
+
 struct Session: Identifiable, Equatable {
     let id: String
     var cwd: String?
@@ -98,6 +122,8 @@ struct Session: Identifiable, Equatable {
     var toolCount = 0
     var activeAgents: Set<String> = []
     var tasks: [TaskItem] = []
+    /// Dernières répliques (les plus récentes en dernier), pour la vue conversation.
+    var conversation: [Utterance] = []
     var doneFlashUntil: Date?
     var endedAt: Date?
 
@@ -112,6 +138,16 @@ struct Session: Identifiable, Equatable {
     var currentTask: TaskItem? { tasks.first { $0.status == .inProgress } }
     /// Toutes les cartes sont des sessions Claude Code : l'étiquette dit où elles tournent.
     var sourceLabel: String { source == .desktop ? L("Claude Code (app)") : (hostName ?? "CLI") }
+
+    /// Ajoute une réplique (texte borné, jamais deux fois de suite la même) et garde les plus récentes.
+    mutating func say(_ speaker: Utterance.Speaker, _ text: String?, at date: Date) {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+        let bounded = text.count > Utterance.maxLength ? String(text.prefix(Utterance.maxLength - 1)) + "…" : text
+        let utterance = Utterance(speaker: speaker, text: bounded, date: date)
+        guard conversation.last != utterance else { return }
+        conversation.append(utterance)
+        if conversation.count > Utterance.maxCount { conversation.removeFirst(conversation.count - Utterance.maxCount) }
+    }
 
     mutating func absorb(_ context: ProcessContext) {
         if let pid = context.claudePid {
@@ -286,10 +322,12 @@ final class SessionStore: ObservableObject {
             if let message = event.notchMessage {
                 session.lastPrompt = message.isEmpty
                     ? L("message envoyé depuis la notch", table: "Claude") : ToolDescriber.firstLine(message, max: 90)
+                session.say(.you, message, at: now)
             } else if event.isTaskNotification {
                 session.lastPrompt = L("résultat d'un agent en arrière-plan")
             } else if let prompt = event.prompt {
                 session.lastPrompt = ToolDescriber.firstLine(prompt, max: 90)
+                session.say(.you, prompt, at: now)
             }
 
         case "PreToolUse":
@@ -357,6 +395,7 @@ final class SessionStore: ObservableObject {
             if let message = event.lastAssistantMessage.flatMap({ ToolDescriber.cleanMarkdown($0) }) {
                 session.lastMessage = message
             }
+            session.say(.claude, event.lastAssistantMessage, at: now)
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.doneFlashDuration + 0.05) { [weak self] in
                 self?.objectWillChange.send()
             }
@@ -374,7 +413,9 @@ final class SessionStore: ObservableObject {
         case "SubagentStop":
             if event.isInternalAgent {
                 break
-            } else if let agent = event.agentId {
+            }
+            session.say(.agent(event.agentType ?? ""), event.lastAssistantMessage, at: now)
+            if let agent = event.agentId {
                 session.activeAgents.remove(agent)
             } else if let any = session.activeAgents.first {
                 session.activeAgents.remove(any)
