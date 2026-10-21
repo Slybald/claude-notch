@@ -60,14 +60,18 @@ struct DetachHandle: View {
     let detach: () -> Void
     /// Rayon du coin du panneau, pour que l'arc le suive.
     var cornerRadius: CGFloat = 24
+    /// Premières ouvertures du panneau : l'indice s'affiche seul quelques secondes (vrai = à montrer, déjà compté).
+    var takeHint: () -> Bool = { false }
 
     @State private var hovering = false
     @State private var pressing = false
+    @State private var hinting = false
 
     static let size: CGFloat = 26
+    static let hintDuration: TimeInterval = 3.5
 
     var body: some View {
-        DetachGrip(cornerRadius: cornerRadius, lit: hovering || pressing, pressed: pressing)
+        DetachGrip(cornerRadius: cornerRadius, lit: hovering || pressing || hinting, pressed: pressing)
             .frame(width: Self.size, height: Self.size)
             // Seulement la marge du panneau (14 pt) : les contrôles d'un module dans ce coin gardent leurs clics.
             .contentShape(CornerBand(width: ExpandedPanel.bottomPadding))
@@ -77,6 +81,23 @@ struct DetachHandle: View {
                 if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
             .onDisappear { if hovering { NSCursor.pop() } }
+            // Indice sous l'angle : tout de suite au survol (l'info-bulle met une seconde), et seul aux premières
+            // ouvertures. Hors du panneau, sans prendre la souris.
+            .overlay(alignment: .topTrailing) {
+                if hovering || hinting {
+                    DetachHint()
+                        .fixedSize()
+                        .offset(y: Self.size + 4)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: hovering || hinting)
+            .onAppear {
+                guard takeHint() else { return }
+                hinting = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.hintDuration) { hinting = false }
+            }
             // Glisser tout de suite, ou appui maintenu : la goutte part au premier mouvement (l'appui long seul
             // échouait dès qu'on glissait avant 0,3 s, et rien ne se passait).
             .onLongPressGesture(minimumDuration: 0.3, maximumDistance: 3, perform: begin,
@@ -88,6 +109,25 @@ struct DetachHandle: View {
             .accessibilityHint(Text(L("La notch devient une bulle à poser où tu veux.", table: "Bubble")))
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { detach() }
+    }
+}
+
+/// « Glisse l'angle pour détacher la notch », sous l'angle du panneau.
+struct DetachHint: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.down.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(Palette.accent)
+            Text(L("Glisse l'angle pour détacher la notch", table: "Bubble"))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Palette.primary)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 22)
+        .background(Capsule().fill(Color.black.opacity(0.88)))
+        .overlay(Capsule().strokeBorder(Palette.accent.opacity(0.55), lineWidth: 1))
+        .environment(\.colorScheme, .dark)
     }
 }
 

@@ -137,7 +137,8 @@ struct NotchRootView: View {
         .clipShape(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius))
         .overlay(alignment: .bottomTrailing) {
             if showsHandle {
-                DetachHandle(begin: actions.beginDetach, detach: { actions.detach?() }, cornerRadius: bottomRadius)
+                DetachHandle(begin: actions.beginDetach, detach: { actions.detach?() }, cornerRadius: bottomRadius,
+                             takeHint: prefs.takeHandleHint)
                     .padding(.trailing, topRadius)
                     .transition(.opacity)
             }

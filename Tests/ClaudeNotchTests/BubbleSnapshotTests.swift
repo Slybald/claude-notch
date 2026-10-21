@@ -50,6 +50,18 @@ final class BubbleSnapshotTests: XCTestCase {
         .padding(20)
         try TimerNotesSnapshot.render(zoom, "bubble-handle-zoom", dir, size: CGSize(width: 640, height: 220),
                                       background: Self.wallpaper)
+
+        // Indice de l'angle (survol, premières ouvertures), sous un panneau.
+        let hint = ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.black).frame(width: 300, height: 120)
+            DetachHandle(begin: {}, detach: {}, takeHint: { true })
+                .frame(width: DetachHandle.size, height: DetachHandle.size)
+                .offset(y: 120 - DetachHandle.size)
+        }
+        .frame(width: 300, height: 170, alignment: .topTrailing)
+        .padding(20)
+        try TimerNotesSnapshot.render(hint, "bubble-handle-hint", dir, size: CGSize(width: 340, height: 210),
+                                      background: Self.wallpaper)
     }
 
     /// Étapes du décollage (la goutte s'étire, le col s'amincit, se rompt) puis du rattachement.

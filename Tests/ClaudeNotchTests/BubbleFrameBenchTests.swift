@@ -172,11 +172,12 @@ final class BubbleFrameBenchTests: XCTestCase {
         let field = Ferro.fieldFrame(notch: Self.notch)
         let local = GooCoordinates(field)
         let bubble = BubbleModel()
+        var state = FerroState(notch: local.rect(Self.notch), center: .zero)
         func place(gap: CGFloat) {
             let wanted = CGPoint(x: Self.notch.midX + 60, y: Self.notch.minY - BubbleGeometry.radius - gap)
             let pulled = Ferro.attract(wanted, notch: Self.notch)
-            bubble.ferro = FerroState(notch: local.rect(Self.notch), center: local.point(pulled.center),
-                                      strength: pulled.strength)
+            state.move(to: local.point(pulled.center), strength: pulled.strength, at: Date())
+            bubble.ferro = state
             bubble.layout(center: local.point(pulled.center), window: field.size)
         }
         place(gap: Ferro.reach)
@@ -185,13 +186,16 @@ final class BubbleFrameBenchTests: XCTestCase {
         let bench = Offscreen(root, size: field.size)
         for _ in 0..<10 { bench.frame() }
         var times: [Double] = []
-        for step in 0..<120 {
-            place(gap: Ferro.reach - CGFloat(step) * (Ferro.reach - Ferro.captureGap) / 119)
+        // Approche jusqu'au pont épais, puis éloignement : pont étiré, rompu.
+        for step in 0..<160 {
+            let t = CGFloat(step) / 159
+            let gap = t < 0.7 ? Ferro.reach - (Ferro.reach - 20) * t / 0.7 : 20 + (120 - 20) * (t - 0.7) / 0.3
+            place(gap: gap)
             times.append(bench.frame())
         }
         report("ferro", [
             String(format: "Champ de la notch : %.0f × %.0f pt", field.width, field.height),
-            "Ferrofluide, une image de l'approche : \(Stats(samples: times))",
+            "Ferrofluide, une image (approche, pont, rupture) : \(Stats(samples: times))",
         ])
     }
 }

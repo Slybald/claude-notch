@@ -611,6 +611,19 @@ final class BubbleTests: XCTestCase {
         XCTAssertFalse(controller.window.isVisible)
     }
 
+    /// L'angle se montre aux trois premières ouvertures du panneau, plus jamais ensuite ni une fois le geste trouvé ;
+    /// le compte survit au redémarrage.
+    func testHandleHintShowsOnlyAtFirst() {
+        let defaults = makeEphemeralDefaults(self)
+        let prefs = Preferences(defaults: defaults)
+        XCTAssertEqual((0..<5).map { _ in prefs.takeHandleHint() }, [true, true, true, false, false])
+        XCTAssertFalse(Preferences(defaults: defaults).takeHandleHint())
+        let other = Preferences(defaults: makeEphemeralDefaults(self))
+        XCTAssertTrue(other.takeHandleHint())
+        other.bubbleHandleHints = Preferences.handleHintCount
+        XCTAssertFalse(other.takeHandleHint())
+    }
+
     /// Aucun état sans issue : de chaque phase, des gestes de l'utilisateur ramènent à la notch.
     func testEveryPhaseHasAWayOut() {
         let events: [BubblePhase.Event] = [.grab, .release(detached: false), .release(detached: true), .open, .close,

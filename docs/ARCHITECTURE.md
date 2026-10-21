@@ -493,7 +493,9 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     card there (`revealApproval`), `collapse()` (open a session, settings…) closes it. A file dragged to the notch does not open the Shelf then.
   - **Handle**: an arc and a dot in the bottom right corner of the expanded panel (not in compact full screen nor in tab
     edit mode). A 3 pt drag or a 0.3 s long press (SwiftUI) starts the drag (the long press alone failed as soon as the
-    mouse moved before 0.3 s, and nothing happened); the drags and the mouse-up then come from a local event
+    mouse moved before 0.3 s, and nothing happened). Hovering the corner shows "Drag the corner to detach the notch"
+    right away (the tooltip takes a second), and so do the first three panel openings, for 3.5 s
+    (`Preferences.takeHandleHint`; never again once the gesture is found); the drags and the mouse-up then come from a local event
     monitor (they go to the window of the mouse-down, even outside it) that is removed at the mouse-up. Menu, right
     click and VoiceOver detach without dragging (`detachAutomatically`).
   - **Drop** ("gooey" metaballs): a separate window under the notch, a `Canvas` with `blur` then `alphaThreshold`
@@ -521,20 +523,25 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     stored per display label (`NotchScreenPicker.labels`) as an offset from the display origin, plus the last display;
     a display that disappears sends the bubble back to the notch's display. Hidden with the notch ("Hide the notch",
     full screen "hidden").
-  - **Magnetic return (ferrofluid)** (`Ferro`, `FerroState`, `FerroShapes`, pure; `FerroCanvas`): within 150 pt
-    (`reach`, gap between the bubble's edge and the middle of the notch bottom) the bubble is pulled toward the notch,
-    up to 30 pt, with a strength that grows faster and faster as the gap shrinks (square of the closeness). The bubble
-    window then grows once to the notch's field (`Ferro.fieldFrame`, notch included) and stops moving: the bubble moves
-    inside it, and its outline (`RevolverBubble.outline`), the notch's cone and the neck are drawn in the same view,
-    so nothing lags behind. Outline: a circle stretched toward the notch with seven cone-shaped spikes (sharp tips,
-    bases tangent to the circle) on a 360-point outline whose spikes fall on points (no flicker as they turn). Within
-    44 pt (`magnetGap`) the rim lights up and a release merges; within 16 pt (`captureGap`) the notch sucks it in
-    without waiting for the release. Aspiration (0.42 s): the bubble accelerates into the notch, shrinks, its spikes
-    and cylinder fade, a neck flares from the notch bottom (curves flat on the notch edge, tangent to the bubble); then
-    the notch bottom swells and bounces once (0.45 s), and the window is ordered out. Released between 44 and 150 pt:
-    the bubble relaxes (damped, slightly flattened, then round) and the window shrinks back. The neck goes from the
-    notch's color (black on a real notch) to the bubble's. "Reduce motion": a plain magnet (pulled halfway within
-    44 pt) and a fade. Reattach from the menu or a double click from far away: the bubble glides under the notch first.
+  - **Magnetic return (ferrofluid)** (`Ferro`, `FerroState`, `FerroShapes`, pure; `FerroCanvas`): like a drop rejoining
+    a puddle, drawn at every frame of the drag. Within 150 pt (`reach`, gap between the bubble's edge and the notch
+    bottom right above it, `Ferro.base`) the bubble is pulled toward the notch, up to 30 pt, with a strength that
+    grows faster and faster as the gap shrinks (square of the closeness). The bubble window then grows once to the
+    notch's field (`Ferro.fieldFrame`, notch included) and stops moving: the bubble moves inside it, and its outline
+    (`RevolverBubble.outline`), the notch's cone, the bridge and the notch edge are drawn in the same view, so nothing
+    lags behind. Bubble and notch reach toward each other (`reachOut`): the bubble stretches into a drop with seven
+    cone-shaped spikes (sharp tips, bases tangent to the circle, on a 360-point outline whose spikes fall on points),
+    the notch grows a cone (40 % of the gap) and its bottom bulges; at 70 pt (`bridgeGap`) the tips touch and a
+    bridge forms (its neck grows from nothing in 0.12 s), thicker as the bubble comes closer. Pulled away, the bridge
+    stretches into a thread and breaks only beyond 105 pt (`breakGap`, hysteresis: it does not flicker at the limit);
+    both halves spring back (`recoil`). A bridged bubble lights its rim and is sucked in when released; within 16 pt
+    (`captureGap`) it is sucked in without waiting. Aspiration (0.42 s) starts from the bridge as it is (no jump): the
+    bubble accelerates into the notch, shrinks, its spikes and cylinder fade, the bridge widens into a funnel (its base
+    stays within the notch's flat bottom); then a ripple runs along the notch bottom toward both corners and dies out
+    (0.6 s), and the window is ordered out. Released unbridged in the field: the bubble relaxes (damped, slightly
+    flattened, then round) and the window shrinks back. The bridge goes from the notch's color (black on a real notch)
+    to the bubble's. "Reduce motion": a plain magnet (pulled halfway within 44 pt) and a fade. Reattach from the menu or
+    a double click from far away: the bubble glides under the notch first.
   - **Revolver** (`Revolver`, pure): one chamber per enabled tab in the user's order, active tab at the top (fixed
     mark), `turn` counts detents without bounds so the spring always turns the short way. Scroll: 1 detent per wheel
     line or per 28 pt of trackpad, momentum ignored (`RevolverScroll`); circular drag on the chambers: one detent per

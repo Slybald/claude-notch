@@ -8,10 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
-- **The bubble comes back like ferrofluid.** Near the notch the bubble is pulled in, harder and harder as it gets
-  closer: it stretches toward the notch and grows spikes, and the notch reaches down to it. Close enough, the notch
-  sucks it in (no need to let go), and its bottom swells and bounces once. Let go before that and the bubble relaxes
-  back into a round shape. "Reduce motion" keeps the simple magnet and fade.
+- **The bubble comes back like a drop rejoining a puddle, in ferrofluid**, live while you drag. As soon as it nears
+  the notch it is pulled in, harder and harder: it stretches into a spiky drop, the notch bulges and reaches down to
+  it, and when they touch a bridge of fluid forms and thickens as you come closer. Pull away and the bridge stretches
+  into a thread, then breaks, and both spring back. Let go while bridged, or bring it close, and the notch sucks it in
+  in one motion, then a ripple runs along its edge. "Reduce motion" keeps the simple magnet and fade.
+- **The detach corner shows itself**: hovering it says "Drag the corner to detach the notch" at once, and so do the
+  first three panel openings.
 - **Back to the cylinder** from a tab opened in the bubble: a back button at the start of the tab bar, Esc (when the
   panel has the keyboard), a pinch, or a click outside the panel. The content folds back into its chamber.
 

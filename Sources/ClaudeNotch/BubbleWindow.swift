@@ -295,6 +295,8 @@ final class BubbleController {
     /// Appui maintenu sur la poignée : la goutte suit la souris (`pullMoved`) jusqu'au relâchement (`pullEnded`).
     func beginPull(panel: CGRect) {
         guard model.bubble == .attached, prefs.allowsDetach else { return }
+        // Le geste est trouvé : l'angle n'a plus besoin de se montrer.
+        prefs.bubbleHandleHints = Preferences.handleHintCount
         let handle = mouseLocation()
         let notch = notchRect()
         pull = (panel, notch, handle)
