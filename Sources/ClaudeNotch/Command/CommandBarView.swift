@@ -106,7 +106,6 @@ struct CommandBarView: View {
                 ForEach(Array(model.results.enumerated()), id: \.element.id) { index, command in
                     CommandRow(command: command, isSelected: index == model.selection)
                         .onTapGesture { model.run(command) }
-                        .onHover { inside in if inside { model.select(index) } }
                 }
             }
             .accessibilityElement(children: .contain)
@@ -204,6 +203,9 @@ struct CommandRow: View {
     let command: NotchCommand
     let isSelected: Bool
 
+    /// Le survol colore la ligne sans changer la sélection : une souris immobile ne doit pas déplacer ce que ⏎ lance.
+    @State private var hovering = false
+
     var body: some View {
         HStack(spacing: 11) {
             Image(systemName: command.symbol)
@@ -232,11 +234,14 @@ struct CommandRow: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 46)
-        .background(ModuleStyle.shape(ModuleStyle.rowRadius).fill(isSelected ? Palette.accent.opacity(0.13) : .clear))
+        .background(ModuleStyle.shape(ModuleStyle.rowRadius)
+            .fill(isSelected ? Palette.accent.opacity(0.13) : Color.white.opacity(hovering && command.isEnabled ? 0.06 : 0)))
         .overlay(ModuleStyle.shape(ModuleStyle.rowRadius).stroke(Palette.accent.opacity(isSelected ? 0.6 : 0), lineWidth: 1))
         .opacity(command.isEnabled ? 1 : 0.55)
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .animation(ModuleStyle.hover, value: isSelected)
+        .animation(ModuleStyle.hover, value: hovering)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(command.title + ", " + command.detail)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -297,7 +302,11 @@ struct CommandField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.parent = self
-        if field.stringValue != text { field.stringValue = text }
+        if field.stringValue != text {
+            field.stringValue = text
+            // Le texte réécrit (le verbe vient de passer à part) : le curseur reste au bout, rien n'est sélectionné.
+            (field.currentEditor() as? NSTextView)?.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+        }
         field.placeholderAttributedString = NSAttributedString(
             string: placeholder, attributes: [.foregroundColor: NSColor.white.withAlphaComponent(0.4),
                                               .font: NSFont.systemFont(ofSize: 15, weight: .medium)])
@@ -341,6 +350,10 @@ private final class FocusingTextField: NSTextField {
         super.viewDidMoveToWindow()
         guard window != nil else { return }
         NotchKeyboard.take()
-        DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(self) }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window?.makeFirstResponder(self) == true else { return }
+            // Un champ qui prend le focus sélectionne son texte : le curseur va au bout.
+            (self.currentEditor() as? NSTextView)?.setSelectedRange(NSRange(location: (self.stringValue as NSString).length, length: 0))
+        }
     }
 }

@@ -124,7 +124,6 @@ final class CommandBarTests: XCTestCase {
 
         bar.text = "t 25"
         bar.move(1)
-        bar.select(0)
         bar.pick(CommandVerb(key: "t", title: "timer"))
         XCTAssertEqual(spy.runs, 0, "chercher, parcourir et choisir ne lancent rien")
         XCTAssertEqual(finished, 0)
@@ -256,6 +255,43 @@ final class CommandBarTests: XCTestCase {
         XCTAssertEqual(Set(verbs.map(\.key)), ["t", "n", "c", "s", ">"])
         XCTAssertEqual(verbs.count, 5)
         XCTAssertEqual(Set(verbs.map(\.key)).count, verbs.count)
+    }
+
+    // MARK: - Raccourci et état
+
+    /// Une combinaison ne sert qu'à une action ; le choix est gardé et remis à zéro avec les réglages de la notch.
+    func testCommandHotKeyIsExclusiveAndPersists() {
+        let defaults = makeEphemeralDefaults(self)
+        let prefs = Preferences(defaults: defaults)
+        XCTAssertEqual(prefs.commandHotKey, .none, "aucun raccourci par défaut")
+
+        prefs.toggleHotKey = .controlOptionSpace
+        prefs.hideHotKey = .optionCommandJ
+        prefs.commandHotKey = .controlOptionSpace
+        XCTAssertEqual(prefs.toggleHotKey, .none, "la combinaison passe à la barre")
+        XCTAssertEqual(prefs.hideHotKey, .optionCommandJ)
+
+        prefs.toggleHotKey = .optionCommandK
+        prefs.commandHotKey = .optionCommandK
+        XCTAssertEqual(prefs.toggleHotKey, .none)
+        prefs.hideHotKey = .optionCommandK
+        XCTAssertEqual(prefs.commandHotKey, .none, "et elle repart quand une autre action la reprend")
+
+        prefs.commandHotKey = .optionCommandK
+        prefs.hideHotKey = .none
+        XCTAssertEqual(Preferences(defaults: defaults).commandHotKey, .optionCommandK, "relu au lancement")
+        prefs.resetNotchSettings()
+        XCTAssertEqual(prefs.commandHotKey, .none)
+        XCTAssertNotNil(HotKeyChoice.optionCommandK.carbon)
+    }
+
+    /// La barre ne survit pas au panneau : repliée, elle est fermée (le panneau rouvre sur ses onglets).
+    func testBarClosesWithThePanel() {
+        let model = NotchViewModel()
+        model.isExpanded = true
+        model.isCommandBarOpen = true
+        model.isExpanded = false
+        XCTAssertFalse(model.isCommandBarOpen)
     }
 
     // MARK: - Minuteur

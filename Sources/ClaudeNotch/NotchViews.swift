@@ -87,7 +87,7 @@ struct NotchRootView: View {
     private var bottomRadius: CGFloat { expanded ? (compact ? 18 : 24) : 9 }
     /// Repliée : la notch seule ; les intercalaires se posent contre elle (`EarTabsView`).
     private var bodyWidth: CGFloat {
-        expanded ? prefs.expandedWidth(compact: compact) : model.notchSize.width
+        expanded ? prefs.expandedWidth(compact: compact && !model.isCommandBarOpen) : model.notchSize.width
     }
 
     var body: some View {

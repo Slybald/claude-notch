@@ -184,10 +184,6 @@ final class CommandBarModel: ObservableObject {
         selection = (selection + delta + results.count) % results.count
     }
 
-    func select(_ index: Int) {
-        if results.indices.contains(index) { selection = index }
-    }
-
     /// ⏎ : lance la ligne choisie, si elle a une action.
     func runSelected() {
         guard results.indices.contains(selection) else { return }
