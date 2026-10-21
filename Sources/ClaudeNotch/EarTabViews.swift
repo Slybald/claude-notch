@@ -34,7 +34,8 @@ struct EarTabShape: Shape {
         path.addLine(to: CGPoint(x: i - s * inner, y: rect.maxY))
         path.addQuadCurve(to: CGPoint(x: i, y: rect.maxY - inner), control: CGPoint(x: i, y: rect.maxY))
         if overlap > 0, overlapHeight > 0 {
-            let y = min(overlapHeight, rect.maxY - inner)
+            // Jusqu'en bas de la notch, même si la carte déployée est basse : le jour du coin arrondi de la notch s'y trouve.
+            let y = min(overlapHeight, rect.maxY)
             path.addLine(to: CGPoint(x: i, y: y))
             path.addLine(to: CGPoint(x: i + s * overlap, y: y))
             path.addLine(to: CGPoint(x: i + s * overlap, y: rect.minY))
@@ -139,9 +140,14 @@ private struct EarTabItemView: View {
         .accessibilityAction { openTab(item.id) }
     }
 
+    /// Coin intérieur bas de la carte : pas plus haut que ce qui dépasse sous la notch, sinon il laisse un jour contre elle.
+    private var cardInnerRadius: CGFloat {
+        min(EarTabs.cardRadius, max(0, max(cardHeight, layout.notch.height) - layout.notch.height))
+    }
+
     private var shape: EarTabShape {
         EarTabShape(side: item.side, outerRadius: isHovered ? EarTabs.cardRadius : EarTabs.restRadius,
-                    innerRadius: isHovered ? EarTabs.cardRadius : 0, overlap: overlap,
+                    innerRadius: isHovered ? cardInnerRadius : 0, overlap: overlap,
                     overlapHeight: overlap > 0 ? (isHovered ? layout.notch.height : item.height) : 0)
     }
 

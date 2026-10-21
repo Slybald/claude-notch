@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Index tabs now line up with the real notch.** The tab against the notch was 3 pt shorter than it, so the notch showed
+  as a small lip under the tabs with a step on each side and a gap in its rounded bottom corners; and the collapsed shape
+  drew 6 pt flares on each side of the notch, so on a side without a tab it stuck out of the notch (the shape measured
+  197 pt for a 185 pt notch). The central part is now exactly the notch (same width and height), the first tab on each side
+  is as tall as the notch and continues it without a step or a gap, in every state (always visible, retracted, unfolded,
+  virtual notch). Tests measure the rendered silhouette against the notch for several notch sizes.
+
 ## [1.8.0] - 2026-10-21
 
 ### Changed

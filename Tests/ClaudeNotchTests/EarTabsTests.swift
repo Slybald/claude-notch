@@ -115,12 +115,13 @@ final class EarTabsTests: XCTestCase {
                                         layout.right.last!.inner + layout.right.last!.width))
     }
 
-    /// Escalier : chaque intercalaire est plus court que celui qui est plus près de la notch, tous plus courts qu'elle.
+    /// Escalier : le premier intercalaire a la hauteur de la notch (pas de marche), chacun des suivants est plus court que
+    /// celui qui est plus près d'elle. Le détail par taille d'encoche est dans `EarTabsGeometryTests`.
     func testHeightsStepDownAwayFromTheNotch() {
         for height: CGFloat in [32, 24] {
             let layout = layout(fakeTabs(6), notch: CGSize(width: 185, height: height))
             for side in [layout.left, layout.right] {
-                var previous = height
+                var previous = height + 1
                 for item in side {
                     XCTAssertLessThan(item.height, previous, "hauteur \(height), rang \(item.rank)")
                     XCTAssertGreaterThanOrEqual(item.height, 16, "assez haut pour l'icône")
@@ -128,8 +129,8 @@ final class EarTabsTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(EarTabs.height(rank: 0, notchHeight: 32), 29)
-        XCTAssertEqual(EarTabs.height(rank: 2, notchHeight: 32), 23)
+        XCTAssertEqual(EarTabs.height(rank: 0, notchHeight: 32), 32)
+        XCTAssertEqual(EarTabs.height(rank: 2, notchHeight: 32), 26)
     }
 
     func testWidthsFollowTheModeAndAlertsStayWide() {
