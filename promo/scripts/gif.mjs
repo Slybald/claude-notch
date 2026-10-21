@@ -1,5 +1,5 @@
 // GIF du README : node scripts/gif.mjs [--lang=en] [--fps=20] [--scale=0.5] → ../docs/media/claude-notch[-fr].gif (moins de 5 Mo)
-// C'est la boucle complète de la v2 en 16:9 (retour à la notch fermée), pas la vidéo coupée sur la pastille finale.
+// C'est la boucle complète de la v3 en 16:9 (retour à la notch fermée), pas la vidéo coupée sur la carte finale.
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -9,14 +9,14 @@ import { root } from "./lib.mjs";
 
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `=${d}`).split("=")[1];
 const lang = arg("lang", "en");
-const fps = Number(arg("fps", 20));
+const fps = Number(arg("fps", 16));
 const scale = Number(arg("scale", 0.5));
 const colors = Number(arg("colors", 96));
 const inputProps = { format: "wide", lang };
 
 await ensureBrowser();
 const serveUrl = await bundle({ entryPoint: path.join(root, "src/index.ts") });
-const composition = await selectComposition({ serveUrl, id: "Promo2-16x9", inputProps });
+const composition = await selectComposition({ serveUrl, id: "Promo3-16x9", inputProps });
 fs.mkdirSync(path.join(root, "tmp"), { recursive: true });
 const mp4 = path.join(root, "tmp", `readme-${lang}.mp4`);
 await renderMedia({ composition, serveUrl, inputProps, codec: "h264", outputLocation: mp4, scale, crf: 10, pixelFormat: "yuv420p", overwrite: true });

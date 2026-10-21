@@ -1,6 +1,7 @@
 import React from "react";
 import { C, F, FONT } from "../theme";
 import { useT } from "../i18n";
+import { CodeIcon, MailIcon, MessageIcon } from "./icons3";
 import {
   Clipboard,
   Ellipsis,
@@ -15,22 +16,28 @@ import {
   Tray,
 } from "./icons";
 
-export type TabId = "claude" | "player" | "quick" | "shelf" | "clip" | "timer" | "notes";
+export type TabId = "claude" | "codex" | "player" | "quick" | "shelf" | "clip" | "timer" | "notes" | "messages" | "mail";
 export const DEFAULT_ORDER: TabId[] = ["claude", "player", "quick", "shelf", "clip", "timer", "notes"];
 
 export const TAB_TITLE: Record<TabId, [string, string]> = {
   claude: ["Claude", "Claude"],
+  codex: ["Codex", "Codex"],
   player: ["Player", "Lecteur"],
   quick: ["Quick Settings", "Réglages rapides"],
   shelf: ["Shelf", "Étagère"],
   clip: ["Clipboard", "Presse-papiers"],
   timer: ["Timer", "Minuteur"],
   notes: ["Quick notes", "Notes rapides"],
+  messages: ["Messages", "Messages"],
+  mail: ["Mail", "Mail"],
 };
 
 /** Hauteur du contenu de chaque onglet, relevée sur les rendus de l'app (en pt). */
 export const TAB_CONTENT_H: Record<TabId, number> = {
   claude: 209,
+  codex: 251,
+  messages: 211,
+  mail: 205,
   player: 150,
   quick: 217,
   shelf: 184,
@@ -103,6 +110,12 @@ const TabGlyph: React.FC<{ id: TabId; color: string; state?: "idle" | "attention
   switch (id) {
     case "claude":
       return state === "attention" ? <Hand size={15} color={C.amber} /> : <Spark size={15} color={C.accent} />;
+    case "codex":
+      return <CodeIcon size={s} color={color} />;
+    case "messages":
+      return <MessageIcon size={s} color={color} />;
+    case "mail":
+      return <MailIcon size={s} color={color} />;
     case "player":
       return <PlayCircle size={s} color={color} />;
     case "quick":
@@ -298,6 +311,8 @@ export const PanelInner: React.FC<{
   contentOpacity?: number;
   okPress?: number;
   titleTab?: TabId;
+  /** Remplace le bouton « + » du mode édition (par défaut, celui de la v1). */
+  addSlot?: React.ReactNode;
   children?: React.ReactNode;
 }> = ({
   tab,
@@ -314,6 +329,7 @@ export const PanelInner: React.FC<{
   contentOpacity = 1,
   okPress = 0,
   titleTab,
+  addSlot,
   children,
 }) => {
   const t = useT();
@@ -334,7 +350,7 @@ export const PanelInner: React.FC<{
         }}
       >
         <TabBar order={order} active={tab} frame={frame} editing={editing} claudeState={claudeState} {...tabBarProps} />
-        {editing && <AddButton />}
+        {editing && (addSlot ?? <AddButton />)}
         {!hideTitle && !editing && (
           <div
             style={{
