@@ -64,7 +64,7 @@ organised and why some choices were made, so they are not undone by accident.
   virtual notch geometry (`NotchScreenPicker`). `HotKeys`: global shortcuts (`HotKeyCenter`) through Carbon
   `RegisterEventHotKey`, which needs no Accessibility permission.
 - `HookInstaller` + `OrderedJSON`: add and remove the hooks in `~/.claude/settings.json`. `Onboarding`:
-  welcome window (first launch) and hook menu items. `AppIdentity`: bundle identifier and migration from early builds.
+  hook window (install, update) and hook menu items. `SetupAssistant`: the first-launch setup assistant. `AppIdentity`: bundle identifier and migration from early builds.
 - `ActivityLog`: `files.jsonl` / `permissions.jsonl`. `JobRunner`: optional companion tool jobs.
 - `Localization`: the `L()` helper, with an optional table. `LaunchAgent`: open at login.
 - `Updater`: automatic updates from GitHub releases (check, signature, install, relaunch) and its menu items.
@@ -149,10 +149,19 @@ Apple Events and Bluetooth are already there) nor another module's files.
     204 at once (fail-open). No Claude ears, no switch to the Claude tab, default tab = first enabled one, no
     session or hook items in the **…** menu ("Uninstall" stays, without hook wording when none are installed).
     Back on: everything restarts; open sessions show up at their next event.
-  - **First launch** (`HookSetup.launchWindow`, `onboarding.welcomeShown`): a welcome window once (how to open the
-    notch, tabs, settings). Claude tab on: a "Claude Code integration" section offers the hooks (opt-in, "Later").
-    Off: one line says where to turn the Claude tab on. Not shown after an update from a version that had
-    installed the hooks.
+  - **First launch** (`HookSetup.launchWindow`, `onboarding.welcomeShown`): the setup assistant, once. Not shown
+    after an update from a version that had installed the hooks. Four steps (`SetupAssistantModel.Step`): welcome,
+    tabs, behavior, done. The choices are plain data (`SetupChoices`, pure, tested without a window): the tabs
+    offered are all of them except Claude when Claude Code is not detected (unless its tab is already on, which
+    matters when the assistant is run again), at least one stays ticked, and `apply` writes `tabs.enabled` through
+    `ModuleRegistry.setEnabled` (same storage as Settings › Tabs) plus `hover.trigger` and `keyboard.togglePanel`.
+    Nothing is written before "Apply" (the last step before "Done"); "Skip" or closing the window changes
+    nothing. "Open at login" and the hooks are closures given by `HookSetup` (`applyLaunchAtLogin`, `installHooks`),
+    so the tests never touch the Mac. The hooks are an unticked checkbox under the Claude card (ticked by default
+    only for an update of hooks that were already installed) and are written at "Apply", the result shown on the
+    last step. `~/.claude` is read only if the Claude card is offered. No macOS permission is requested. Run again
+    from Settings › General (`HookSetup.showSetupAssistant`, `firstRun: false`): it starts from the current
+    settings. `OnboardingView` keeps only the hook window (install, update).
 - **Facts measured on Claude Code 2.1.29x**: `PermissionRequest` carries no `tool_use_id` (it is matched to the
   last active tool with the same name); internal agents send `SubagentStop` with an empty `agent_type`
   (ignored); a background agent's result comes back as a `UserPromptSubmit` starting with
@@ -306,8 +315,8 @@ Apple Events and Bluetooth are already there) nor another module's files.
   `settings.json` is not touched. When our entries come from a previous version (`.outdated`), entries and
   script are reinstalled silently too (timestamped backup). Only with the Claude tab on, and so only for people who
   already had the hooks; with the tab off, `~/.claude` is not even read at launch. A window opens only if that
-  update fails. Hooks that were never installed are offered once, in the welcome window (first launch, Claude Code
-  detected), then from Settings › Claude; never at every launch.
+  update fails. Hooks that were never installed are offered once, in the setup assistant (first launch, Claude Code
+  detected, unticked), then from Settings › Claude; never at every launch.
 - **Reply flow** (`/permission`, `/inbox`): the hook script posts with the token (curl reads it from the 0600 file
   `hook-token`, never from argv) and waits. `HookServer` checks `Host`, `Origin` and the token, then hands the
   request to `ReplyCenter`. A click gives the answer: the app returns it with the `X-Claude-Notch-Proof` header,
