@@ -30,8 +30,8 @@ export const T = {
   codex: 4.7,
   cAllow: 5.45,
   player: 6.0,
-  pause: 6.5,
-  day: 6.95,
+  pause: 6.4,
+  day: 6.8,
   quick: 7.5,
   caf: 8.1,
   shelf: 8.6,
@@ -40,38 +40,38 @@ export const T = {
   clip: 10.05,
   copy: 10.65,
   timer: 11.1,
-  notes: 11.75,
-  typeNotes: 11.95,
-  mail: 13.0,
-  reply: 13.7,
-  typeMail: 13.85,
-  mailSend: 14.7,
-  press: 15.35, // appui long sur la barre d'onglets
-  edit: 15.85, // 0,5 s plus tard : le mode édition
-  drag: 16.1,
-  drop2: 16.75,
-  plus: 17.1,
-  pick2: 17.6,
-  done: 18.1,
-  messages: 18.5,
-  msgReply: 19.15,
-  typeMsg: 19.3,
-  msgSend: 20.0,
-  more: 20.6,
-  menuHover: 21.0,
-  menuClose: 21.6,
-  collapse: 21.7,
-  fall: 22.55, // la notch tombe et devient la fenêtre de l'assistant
-  profile: 23.75,
-  pill: 24.65, // la fenêtre se resserre en carte du nom
-  pillText: 25.05,
-  link: 25.5, // la roue monte et devient la carte du lien
+  notes: 11.9,
+  typeNotes: 12.1,
+  mail: 13.15,
+  reply: 13.85,
+  typeMail: 14.0,
+  mailSend: 14.85,
+  press: 15.5, // appui long sur la barre d'onglets
+  edit: 16.0, // 0,5 s plus tard : le mode édition
+  drag: 16.25,
+  drop2: 16.9,
+  plus: 17.25,
+  pick2: 17.75,
+  done: 18.25,
+  messages: 18.65,
+  msgReply: 19.3,
+  typeMsg: 19.45,
+  msgSend: 20.15,
+  more: 20.75,
+  menuHover: 21.15,
+  menuClose: 21.75,
+  collapse: 21.85,
+  fall: 22.7, // la notch tombe et devient la fenêtre de l'assistant
+  profile: 23.9,
+  pill: 24.8, // la fenêtre se resserre en carte du nom
+  pillText: 25.2,
+  link: 25.65, // la roue monte et devient la carte du lien
   /** Fin de la vidéo ; la boucle du GIF continue jusqu'à `loopEnd`. */
-  ret: 27.75,
-  loopEnd: 28.45,
+  ret: 27.9,
+  loopEnd: 28.6,
   /** La roue : instants où elle passe à la fonction suivante (une valeur par entrée de FEATURES, sauf la première). */
   wheel: [
-    1.2, 1.5, 3.1, 4.7, 6.0, 6.95, 7.5, 8.6, 10.05, 11.1, 11.75, 13.0, 15.4, 16.1, 17.1, 18.5, 20.6, 22.65, 23.75,
+    1.2, 1.95, 3.1, 4.7, 6.0, 6.8, 7.5, 8.6, 10.05, 11.1, 11.9, 13.15, 15.55, 16.25, 17.25, 18.65, 20.75, 22.8, 23.9,
   ],
 };
 export const CTA_END = fr(T.ret);

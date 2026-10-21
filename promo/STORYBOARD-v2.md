@@ -1,4 +1,4 @@
-# Claude Notch — storyboard minuté, version 2
+# Claude Notch — storyboard minuté, version 2 (remplacée par la v3 : [STORYBOARD.md](STORYBOARD.md))
 
 Vidéo de présentation de **15,8 s** en **60 images/s**, muette, refaite dans le style de la vidéo de référence de
 l'utilisateur ([REFERENCE.md](REFERENCE.md) : analyse mesurée et tableau « v1 → à changer »). La v1 (40 s, mots géants
