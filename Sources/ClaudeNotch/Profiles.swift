@@ -1,7 +1,7 @@
 import Foundation
 
 // Profils : plusieurs façons de partir avec la notch (développeur, étudiant…) dans UNE seule app, donc une seule
-// mise à jour et une seule signature (voir docs/EDITIONS.md). Un profil est un point de départ : il règle les
+// mise à jour et une seule signature. Un profil est un point de départ : il règle les
 // onglets, leur ordre, l'ouverture et les oreilles, puis tout reste modifiable. Logique pure : ni fenêtre ni accès
 // au Mac, ni donnée d'un onglet, hooks, apparence ou raccourci.
 

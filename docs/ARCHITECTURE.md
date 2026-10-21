@@ -5,7 +5,8 @@ organised and why some choices were made, so they are not undone by accident.
 
 The product is called Oriel (formerly Claude Notch). Internal names keep the old one on purpose: the Swift module
 and `Sources/ClaudeNotch`, the executable `ClaudeNotch`, the bundle identifier, the data folder, the hook scripts.
-The list and the reasons are in [RENAME.md](RENAME.md).
+The reason: someone updating from Claude Notch keeps their macOS permissions, settings, hooks (and Codex's approval of
+the hooks) and data, with nothing to move or approve again.
 
 ## Commands
 
@@ -68,7 +69,7 @@ The list and the reasons are in [RENAME.md](RENAME.md).
     machine fed by Codex's hooks, one `kqueue` per Codex process, one-shot deadlines, no periodic timer),
     `CodexApprovals` (the held `PermissionRequest` requests), `CodexHookInstaller` (`~/.codex/hooks.json`),
     `CodexProcess` (Codex process and host app from the hook's `$PPID`), `CodexUsage` (quota gauge store), `CodexViews`.
-    See [CODEX.md](CODEX.md).
+    See *Codex* below.
   - `Media/` (`media`): `MediaModule` (life cycle, settings), `NowPlaying` (state rebuilt from the
     `mediaremote-adapter` JSON lines; `MediaRemoteAdapter` runs the helper and restarts it with a growing delay),
     `MediaCalendar` (week maths and the Calendar opener), `MediaViews`.
@@ -82,7 +83,7 @@ The list and the reasons are in [RENAME.md](RENAME.md).
     Fans: `FanController` (reading while the tab is shown, fixed speed held by the helper), `FanBackend` (SMC reads,
     helper install, `sudo -n fanctl hold`), `FanAuthorization` (pure: sudoers rule and root install command),
     `FanViews`. The SMC code is the `FanControl` library (`Sources/FanControl`), shared with the `fanctl` helper
-    (`Sources/fanctl`, root, `auto` and `hold` only). See [FANS.md](FANS.md).
+    (`Sources/fanctl`, root, `auto` and `hold` only).
   - `Shelf/` (`shelf`): `ShelfModule`, `ShelfStore` (bookmarks in `shelf.json`), `ShelfAppKit` (drag and drop,
     Quick Look, `ShelfDropView`, the AppKit view under the notch's SwiftUI content), `ShelfViews`.
   - `Clipboard/` (`clipboard`): `ClipboardModule` (capture by change count, limits, suspension), `ClipboardSystem`
@@ -98,8 +99,7 @@ The list and the reasons are in [RENAME.md](RENAME.md).
   - `Mail/` (`mail`, off by default): `MailModule` (state, 2-minute counter poll while Mail runs, the 3 to 5 latest
     received emails, the reply in progress), `MailModels` (the read and reply AppleScripts and the parser of their
     answers), `MailViews` (list, hover "Reply" button, reply bar). `AppleEvents.swift` is shared by both: Automation status
-    without a prompt, `osascript` runner with a time limit, System Settings privacy links. See
-    [MESSAGES-MAIL.md](MESSAGES-MAIL.md).
+    without a prompt, `osascript` runner with a time limit, System Settings privacy links.
 - `Preferences`: every setting (UserDefaults, observable, values clamped). `SettingsWindow`: the settings
   window (SwiftUI in an `NSWindow`, sidebar) and the main menu (⌘, ⌘W, editing).
 - `NotchShell`: notch rules that do not need a window: visibility (`NotchVisibilityRule`), screen choice and
@@ -226,7 +226,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   settings under `<id>.<name>`. The accent color is read through `Palette.accent`; the notch view is rebuilt
   when it changes. "Reply from the notch" (`claude.replyFromNotch`, off by default): off, the reply hooks get
   an immediate "no decision".
-- **Messages and Mail** (`docs/MESSAGES-MAIL.md`): optional tabs for everyone, off by default, no permission before the
+- **Messages and Mail**: optional tabs for everyone, off by default, no permission before the
   tab is opened. They only run collapsed (`keepsRunningWhenCollapsed`) once a first read worked (`<id>.armed`):
   Messages listens to FSEvents on `chat.db` / `chat.db-wal` (no timer), Mail polls a counter script every 2 minutes
   only while Mail runs and never launches it (`application id … is not running` guard, checked). Message text and
@@ -293,7 +293,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     last step. `~/.claude` is read only if the Claude card is offered. No macOS permission is requested. Run again
     from Settings › General (`HookSetup.showSetupAssistant`, `firstRun: false`): it starts from the current
     settings. `OnboardingView` keeps only the hook window (install, update).
-  - **Profiles** (`Profiles.swift`, `ProfileViews.swift`, `docs/EDITIONS.md`): several ways to start in ONE app (one
+  - **Profiles** (`Profiles.swift`, `ProfileViews.swift`): several ways to start in ONE app (one
     update, one signature). `NotchProfile` (developer, student, creative, minimal) is pure data: tab IDs in order
     (an ID the app does not have yet, like `codex`, is ignored), opening mode, ears. `ProfilePlan` computes what a
     profile shows and hides and writes only `tabs.enabled` (through `ModuleRegistry.setEnabled`), `tabs.order`,
@@ -366,8 +366,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     (`waiting`, `queued`, `headless`, `none`).
 - **CLI, same version** (interactive `claude` in a pty): `PermissionRequest` is called for Bash and AskUserQuestion,
   the terminal dialog stays up ("Allowed by PermissionRequest hook" when the hook answers first).
-- **Quota gauges** (`Modules/Quota/`, `ClaudeUsage`, `StatusLineRelay`, `CodexUsage`; docs in README › Quota gauges and
-  [CODEX.md](CODEX.md)). One ring per window (5 h, 7 d), amber from 80 %, red from 95 %, under the session list of the Claude and
+- **Quota gauges** (`Modules/Quota/`, `ClaudeUsage`, `StatusLineRelay`, `CodexUsage`; docs in README › Quota gauges). One ring per window (5 h, 7 d), amber from 80 %, red from 95 %, under the session list of the Claude and
   Codex tabs and in their compact summary (so also in the unfolded index tab and the full screen summary, where the strip drops
   the reset times when too narrow and carries the agent's name). Nothing when the tab is off or there is no figure; no ear.
   - **Claude**: the only source is the `statusLine` JSON (`rate_limits.five_hour` / `seven_day`: `used_percentage`,
@@ -389,7 +388,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   - Tests: `QuotaTests` (both parsers, store with a double, installer, real relay script against the real server) and
     `QuotaSnapshotTests` (PNG). `StatusLineInstaller.standard` points at a missing folder under XCTest: a test never touches the
     real `~/.claude`.
-- **Codex** (measured on Codex CLI 0.154, details in [CODEX.md](CODEX.md)): the tab follows Codex through its own
+- **Codex** (measured on Codex CLI 0.154): the tab follows Codex through its own
   hooks (`~/.codex/hooks.json`), never `notify` or `config.toml`, never the compressed rollout files.
   - **Same optional rules as Claude**: `CodexHookInstaller.codexPresent` (`~/.codex`, `$CODEX_HOME`, `Codex.app`, a
     `codex` command), never real under XCTest; `Preferences.decideCodexTab` decides once at launch (enabled only if
@@ -584,7 +583,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   losing it breaks automatic updates for every existing installation. Each release carries two signed images of
   the same app: `Oriel-<v>.dmg` (volume "Oriel", with `Oriel.app`) and `ClaudeNotch-<v>.dmg` (with `ClaudeNotch.app`),
   because the Updater of 1.1.0 to 1.9.0 only looks for the old file name and the old bundle name. Keep the second
-  one as long as such versions can still be installed (see [RENAME.md](RENAME.md)).
+  one as long as such versions can still be installed.
 - **Install**: `hdiutil attach` on a private mount point, the volume's `Oriel.app` must have our bundle
   identifier and the announced version, `ditto` into a hidden folder next to the installed app (same volume),
   detach, then two renames (current → a hidden `-old.app` backup next to it, new → current path) with a rollback if
@@ -600,7 +599,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   app keeps its `ClaudeNotch.app` folder. The repository rename relies on GitHub's 301 on `/releases/latest`, which
   URLSession follows. Covered by `UpdaterTests.testLegacyUpdaterInstallsTheRenamedApp` and
   `testLatestReleaseFollowsRepositoryRename`. What is kept (bundle identifier, certificate, executable name, data
-  folder, hook scripts…) and why: [RENAME.md](RENAME.md).
+  folder, hook scripts…): everything a user would otherwise have to move or approve again.
 - **When to install**: at launch, as soon as a version is found; later, only when no session is working or
   waiting (`SessionStore.hasBusySessions`), retried every 10 min. With the preference off, the version is only
   announced in the menu.

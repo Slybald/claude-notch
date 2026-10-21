@@ -8,7 +8,7 @@ enum AppIdentity {
     static let bundleId = "io.github.slybald.claudenotch"
     /// Identifiant des premières versions, installées par scripts/install.sh.
     static let legacyBundleId = "local.claudenotch"
-    /// Nom de l'app et de son bundle depuis la 2.0.0 (docs/RENAME.md).
+    /// Nom de l'app et de son bundle depuis la 2.0.0.
     static let name = "Oriel"
     static let bundleName = "Oriel.app"
     /// Bundle jusqu'à la 1.9.0 : le seul nom que leur mise à jour automatique sait installer.

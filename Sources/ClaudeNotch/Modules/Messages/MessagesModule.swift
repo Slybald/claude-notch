@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Onglet « Messages » : les conversations récentes d'iMessage / SMS, la pastille de non-lus dans les oreilles et
 /// une réponse rapide. Désactivé par défaut. Textes dans Resources/{en,fr}.lproj/Messages.strings ; réglages dans
-/// UserDefaults sous « messages.… ». Voir docs/MESSAGES-MAIL.md.
+/// UserDefaults sous « messages.… ».
 ///
 /// - Lecture seule de `~/Library/Messages/chat.db` (`MessagesDatabase`) : exige l'Accès complet au disque, que macOS
 ///   ne propose pas par une fenêtre. L'absence d'accès est détectée et expliquée dans l'onglet.
