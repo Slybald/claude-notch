@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Forme d'un intercalaire : coin extérieur bas arrondi (et coin intérieur bas une fois déployé), bord haut collé au
-/// haut de l'écran. Le prolongement derrière la notch (`overlap`, sur `overlapHeight`) bouche le jour que laisse le
-/// coin arrondi de la notch contre l'intercalaire qui la touche.
+/// haut de l'écran. Le prolongement derrière la notch ou derrière l'intercalaire précédent (`overlap`, sur
+/// `overlapHeight`) bouche le jour que laissent leurs coins arrondis.
 struct EarTabShape: Shape {
     var side: EarTabsLayout.Side
     var outerRadius: CGFloat
@@ -47,13 +47,32 @@ struct EarTabShape: Shape {
     }
 }
 
+/// Le bord extérieur d'un intercalaire (arête et coin bas arrondi) : le filet clair qui sépare deux tranches de la pile.
+struct EarTabEdge: Shape {
+    var side: EarTabsLayout.Side
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = max(0, min(radius, rect.width / 2, rect.height))
+        let s: CGFloat = side == .left ? 1 : -1
+        let o = side == .left ? rect.minX : rect.maxX
+        var path = Path()
+        path.move(to: CGPoint(x: o, y: rect.minY))
+        path.addLine(to: CGPoint(x: o, y: rect.maxY - r))
+        path.addQuadCurve(to: CGPoint(x: o + s * r, y: rect.maxY), control: CGPoint(x: o, y: rect.maxY))
+        return path
+    }
+}
+
 /// Hauteur du contenu de l'intercalaire déployé, mesurée par la vue (le contrôleur en tire sa zone de survol).
 private struct EarCardHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// Les intercalaires de la notch repliée, posés de part et d'autre de la notch. La fenêtre laisse passer la souris :
+/// Les intercalaires de la notch repliée, étalés en éventail de part et d'autre de la notch : le premier contre elle et
+/// au-dessus, chacun des suivants glissé sous le précédent (il n'en montre qu'une tranche), comme des cartes décalées sur
+/// une table. Le survol en ouvre un en grand. La fenêtre laisse passer la souris :
 /// le contrôleur décide du survol (`EarTabsLayout.hit`) et dit lequel est déployé (`hovered`) ; la vue ne fait que dessiner.
 /// Les clics n'arrivent ici que sur un intercalaire déployé (le contrôleur rend alors la souris à la fenêtre).
 struct EarTabsView: View {
@@ -75,7 +94,9 @@ struct EarTabsView: View {
                 EarTabItemView(item: item, layout: layout, isHovered: isHovered, cardHeight: cardHeight,
                                claudeEars: claudeEars, fill: fill, registry: registry, openTab: openTab)
                     .offset(x: frameOf(item, isHovered).midX)
-                    .zIndex(isHovered ? 1 : 0)
+                    // Le rang 0 est au-dessus. Déployé, un intercalaire garde son rang : il recouvre ceux qui sont plus
+                    // loin que lui, jamais ceux qui sont plus près de la notch.
+                    .zIndex(Double(-item.rank))
                     .transition(.opacity)
             }
         }
@@ -117,8 +138,11 @@ private struct EarTabItemView: View {
     static func moreTitle(_ count: Int) -> String {
         String(format: L(count, one: "%d autre activité", other: "%d autres activités"), count)
     }
-    /// L'intercalaire contre la notch prolonge sa forme derrière elle.
-    private var overlap: CGFloat { item.rank == 0 ? EarTabs.overlap : 0 }
+    /// Chaque intercalaire prolonge sa forme sous le précédent (le premier, sous la notch).
+    private var overlap: CGFloat { EarTabs.overlap }
+    /// Les intercalaires plus bas dans la pile sont à peine plus clairs : on lit la superposition. Le premier garde le noir
+    /// de la notch ; déployé, un intercalaire revient au fond de base.
+    private var tint: Double { isHovered ? 0 : 0.05 * Double(min(item.rank, 3)) }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -131,7 +155,16 @@ private struct EarTabItemView: View {
         .frame(width: isHovered ? cardWidth : item.width,
                height: isHovered ? max(cardHeight, layout.notch.height) : item.height, alignment: .top)
         .clipShape(shape)
-        .background(shape.fill(fill))
+        .background(ZStack {
+            shape.fill(fill)
+            shape.fill(Color.white.opacity(tint))
+        })
+        // Filet clair sur le bord extérieur : sépare la tranche de celle qu'elle recouvre. Déployé, la carte n'en a pas.
+        .overlay(EarTabEdge(side: item.side, radius: EarTabs.restRadius)
+            .stroke(Color.white.opacity(isHovered ? 0 : 0.16), lineWidth: 1))
+        // Ombre portée sur la tranche d'en dessous (au repos) ou sur la pile (déployé).
+        .shadow(color: .black.opacity(isHovered ? 0.5 : 0.55), radius: isHovered ? 7 : 2.5,
+                x: item.outward * (isHovered ? 2 : 1.5), y: isHovered ? 3 : 1)
         .contentShape(shape)
         .accessibilityElement(children: isHovered ? .contain : .ignore)
         .accessibilityLabel(accessibilityLabel)
@@ -140,15 +173,10 @@ private struct EarTabItemView: View {
         .accessibilityAction { openTab(item.id) }
     }
 
-    /// Coin intérieur bas de la carte : pas plus haut que ce qui dépasse sous la notch, sinon il laisse un jour contre elle.
-    private var cardInnerRadius: CGFloat {
-        min(EarTabs.cardRadius, max(0, max(cardHeight, layout.notch.height) - layout.notch.height))
-    }
-
     private var shape: EarTabShape {
         EarTabShape(side: item.side, outerRadius: isHovered ? EarTabs.cardRadius : EarTabs.restRadius,
-                    innerRadius: isHovered ? cardInnerRadius : 0, overlap: overlap,
-                    overlapHeight: overlap > 0 ? (isHovered ? layout.notch.height : item.height) : 0)
+                    innerRadius: isHovered ? layout.cardInnerRadius(item, height: cardHeight) : 0, overlap: overlap,
+                    overlapHeight: isHovered ? item.previousHeight : item.height)
     }
 
     // MARK: Au repos
@@ -163,7 +191,7 @@ private struct EarTabItemView: View {
             } else {
                 HStack(spacing: EarTabs.iconGap) {
                     EarTabIcon(tab: item.tab, accent: accent)
-                    EarTabInfo(tab: item.tab, claudeEars: claudeEars, accent: accent)
+                    if item.showsInfo { EarTabInfo(tab: item.tab, claudeEars: claudeEars, accent: accent) }
                 }
                 .padding(.horizontal, EarTabs.padding)
                 .frame(maxHeight: .infinity)

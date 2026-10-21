@@ -3,9 +3,10 @@ import Foundation
 
 /// Réglage « Intercalaires » (Réglages › Apparence › Notch repliée).
 enum EarTabsMode: String, CaseIterable, Identifiable {
-    /// Fine languette au repos ; l'intercalaire se déploie au survol.
+    /// Éventail serré : une fine languette par intercalaire au repos ; il s'ouvre au survol.
     case retracted
-    /// Icône et information courte toujours visibles ; l'intercalaire se déploie au survol.
+    /// Éventail à moitié fermé : chaque intercalaire montre son icône (le premier aussi son information courte) ;
+    /// il s'ouvre au survol.
     case visible
 
     var id: String { rawValue }
@@ -74,12 +75,15 @@ enum EarTabs {
     static let barsWidth: CGFloat = 16
     /// Largeur de la languette « Rétractés ».
     static let sliverWidth: CGFloat = 8
+    /// Ce que montre de lui un intercalaire glissé sous le précédent : son icône, entre deux marges.
+    static let sliceWidth: CGFloat = 2 * padding + iconWidth
     /// Rayon du coin extérieur bas d'un intercalaire au repos, et déployé.
     static let restRadius: CGFloat = 6
     static let cardRadius: CGFloat = 14
     /// Largeur d'un intercalaire déployé (réduite pour rester dans la fenêtre).
     static let cardWidth: CGFloat = 236
-    /// Dépassement sous la notch (derrière elle), pour qu'aucun jour ne reste dans son coin arrondi.
+    /// Dépassement sous la notch (derrière elle) ou sous l'intercalaire précédent de la pile, pour qu'aucun jour ne
+    /// reste dans leur coin arrondi.
     static let overlap: CGFloat = 12
     /// Marge gardée entre un intercalaire déployé et le bord de la fenêtre.
     static let windowMargin: CGFloat = 6
@@ -146,6 +150,13 @@ enum EarTabs {
         }
     }
 
+    /// Ce qu'un intercalaire montre de lui au repos : une languette (« Rétractés »), son icône et son information (le
+    /// premier de la pile, ou une alerte, qui reste déployée), ou son icône seule (les suivants, glissés sous lui).
+    static func slice(of tab: EarTab, rank: Int, mode: EarTabsMode) -> CGFloat {
+        if mode == .retracted && !tab.isAlert { return sliverWidth }
+        return rank == 0 || tab.isAlert ? tab.restWidth : min(tab.restWidth, sliceWidth)
+    }
+
     /// Hauteur d'un intercalaire au repos : celui qui touche la notch a exactement sa hauteur (aucune marche entre elles),
     /// puis un cran de moins que le précédent en s'éloignant (escalier).
     static func height(rank: Int, notchHeight: CGFloat) -> CGFloat {
@@ -168,21 +179,34 @@ struct EarTabsLayout: Equatable {
     struct Item: Equatable, Identifiable {
         let tab: EarTab
         let side: Side
-        /// 0 = contre la notch.
+        /// 0 = contre la notch, au-dessus de la pile.
         let rank: Int
-        /// Distance du centre au bord collé à la notch.
+        /// Distance du centre au bord intérieur de la tranche visible (là où finit celui qui le précède).
         let inner: CGFloat
+        /// Largeur de la tranche visible : le reste de l'intercalaire glisse sous celui qui le précède.
         let width: CGFloat
         let height: CGFloat
+        /// Hauteur de ce qui le précède (la notch pour le rang 0) : un intercalaire déployé ne peut pas arrondir son
+        /// coin intérieur au-dessus.
+        let previousHeight: CGFloat
 
         var id: String { tab.id }
         /// Sens du bord extérieur : −1 à gauche, +1 à droite.
         var outward: CGFloat { side == .left ? -1 : 1 }
+        /// La tranche montre-t-elle aussi l'information courte (sinon l'icône seule ou la languette) ?
+        var showsInfo: Bool { width >= tab.restWidth }
 
-        /// Rectangle au repos.
+        /// Tranche visible au repos.
         var frame: CGRect {
             let edge = outward * inner
             return CGRect(x: side == .left ? edge - width : edge, y: 0, width: width, height: height)
+        }
+
+        /// Tout l'intercalaire au repos : la tranche et le bout glissé sous le précédent.
+        var bodyFrame: CGRect {
+            let edge = outward * inner
+            return CGRect(x: side == .left ? edge - width : edge - EarTabs.overlap, y: 0,
+                          width: width + EarTabs.overlap, height: height)
         }
     }
 
@@ -203,11 +227,13 @@ struct EarTabsLayout: Equatable {
         let placed = EarTabs.distribute(tabs)
         func build(_ tabs: [EarTab], _ side: Side) -> [Item] {
             var inner = notch.width / 2
+            var previousHeight = notch.height
             return tabs.enumerated().map { rank, tab in
-                let width = mode == .retracted && !tab.isAlert ? EarTabs.sliverWidth : tab.restWidth
-                defer { inner += width }
-                return Item(tab: tab, side: side, rank: rank, inner: inner, width: width,
-                            height: EarTabs.height(rank: rank, notchHeight: notch.height))
+                let width = EarTabs.slice(of: tab, rank: rank, mode: mode)
+                let height = EarTabs.height(rank: rank, notchHeight: notch.height)
+                defer { inner += width; previousHeight = height }
+                return Item(tab: tab, side: side, rank: rank, inner: inner, width: width, height: height,
+                            previousHeight: previousHeight)
             }
         }
         left = build(placed.left, .left)
@@ -245,38 +271,49 @@ struct EarTabsLayout: Equatable {
     // MARK: Survol
 
     /// Ce qui est sous `point` (repère de la notch) : un intercalaire (la forme réelle, coin arrondi compris), le centre
-    /// de la notch, ou rien. L'intercalaire déployé passe devant ses voisins ; les zones ne se recouvrent pas.
+    /// de la notch, ou rien. Du dessus vers le dessous de la pile : le rang 0 recouvre les suivants, un intercalaire
+    /// déployé recouvre ceux qui sont plus loin que lui ; les zones ne se recouvrent pas. Déployé, sa zone contient
+    /// toujours celle qu'il avait au repos (rien ne change de cible sous une souris immobile).
     func hit(_ point: CGPoint, hovered: String?, cardHeight: CGFloat) -> Hit {
         // La notch d'abord : sur le bord qu'elle partage avec un intercalaire, c'est elle. Elle garde sa marge de 2 pt sous
         // la bande, comme avant les intercalaires ; bords inclusifs (la souris peut être pile sur le bord haut de l'écran).
         if abs(point.x) <= notch.width / 2, point.y >= 0, point.y <= notch.height + 2 { return .notch }
-        if let hovered, let item = item(hovered),
-           Self.contains(cardFrame(item, height: cardHeight), point, side: item.side, radius: EarTabs.cardRadius,
-                         roundsInner: true) {
-            return .tab(hovered)
-        }
-        for item in items where Self.contains(item.frame, point, side: item.side, radius: EarTabs.restRadius,
-                                              roundsInner: false) {
-            return .tab(item.id)
+        for item in items {
+            if item.id == hovered,
+               Self.contains(cardFrame(item, height: cardHeight), point, side: item.side, outerRadius: EarTabs.cardRadius,
+                             innerRadius: cardInnerRadius(item, height: cardHeight)) {
+                return .tab(item.id)
+            }
+            if Self.contains(item.bodyFrame, point, side: item.side, outerRadius: EarTabs.restRadius, innerRadius: 0) {
+                return .tab(item.id)
+            }
         }
         return .none
     }
 
-    /// Dans `rect` (bords inclusifs), sans les coins bas arrondis : l'extérieur toujours, l'intérieur au besoin.
-    static func contains(_ rect: CGRect, _ point: CGPoint, side: Side, radius: CGFloat, roundsInner: Bool) -> Bool {
+    /// Rayon du coin intérieur bas d'un intercalaire déployé : pas plus haut que ce qui dépasse sous celui qui le précède
+    /// (la notch pour le rang 0), sinon il laisse un jour contre lui.
+    func cardInnerRadius(_ item: Item, height: CGFloat) -> CGFloat {
+        min(EarTabs.cardRadius, max(0, max(height, notch.height) - item.previousHeight))
+    }
+
+    /// Dans `rect` (bords inclusifs), sans les coins bas arrondis (rayon 0 : coin droit).
+    static func contains(_ rect: CGRect, _ point: CGPoint, side: Side, outerRadius: CGFloat,
+                         innerRadius: CGFloat) -> Bool {
         guard point.x >= rect.minX, point.x <= rect.maxX, point.y >= rect.minY, point.y <= rect.maxY else { return false }
-        let r = min(radius, rect.width / 2, rect.height)
-        func inCorner(centerX: CGFloat) -> Bool {
+        func inCorner(centerX: CGFloat, radius r: CGFloat) -> Bool {
             let dx = point.x - centerX
             let dy = point.y - (rect.maxY - r)
             return dy <= 0 || dx * dx + dy * dy <= r * r
         }
-        let outerX = side == .left ? rect.minX + r : rect.maxX - r
-        let innerX = side == .left ? rect.maxX - r : rect.minX + r
+        let outer = max(0, min(outerRadius, rect.width / 2, rect.height))
+        let inner = max(0, min(innerRadius, rect.width / 2, rect.height))
+        let outerX = side == .left ? rect.minX + outer : rect.maxX - outer
+        let innerX = side == .left ? rect.maxX - inner : rect.minX + inner
         let outerSide = side == .left ? point.x < outerX : point.x > outerX
         let innerSide = side == .left ? point.x > innerX : point.x < innerX
-        if outerSide, !inCorner(centerX: outerX) { return false }
-        if roundsInner, innerSide, !inCorner(centerX: innerX) { return false }
+        if outerSide, !inCorner(centerX: outerX, radius: outer) { return false }
+        if inner > 0, innerSide, !inCorner(centerX: innerX, radius: inner) { return false }
         return true
     }
 }
