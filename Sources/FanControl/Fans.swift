@@ -53,7 +53,7 @@ public enum Fans {
 
     /// Passe un ventilateur en manuel à `rpm` (bornes déjà vérifiées par `FanRequest`). Si le SMC refuse
     /// `F<n>Md` = 1 (sur M3 et suivantes, macOS garde la main), on pose `Ftst` = 1, puis on réessaie toutes les
-    /// 100 ms pendant 10 s au plus : le déverrouillage prend quelques secondes (voir docs/FANS.md). `pause` sert aux
+    /// 100 ms pendant 10 s au plus : le déverrouillage prend quelques secondes. `pause` sert aux
     /// tests. Rend false si le mode ou la vitesse est refusé.
     public static func setManual(_ smc: SMCDevice, fan index: Int, rpm: Int,
                                  pause: (Double) -> Void = { usleep(useconds_t($0 * 1_000_000)) }) -> Bool {

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Compile en release (binaire universel arm64 + x86_64) et assemble build/Oriel.app (exécutable ClaudeNotch,
-# identifiant io.github.slybald.claudenotch : voir docs/RENAME.md).
+# identifiant io.github.slybald.claudenotch : conservés pour la mise à jour).
 #
 # Signature : ad hoc par défaut (le cdhash change à chaque build, macOS redemande alors les autorisations).
 # SIGN_KEYCHAIN=<trousseau> SIGN_IDENTITY=<nom ou empreinte du certificat> scripts/build.sh → signature avec ce

@@ -101,12 +101,14 @@ needs you.
   eight.
 - **Messages** (off by default): your recent iMessage and SMS conversations, an unread badge on the collapsed notch
   and a quick reply. It reads the Messages database on your Mac, which needs Full Disk Access; nothing is stored or
-  sent anywhere. Details and limits in [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+  sent anywhere. Limits: the unread badge covers the last 30 days and can differ from the Dock's; a group
+  conversation only opens the Messages app.
 - **Mail** (off by default): the unread count of Apple Mail and your latest 3 to 5 received emails (sender, subject,
   the start of the text, time, a dot when unread). Click one to open it in Mail; hover it and click **Reply** to
   write an answer right in the notch. The reply is sent only when you click **Send** (or press Return), and **Continue
-  in Mail** opens Mail's own reply window with your text already typed. Oriel never launches Mail: it only
-  reads it while it is open.
+  in Mail** opens Mail's own reply window with your text already typed. If Mail does not confirm within 60 s, the
+  notch says so and asks you to check before trying again. Oriel never launches Mail: it only reads it while it is
+  open.
 
 ## Command bar
 
@@ -163,8 +165,7 @@ opened before the update gets replies only after it restarts.
 ## Codex tab
 
 Codex has hooks of its own, so the tab works like Claude's. It follows Codex wherever it runs: the **ChatGPT app**
-(which now contains Codex), the `codex` command in a terminal, or an editor. Details and measurements:
-[docs/CODEX.md](docs/CODEX.md).
+(which now contains Codex), the `codex` command in a terminal, or an editor.
 
 1. **Settings › Codex › Install Codex hooks** (the tab's button opens it). This adds one entry per event to
    `~/.codex/hooks.json` (timestamped backup first, your own hooks stay) and copies `codex-notch-hook.sh` to
@@ -249,7 +250,7 @@ Open **…** › **Settings…** (⌘,).
 - **Profile**: **Change Profile…** starts you from a profile (Developer, Student, Creative or Minimal): it shows
   the tabs it will show and hide, the opening mode and the ears, and changes nothing until you confirm. Your tab
   data and the hooks are never touched; hidden tabs come back from **Settings › Tabs**. The pane names the profile
-  that matches your tabs, or "Custom". See [docs/EDITIONS.md](docs/EDITIONS.md).
+  that matches your tabs, or "Custom".
 - **Setup assistant**: **Run the Setup Assistant Again** goes through the first-launch steps again, starting from
   your current settings.
 - **Reset to defaults**, after a confirmation. Tabs, their data and the hooks are not changed.
@@ -331,7 +332,7 @@ Oriel updates itself from the [Releases](https://github.com/Slybald/oriel/releas
   itself `Oriel.app` at its first launch, points open-at-login to the new path and restarts (one instance only).
   If an older `ClaudeNotch.app` is still next to `Oriel.app` (a manual install), it goes to the Trash. The data
   folder and the hook scripts keep their old names (`ClaudeNotch`, `claude-notch-hook.sh`): that is on purpose, so
-  that nothing has to be moved or approved again. Details in [docs/RENAME.md](docs/RENAME.md).
+  that nothing has to be moved or approved again.
 
 ## Privacy
 
@@ -404,7 +405,7 @@ Oriel asks for a permission only when you use the feature that needs it. Nothing
 - Fixed fan speed needs root to write to the SMC. The first fixed speed asks for your password once and installs a
   small helper (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) and a system rule that allows
   only this helper (`/etc/sudoers.d/claude-notch-fans`). Reading speeds and temperatures needs nothing. "Remove the
-  authorization" in Settings or uninstalling removes both. See [docs/FANS.md](docs/FANS.md).
+  authorization" in Settings or uninstalling removes both.
 
 ## How it works
 
@@ -692,13 +693,14 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
   dès que tu en as plus de huit.
 - **Messages** (désactivé par défaut) : tes conversations iMessage et SMS récentes, une pastille de non-lus sur la
   notch repliée et une réponse rapide. Il lit la base de Messages sur ton Mac, ce qui exige l'Accès complet au
-  disque ; rien n'est enregistré ni envoyé ailleurs. Détails et limites dans
-  [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+  disque ; rien n'est enregistré ni envoyé ailleurs. Limites : la pastille compte les non-lus des 30 derniers jours
+  et peut différer de celle du Dock ; une conversation de groupe ouvre seulement l'app Messages.
 - **Mail** (désactivé par défaut) : le nombre de messages non lus d'Apple Mail et tes 3 à 5 derniers mails reçus
   (expéditeur, objet, début du texte, heure, pastille s'il n'est pas lu). Un clic en ouvre un dans Mail ; au survol,
   **Répondre** ouvre un champ pour écrire la réponse dans la notch. Elle ne part que sur ton clic sur **Envoyer** (ou
-  Entrée) ; **Continuer dans Mail** ouvre la fenêtre de réponse de Mail avec ton texte déjà tapé. Oriel ne
-  lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
+  Entrée) ; **Continuer dans Mail** ouvre la fenêtre de réponse de Mail avec ton texte déjà tapé. Si Mail ne
+  confirme pas en 60 s, la notch le dit et te demande de vérifier avant de réessayer. Oriel ne lance jamais Mail : il
+  ne le lit que pendant qu'il est ouvert.
 
 ### Barre de commande
 
@@ -757,8 +759,7 @@ Une session ouverte avant la mise à jour ne reçoit les réponses qu'après son
 ### Onglet Codex
 
 Codex a ses propres hooks : l'onglet marche comme celui de Claude. Il suit Codex où qu'il tourne : l'**app ChatGPT**
-(qui contient maintenant Codex), la commande `codex` dans un terminal, ou un éditeur. Détails et mesures :
-[docs/CODEX.md](docs/CODEX.md).
+(qui contient maintenant Codex), la commande `codex` dans un terminal, ou un éditeur.
 
 1. **Réglages › Codex › Installer les hooks Codex** (le bouton de l'onglet l'ouvre). Une entrée par événement est ajoutée à
    `~/.codex/hooks.json` (sauvegarde horodatée d'abord, tes hooks restent) et `codex-notch-hook.sh` est copié dans
@@ -847,8 +848,7 @@ Ouvre **…** › **Réglages…** (⌘,).
 - **Profil** : **Changer de profil…** te fait partir d'un profil (Développeur, Étudiant, Créatif ou Minimal) : la
   fenêtre montre les onglets affichés et masqués, l'ouverture et les oreilles, et ne change rien avant ta
   confirmation. Les données des onglets et les hooks ne sont jamais touchés ; les onglets masqués reviennent depuis
-  **Réglages › Onglets**. Le volet nomme le profil qui correspond à tes onglets, ou « Personnalisé ». Voir
-  [docs/EDITIONS.md](docs/EDITIONS.md).
+  **Réglages › Onglets**. Le volet nomme le profil qui correspond à tes onglets, ou « Personnalisé ».
 - **Assistant de configuration** : **Relancer l'assistant de configuration** refait les étapes du premier lancement,
   en partant de tes réglages actuels.
 - **Rétablir les réglages par défaut**, après confirmation. Les onglets, leurs données et les hooks ne changent pas.
@@ -934,7 +934,7 @@ Oriel se met à jour seule depuis la page [Releases](https://github.com/Slybald/
   le nouveau chemin et redémarre (une seule instance). Si une ancienne `ClaudeNotch.app` traîne encore à côté
   d'`Oriel.app` (installation manuelle), elle part à la Corbeille. Le dossier de données et les scripts de hook
   gardent leurs anciens noms (`ClaudeNotch`, `claude-notch-hook.sh`) : c'est voulu, pour ne rien déplacer ni
-  faire réapprouver. Détails dans [docs/RENAME.md](docs/RENAME.md).
+  faire réapprouver.
 
 ### Confidentialité
 
@@ -1014,8 +1014,7 @@ lancement.
 - La vitesse fixe des ventilateurs exige root pour écrire dans le SMC. La première vitesse fixe demande ton mot de
   passe une fois et installe un petit outil (`/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl`) et
   une règle système qui n'autorise que lui (`/etc/sudoers.d/claude-notch-fans`). Lire les vitesses et les températures
-  ne demande rien. « Retirer l'autorisation » dans les réglages ou la désinstallation retire les deux. Voir
-  [docs/FANS.md](docs/FANS.md).
+  ne demande rien. « Retirer l'autorisation » dans les réglages ou la désinstallation retire les deux.
 
 ### Fonctionnement
 

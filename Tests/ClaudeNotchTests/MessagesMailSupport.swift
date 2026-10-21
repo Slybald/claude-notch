@@ -342,7 +342,7 @@ final class FakeChatDatabase {
     }
 }
 
-/// Octets `attributedBody` produits par `NSArchiver` sur macOS 27.0.1 (voir docs/MESSAGES-MAIL.md).
+/// Octets `attributedBody` produits par `NSArchiver` sur macOS 27.0.1.
 enum TypedStreamFixtures {
     /// `NSAttributedString` « Salut, on se voit ce soir ? » (classe `NSString`).
     static let short = hex(
