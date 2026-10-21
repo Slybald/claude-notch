@@ -13,7 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         replaceLegacyInstance()
         AppIdentity.migrateLegacyInstall()
         core.start()
-        HookSetup.shared.showOnboardingIfNeeded(claudeEnabled: core.isClaudeEnabled, prefs: core.prefs)
+        HookSetup.shared.showOnboardingIfNeeded(claudeEnabled: core.isClaudeEnabled, prefs: core.prefs,
+                                                registry: core.registry)
     }
 
     /// App rouverte (Finder, Spotlight) alors qu'elle tourne : sans icône dans le Dock ni la barre des menus, c'est
@@ -132,6 +133,7 @@ final class AppCore {
     }
 
     var isClaudeEnabled: Bool { notch?.registry.isClaudeEnabled ?? false }
+    var registry: ModuleRegistry? { notch?.registry }
 
     func openSettings() {
         notch?.openSettings()

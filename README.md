@@ -124,6 +124,8 @@ Open **…** › **Settings…** (⌘,).
 - **Screen**: the built-in display (the default), the main display, the display under the mouse, or a display
   picked by name. A screen without a notch gets a virtual one at the top center.
 - **Privacy**: hide the notch from screenshots and screen sharing. This depends on the app that captures the screen.
+- **Setup assistant**: **Run the Setup Assistant Again** goes through the first-launch steps again, starting from
+  your current settings.
 - **Reset to defaults**, after a confirmation. Tabs, their data and the hooks are not changed.
 
 ## Installation
@@ -151,12 +153,22 @@ accesses you granted (calendar, Bluetooth, Automation, folders). Older versions 
 that changes with every build: when you move to the first release signed with the certificate, macOS asks for
 these accesses one last time, then no longer.
 
-On first launch, a welcome window presents the notch. If Claude Code is found on the Mac, it also offers to
-install the Claude Code hooks (or later): they add Claude Notch's entries to `~/.claude/settings.json` (a
-timestamped backup is written next to it first, and your existing hooks are kept) and install the hook script in
-`~/.claude/hooks/`. You can install them later from **Settings › Claude**. Sessions that were already open show up
-at their next message. Without Claude Code, nothing is said about the hooks; if you start using it, turn on the
-Claude tab in **Settings › Tabs**.
+On first launch, a setup assistant lets you pick what you need, in four short steps. **Skip** is always there and
+changes nothing; nothing is written before you click **Apply**.
+
+1. **Welcome**: what the notch is.
+2. **Tabs**: one card per tab, tick the ones you want (at least one stays on). The Claude card is offered only when
+   Claude Code is found on the Mac, and with it an unticked option to install the Claude Code hooks: they add
+   Claude Notch's entries to `~/.claude/settings.json` (a timestamped backup is written next to it first, and your
+   existing hooks are kept) and install the hook script in `~/.claude/hooks/`. Without Claude Code, a line says
+   where to turn the Claude tab on later (**Settings › Tabs**).
+3. **Behavior**: open on hover or on click, an optional keyboard shortcut, and open at login.
+4. **Done**: a preview of your notch with the chosen tabs, and where to find everything (the **…** menu, Settings).
+
+The assistant never asks for a macOS permission (calendar, Bluetooth…): macOS asks only when you use the tab that
+needs one. It is shown once, and not after an update from a version that was already set up. To run it again:
+**Settings › General › Run the Setup Assistant Again**. The hooks can also be installed later from
+**Settings › Claude**; sessions that were already open show up at their next message.
 
 ### Requirements
 
@@ -530,6 +542,8 @@ Ouvre **…** › **Réglages…** (⌘,).
   nom. Un écran sans encoche reçoit une encoche virtuelle en haut au centre.
 - **Confidentialité** : masquer la notch des captures d'écran et du partage d'écran. Cela dépend de l'app qui capture
   l'écran.
+- **Assistant de configuration** : **Relancer l'assistant de configuration** refait les étapes du premier lancement,
+  en partant de tes réglages actuels.
 - **Rétablir les réglages par défaut**, après confirmation. Les onglets, leurs données et les hooks ne changent pas.
 
 ### Installation
@@ -557,12 +571,23 @@ accès que tu as accordés (calendrier, Bluetooth, Automation, dossiers). Les ve
 signées ad hoc, une signature qui change à chaque build : au passage à la première release signée avec le
 certificat, macOS redemande ces accès une dernière fois, puis plus jamais.
 
-Au premier lancement, une fenêtre de bienvenue présente la notch. Si Claude Code est sur le Mac, elle propose
-aussi d'installer les hooks de Claude Code (ou plus tard) : ils ajoutent les entrées de Claude Notch dans
-`~/.claude/settings.json` (une sauvegarde horodatée est faite à côté avant, tes hooks existants sont conservés) et
-installent le script de hook dans `~/.claude/hooks/`. Tu peux les installer plus tard depuis **Réglages › Claude**.
-Une session déjà ouverte apparaît à son prochain message. Sans Claude Code, rien sur les hooks ; si tu t'y mets,
-active l'onglet Claude dans **Réglages › Onglets**.
+Au premier lancement, un assistant de configuration te laisse choisir ce qui t'intéresse, en quatre courtes
+étapes. **Passer** est toujours possible et ne change rien ; rien n'est écrit avant **Appliquer**.
+
+1. **Bienvenue** : ce qu'est la notch.
+2. **Onglets** : une carte par onglet, coche ceux que tu veux (au moins un reste activé). La carte Claude n'est
+   proposée que si Claude Code est sur le Mac, avec une option décochée pour installer les hooks de Claude Code :
+   ils ajoutent les entrées de Claude Notch dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à
+   côté avant, tes hooks existants sont conservés) et installent le script de hook dans `~/.claude/hooks/`. Sans
+   Claude Code, une ligne dit où activer l'onglet Claude plus tard (**Réglages › Onglets**).
+3. **Comportement** : ouverture au survol ou au clic, un raccourci clavier facultatif, et le lancement à l'ouverture
+   de session.
+4. **Fin** : un aperçu de ta notch avec les onglets choisis, et où retrouver tout ça (menu **…**, Réglages).
+
+L'assistant ne demande aucune autorisation macOS (calendrier, Bluetooth…) : macOS ne la demande que lorsque tu
+utilises l'onglet concerné. Il ne s'affiche qu'une fois, et pas après une mise à jour depuis une version déjà
+configurée. Pour le refaire : **Réglages › Général › Relancer l'assistant de configuration**. Les hooks peuvent
+aussi s'installer plus tard depuis **Réglages › Claude** ; une session déjà ouverte apparaît à son prochain message.
 
 #### Prérequis
 

@@ -23,6 +23,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   Claude Desktop is held at the end of a turn only. Held at the start of a session, the hook would delay the first
   prompt.
 
+## [1.4.0] - 2026-10-21
+
+### Added
+
+- A setup assistant replaces the welcome window on first launch. In four short steps you pick the tabs you want
+  (one card each; the Claude card only when Claude Code is found on the Mac, with the hooks as an option that is
+  off by default), how the notch opens (hover or click, an optional keyboard shortcut, open at login), and see a
+  preview of your notch. "Skip" is always there and changes nothing; nothing is written before "Apply". It asks
+  for no macOS permission. It is shown once, and not after an update from a version that was already set up.
+- **Settings › General › Run the Setup Assistant Again** goes through the steps again, starting from the current
+  settings.
+
+### Changed
+
+- The hooks window (Settings › Claude, the **…** menu, a failed silent update) no longer carries the welcome
+  content.
+
 ## [1.3.0] - 2026-10-21
 
 ### Added
