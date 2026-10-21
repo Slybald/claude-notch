@@ -17,6 +17,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   code, command or URL from a tab, only a button that opens a named app. A script's tab always says which program sent
   it and can never pass for a Claude or Codex request. Settings › Scripts lists the last clients.
 
+### Fixed
+
+- **Index tabs now line up with the real notch.** The tab against the notch was 3 pt shorter than it, so the notch showed
+  as a small lip under the tabs with a step on each side and a gap in its rounded bottom corners; and the collapsed shape
+  drew 6 pt flares on each side of the notch, so on a side without a tab it stuck out of the notch (the shape measured
+  197 pt for a 185 pt notch). The central part is now exactly the notch (same width and height), the first tab on each side
+  is as tall as the notch and continues it without a step or a gap, in every state (always visible, retracted, unfolded,
+  virtual notch). Tests measure the rendered silhouette against the notch for several notch sizes.
+
 ## [1.9.0] - 2026-10-21
 
 ### Added

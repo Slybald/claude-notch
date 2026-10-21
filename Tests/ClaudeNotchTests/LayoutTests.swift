@@ -21,8 +21,8 @@ final class LayoutTests: XCTestCase {
         window.orderFrontRegardless()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
 
-        // Replié : la notch seule (+ 2 × 6 de rayon haut) ; les intercalaires se posent à côté (`EarTabsLayout`).
-        XCTAssertEqual(model.contentSize.width, 185 + 12, accuracy: 1)
+        // Replié : exactement la notch (sans évasement sur une vraie encoche) ; les intercalaires se posent à côté (`EarTabsLayout`).
+        XCTAssertEqual(model.contentSize.width, 185, accuracy: 1)
         XCTAssertEqual(model.contentSize.height, 32, accuracy: 1)
 
         model.isExpanded = true
@@ -37,7 +37,7 @@ final class LayoutTests: XCTestCase {
 
         model.isExpanded = false
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
-        XCTAssertEqual(model.contentSize.width, 185 + 12, accuracy: 1, "replié : la notch seule")
+        XCTAssertEqual(model.contentSize.width, 185, accuracy: 1, "replié : la notch seule")
         XCTAssertEqual(model.contentSize.height, 32, accuracy: 1)
         window.close()
     }
@@ -76,7 +76,7 @@ final class LayoutTests: XCTestCase {
     func testEarsFollowPreferencesAndModules() {
         let notch = NotchHarness(self, store: .working(1))
         notch.prefs.showEars = false
-        XCTAssertEqual(notch.measure().width, 185 + 12, accuracy: 1)
+        XCTAssertEqual(notch.measure().width, 185, accuracy: 1)
 
         let idle = NotchHarness(self)
         let timer = FakeModule(id: "fake", ears: ModuleEars(symbol: "timer", text: "4:59"), keepsRunning: true)
@@ -90,7 +90,7 @@ final class LayoutTests: XCTestCase {
         window.isReleasedWhenClosed = false
         window.contentView = hosting
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(idle.model.contentSize.width, 185 + 12, accuracy: 1, "la notch ne s'élargit plus")
+        XCTAssertEqual(idle.model.contentSize.width, 185, accuracy: 1, "la notch ne s'élargit plus")
         let layout = registry.earLayout(claude: .none, claudeEars: nil, notch: idle.model.notchSize)
         XCTAssertEqual(layout.left.map { $0.id }, ["fake"], "l'intercalaire du module est posé à gauche")
         window.close()
