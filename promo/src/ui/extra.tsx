@@ -2,7 +2,7 @@ import React from "react";
 import { C, F, FONT } from "../theme";
 import { useT } from "../i18n";
 import { Card, NOTCH_W, TabBar, TabId } from "./notch";
-import { CheckCircleFill, Hand, TimerIcon, ChevronDown } from "./icons";
+import { CheckCircleFill, Hand, TimerIcon, ChevronDown, Forward, Pause, Rewind } from "./icons";
 import { Check } from "./icons";
 import { HostPill } from "./claude";
 import {
@@ -191,6 +191,24 @@ export const SummaryRow: React.FC<{ name: string; status: string; detail?: strin
         <span style={{ color: attention ? C.amber : C.accent, fontWeight: 500 }}>{status}</span>
         {detail && <span style={{ color: "rgba(255,255,255,0.75)" }}> · {detail}</span>}
       </div>
+    </div>
+  </div>
+);
+
+/** Détail de l'intercalaire de lecture déployé : pochette, titre, artiste, précédent / pause / suivant (74 pt). */
+export const MediaCardDetail: React.FC<{ title: string; artist: string; width?: number }> = ({ title, artist, width = CARD_W - 20 }) => (
+  <div style={{ position: "relative", width, height: 74, borderRadius: 12, background: C.card }}>
+    <div style={{ position: "absolute", left: 10, top: 9, width: 34, height: 34, borderRadius: 8, background: "#DD2DF5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 17, height: 17, borderRadius: 9, background: "rgba(255,255,255,0.4)" }} />
+    </div>
+    <div style={{ position: "absolute", left: 54, top: 10, lineHeight: "16px" }}>
+      <div style={{ fontSize: F(13.5), fontWeight: 700, color: "#fff" }}>{title}</div>
+      <div style={{ fontSize: F(12), color: C.secondary }}>{artist}</div>
+    </div>
+    <div style={{ position: "absolute", left: 0, right: 0, top: 50, display: "flex", justifyContent: "center", alignItems: "center", gap: 36 }}>
+      <Rewind size={13} color="#fff" />
+      <Pause size={14} color="#fff" />
+      <Forward size={13} color="#fff" />
     </div>
   </div>
 );

@@ -9,7 +9,7 @@ import { ClipboardTab, EqualizerBars, FileGlyph, NotesTab, PlayerTab, QuickTab, 
 import { Conversation, PermissionReply, SessionCard } from "../ui/claude";
 import { Cursor, PauseCircle, Radio, Spark, Trash } from "../ui/icons";
 import { MessageIcon, NotchGlyph } from "../ui/icons3";
-import { CodexTab, IndexTabs, MacMenu, MailTab, MenuEntry, MessagesTab, PlainPlus, SetupWindow, SummaryRow, WINDOW_H, WINDOW_W, idxTabs } from "../ui/extra";
+import { CodexTab, IndexTabs, MacMenu, MailTab, MediaCardDetail, MenuEntry, MessagesTab, PlainPlus, SetupWindow, WINDOW_H, WINDOW_W, idxTabs } from "../ui/extra";
 import { APP } from "./identity";
 import { FEATURES } from "./copy3";
 import { Wheel } from "./Wheel";
@@ -18,61 +18,59 @@ import { Format3, Layout3, layout3 } from "./layout3";
 // ─────────────────────────────── Calendrier (secondes) ───────────────────────────────
 // Un temps fort tous les 0,5 à 1,5 s. Chaque réaction suit l'arrivée du curseur de 0,10 s (arrêt, puis clic).
 export const T = {
-  hover: 0.5, // le curseur survole l'intercalaire de Claude : il se déploie
-  open: 1.2, // clic sur la carte : le panneau s'ouvre
-  ask: 1.5,
-  allow: 2.3,
-  chatHover: 2.65,
-  chat: 3.1,
-  typeFrom: 3.3,
-  typeTo: 3.95,
-  send: 4.15,
-  codex: 4.7,
-  cAllow: 5.45,
-  player: 6.0,
-  pause: 6.4,
-  day: 6.8,
-  quick: 7.5,
-  caf: 8.1,
-  shelf: 8.6,
-  pick: 9.05,
-  drop: 9.6,
-  clip: 10.05,
-  copy: 10.65,
-  timer: 11.1,
-  notes: 11.9,
-  typeNotes: 12.1,
-  mail: 13.15,
-  reply: 13.85,
-  typeMail: 14.0,
-  mailSend: 14.85,
-  press: 15.5, // appui long sur la barre d'onglets
-  edit: 16.0, // 0,5 s plus tard : le mode édition
-  drag: 16.25,
-  drop2: 16.9,
-  plus: 17.25,
-  pick2: 17.75,
-  done: 18.25,
-  messages: 18.65,
-  msgReply: 19.3,
-  typeMsg: 19.45,
-  msgSend: 20.15,
-  more: 20.75,
-  menuHover: 21.15,
-  menuClose: 21.75,
-  collapse: 21.85,
-  fall: 22.7, // la notch tombe et devient la fenêtre de l'assistant
-  profile: 23.9,
-  pill: 24.8, // la fenêtre se resserre en carte du nom
-  pillText: 25.2,
-  link: 25.65, // la roue monte et devient la carte du lien
+  hover: 0.5, // le curseur survole l'intercalaire de lecture : il se déploie
+  open: 1.2, // clic sur la carte : le panneau s'ouvre sur le lecteur
+  pause: 1.7,
+  day: 2.2,
+  quick: 2.9,
+  caf: 3.5,
+  shelf: 4.0,
+  pick: 4.45,
+  drop: 5.0,
+  clip: 5.45,
+  copy: 6.05,
+  timer: 6.5,
+  notes: 7.25,
+  typeNotes: 7.45,
+  mail: 8.6,
+  reply: 9.3,
+  typeMail: 9.45,
+  mailSend: 10.3,
+  claude: 11.0, // l'onglet Claude (facultatif) : une session attend
+  ask: 11.3,
+  allow: 12.1,
+  chatHover: 12.45,
+  chat: 12.9,
+  typeFrom: 13.1,
+  typeTo: 13.75,
+  send: 13.95,
+  codex: 14.5,
+  cAllow: 15.25,
+  press: 15.85, // appui long sur la barre d'onglets
+  edit: 16.35, // 0,5 s plus tard : le mode édition
+  drag: 16.6,
+  drop2: 17.25,
+  plus: 17.6,
+  pick2: 18.1,
+  done: 18.6,
+  messages: 19.0,
+  msgReply: 19.65,
+  typeMsg: 19.8,
+  msgSend: 20.5,
+  more: 21.1,
+  menuHover: 21.5,
+  menuClose: 22.1,
+  collapse: 22.2,
+  fall: 23.05, // la notch tombe et devient la fenêtre de l'assistant
+  profile: 24.25,
+  pill: 25.15, // la fenêtre se resserre en carte du nom
+  pillText: 25.55,
+  link: 26.0, // la roue monte et devient la carte du lien
   /** Fin de la vidéo ; la boucle du GIF continue jusqu'à `loopEnd`. */
-  ret: 27.9,
-  loopEnd: 28.6,
+  ret: 28.25,
+  loopEnd: 28.95,
   /** La roue : instants où elle passe à la fonction suivante (une valeur par entrée de FEATURES, sauf la première). */
-  wheel: [
-    1.2, 1.95, 3.1, 4.7, 6.0, 6.8, 7.5, 8.6, 10.05, 11.1, 11.9, 13.15, 15.55, 16.25, 17.25, 18.65, 20.75, 22.8, 23.9,
-  ],
+  wheel: [1.2, 2.2, 2.9, 4.0, 5.45, 6.5, 7.25, 8.6, 11.0, 11.8, 12.9, 14.5, 15.9, 16.6, 17.6, 19.0, 21.1, 23.15, 24.25],
 };
 export const CTA_END = fr(T.ret);
 export const DURATION3 = fr(T.loopEnd);
@@ -82,15 +80,15 @@ const ORDER1: TabId[] = ["claude", "codex", "notes", "player", "quick", "shelf",
 const ALL: TabId[] = ORDER1;
 const PITCH = 29;
 const tabs: { tab: TabId; at: number }[] = [
-  { tab: "claude", at: T.open },
-  { tab: "codex", at: T.codex },
-  { tab: "player", at: T.player },
+  { tab: "player", at: T.open },
   { tab: "quick", at: T.quick },
   { tab: "shelf", at: T.shelf },
   { tab: "clip", at: T.clip },
   { tab: "timer", at: T.timer },
   { tab: "notes", at: T.notes },
   { tab: "mail", at: T.mail },
+  { tab: "claude", at: T.claude },
+  { tab: "codex", at: T.codex },
   { tab: "messages", at: T.messages },
 ];
 const orderAt = (at: number) => (at < T.edit ? ORDER0 : ORDER1);
@@ -398,16 +396,11 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
           tabs={idx}
           fade={tabsFade}
           unfold={{
-            id: "claude",
+            id: "media",
             p: unfoldP,
-            title: "Claude",
-            detailH: 90,
-            detail: (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <SummaryRow name="api" status={tr("Needs your permission", "Attend ta permission")} attention />
-                <SummaryRow name="mon-app" status="Terminal" detail="npm test" />
-              </div>
-            ),
+            title: tr("Player", "Lecteur"),
+            detailH: 74,
+            detail: <MediaCardDetail title={tr("City Lights", "Lumières de la ville")} artist={tr("The Fictives", "Les Fictifs")} />,
           }}
         />
         <div style={{ position: "absolute", left: -wPt / 2, top: 0 }}>
@@ -420,7 +413,7 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
                   order={ALL}
                   frame={f / 2}
                   editing={editing}
-                  claudeState={cur.tab === "claude" && !allowed ? "attention" : "idle"}
+                  claudeState={!allowed ? "attention" : "idle"}
                   contentH={contentH}
                   contentOpacity={1 - 0.65 * editFade}
                   titleOpacity={titleOp}
@@ -500,14 +493,8 @@ function keysFor(L: Layout3): Key[] {
   const plusX = 26 + 9 * PITCH - 2 + 13.5;
   return [
     { arrive: 0, x: L.cx + 0.24 * L.w, y: L.h - 130 },
-    { arrive: T.hover, x: L.cx - 118 * S, y: 15 * S },
-    { arrive: T.open - hold, x: L.cx - 214 * S, y: 18 * S },
-    { arrive: T.allow - hold, ...P(584, 209.5) },
-    { arrive: T.chatHover, ...P(330, 96) },
-    { arrive: T.chat - hold, ...P(550, 85) },
-    { arrive: T.codex - hold, ...tab("codex", T.codex) },
-    { arrive: T.cAllow - hold, ...P(582, 230) },
-    { arrive: T.player - hold, ...tab("player", T.player) },
+    { arrive: T.hover, x: L.cx - 168 * S, y: 13 * S },
+    { arrive: T.open - hold, x: L.cx - 262 * S, y: 62 * S },
     { arrive: T.pause - hold, ...P(183, 190) },
     { arrive: T.day - hold, ...P(484, 127) },
     { arrive: T.quick - hold, ...tab("quick", T.quick) },
@@ -521,6 +508,12 @@ function keysFor(L: Layout3): Key[] {
     { arrive: T.notes - hold, ...tab("notes", T.notes) },
     { arrive: T.mail - hold, ...tab("mail", T.mail) },
     { arrive: T.reply - hold, ...P(567, 80) },
+    { arrive: T.claude - hold, ...tab("claude", T.claude) },
+    { arrive: T.allow - hold, ...P(584, 209.5) },
+    { arrive: T.chatHover, ...P(330, 96) },
+    { arrive: T.chat - hold, ...P(550, 85) },
+    { arrive: T.codex - hold, ...tab("codex", T.codex) },
+    { arrive: T.cAllow - hold, ...P(582, 230) },
     { arrive: T.press - hold, ...tab("notes", T.press) },
     { arrive: T.drop2, ...tab("notes", T.drop2) },
     { arrive: T.plus - hold, ...P(plusX, 44) },
@@ -561,7 +554,7 @@ function cursorAt(keys: Key[], t: number, L: Layout3) {
   return pos;
 }
 
-const CLICKS = [T.open, T.allow, T.chat, T.codex, T.cAllow, T.player, T.pause, T.day, T.quick, T.caf, T.shelf, T.clip, T.copy, T.timer, T.notes, T.mail, T.reply, T.plus, T.pick2, T.done, T.messages, T.msgReply, T.more, T.profile];
+const CLICKS = [T.open, T.pause, T.day, T.quick, T.caf, T.shelf, T.clip, T.copy, T.timer, T.notes, T.mail, T.reply, T.claude, T.allow, T.chat, T.codex, T.cAllow, T.plus, T.pick2, T.done, T.messages, T.msgReply, T.more, T.profile];
 
 const FileAndCursor: React.FC<{ f: number; t: number; L: Layout3 }> = ({ f, t, L }) => {
   const keys = React.useMemo(() => {
