@@ -182,9 +182,12 @@ final class HookServer {
     /// Attente `asyncRewake` (SessionStart, Stop) : 200 + texte du message, ou 204.
     private func wait(_ request: HTTPRequest, on connection: NWConnection) {
         let headers = HookHeaders(request.headers)
-        guard let sessionId = HookEvent(data: request.body, headers: headers)?.sessionId else {
+        guard let event = HookEvent(data: request.body, headers: headers), let sessionId = event.sessionId else {
             return reply(204, "No Content", on: connection)
         }
+        // Onglet Code de Claude Desktop (identifiant de session Desktop) : voir `ReplyCenter.wait`.
+        let desktop = headers.hostSessionId != nil
+        let atStop = event.name == "Stop"
         let id = UUID()
         let replies = self.replies
         let respond: (String?) -> Void = { [weak self] message in
@@ -196,7 +199,10 @@ final class HookServer {
                 self.reply(204, "No Content", on: connection)
             }
         }
-        DispatchQueue.main.async { replies.wait(sessionId: sessionId, pid: headers.ppid, id: id, reply: respond) }
+        DispatchQueue.main.async {
+            replies.wait(sessionId: sessionId, pid: headers.ppid, id: id, desktop: desktop, atStop: atStop,
+                         reply: respond)
+        }
         watchClosure(of: connection) { DispatchQueue.main.async { replies.connectionClosed(id) } }
     }
 

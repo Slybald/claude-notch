@@ -23,11 +23,11 @@ final class ClaudeHookScriptTests: XCTestCase {
         private(set) var stderr = ""
         let started = Date()
 
-        init(mode: String?, payload: [String: Any], home: URL, port: UInt16) throws {
+        init(mode: String?, payload: [String: Any], home: URL, port: UInt16, environment: [String: String] = [:]) throws {
             process.executableURL = URL(fileURLWithPath: "/bin/sh")
             process.arguments = [ClaudeHookScriptTests.script.path] + (mode.map { [$0] } ?? [])
             process.environment = ["HOME": home.path, "CLAUDE_NOTCH_PORT": String(port), "PATH": "/usr/bin:/bin",
-                                   "TMPDIR": home.path]
+                                   "TMPDIR": home.path].merging(environment) { $1 }
             let input = Pipe()
             process.standardInput = input
             process.standardOutput = out
@@ -50,8 +50,9 @@ final class ClaudeHookScriptTests: XCTestCase {
         var duration: TimeInterval { Date().timeIntervalSince(started) }
     }
 
-    private func run(_ mode: String?, _ payload: [String: Any], _ fixture: ReplyServerFixture) throws -> Run {
-        try Run(mode: mode, payload: payload, home: fixture.home, port: fixture.port)
+    private func run(_ mode: String?, _ payload: [String: Any], _ fixture: ReplyServerFixture,
+                     environment: [String: String] = [:]) throws -> Run {
+        try Run(mode: mode, payload: payload, home: fixture.home, port: fixture.port, environment: environment)
     }
 
     // MARK: - permission
@@ -242,6 +243,34 @@ final class ClaudeHookScriptTests: XCTestCase {
         XCTAssertEqual(hook.status, 2)
         XCTAssertEqual(hook.stderr, "Après ce tour, lance les tests")
         XCTAssertNil(fixture.replies.queued["s1"])
+    }
+
+    /// Onglet Code de Claude Desktop, avec le vrai script : l'identifiant de session Desktop part dans la requête, le
+    /// `Stop` est tenu et un message réveille Claude ; le `SessionStart` est rendu aussitôt (il bloquerait le premier
+    /// prompt). Sans l'identifiant (autre programme sans terminal), rien n'est tenu.
+    func testDesktopStopWaitWakesClaude() throws {
+        let fixture = try ReplyServerFixture(self)
+        fixture.replies.processArguments = { _ in ["claude", "--output-format", "stream-json", "--input-format", "stream-json"] }
+        let desktop = ["CLAUDE_CODE_HOST_SESSION_ID": "local_0a1b2c3d-4e5f"]
+
+        let start = try run("inbox", ["hook_event_name": "SessionStart", "session_id": "s1"], fixture, environment: desktop)
+        XCTAssertTrue(start.finish(timeout: 3))
+        XCTAssertEqual(start.status, 0)
+        XCTAssertLessThan(start.duration, 2, "SessionStart : jamais tenu")
+        XCTAssertTrue(fixture.replies.headless.isEmpty)
+
+        let hook = try run("inbox", stop, fixture, environment: desktop)
+        XCTAssertTrue(spin { fixture.replies.waiting == ["s1"] }, "Stop : tenu")
+        XCTAssertEqual(fixture.replies.send("Ajoute un test", to: "s1"), .delivered)
+        XCTAssertTrue(hook.finish())
+        XCTAssertEqual(hook.status, 2)
+        XCTAssertEqual(hook.stderr, "Ajoute un test")
+
+        let other = try run("inbox", stop, fixture)
+        XCTAssertTrue(other.finish(timeout: 3))
+        XCTAssertEqual(other.status, 0)
+        XCTAssertLessThan(other.duration, 2, "sans identifiant Desktop : rendu tout de suite")
+        XCTAssertEqual(fixture.replies.headless, ["s1"])
     }
 
     // MARK: - Relais
