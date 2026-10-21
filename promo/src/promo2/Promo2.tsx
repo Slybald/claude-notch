@@ -184,6 +184,8 @@ const Scene2: React.FC<{ format: Format2; lang: Lang }> = ({ format, lang }) => 
           ),
         };
       }
+      default:
+        return { h: 0, node: null };
     }
   };
 
