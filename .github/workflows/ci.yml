@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
       - main
+  # Appelée par release.yml : une version n'est publiée qu'après une CI verte sur son commit.
+  workflow_call:
 
 permissions:
   contents: read
