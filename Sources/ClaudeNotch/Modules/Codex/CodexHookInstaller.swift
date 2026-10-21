@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 
@@ -9,7 +10,8 @@ import Foundation
 ///   l'ordre des clés sont conservés ; JSON invalide : rien n'est touché.
 /// - Sauvegarde horodatée avant toute écriture sur un fichier existant, aucune écriture si rien ne change, écriture
 ///   atomique.
-/// - Codex ne lance un hook qu'après sa revue par l'utilisateur (`/hooks` dans Codex) : l'installation ne la remplace pas.
+/// - Codex ne lance un hook qu'après son approbation (`/hooks` dans le terminal, « Review hooks » dans l'app) : ici on la
+///   lit dans `config.toml` (lecture seule) ; `CodexHookSetup` la demande à Codex lui-même, sur un clic explicite.
 struct CodexHookInstaller {
     static let hookFileName = "codex-notch-hook.sh"
     static let marker = hookFileName
@@ -77,8 +79,6 @@ struct CodexHookInstaller {
         var inlineHooks = false
         /// Un `notify` est configuré : il n'est pas touché.
         var hasNotify = false
-        /// Nos hooks ont été validés dans Codex (`/hooks`) : une entrée `hooks.state` porte notre fichier.
-        var reviewed = false
     }
 
     let configDirectory: URL
@@ -98,11 +98,13 @@ struct CodexHookInstaller {
                            bundledHook: Bundle.main.url(forResource: "codex-notch-hook", withExtension: "sh"))
     }
 
-    /// Codex présent sur ce Mac : `~/.codex`, `$CODEX_HOME`, l'app Codex ou la commande `codex` à un endroit usuel.
+    /// Codex présent sur ce Mac : `~/.codex`, `$CODEX_HOME`, l'app Codex (aujourd'hui dans l'app ChatGPT, bundle
+    /// `com.openai.codex`) ou la commande `codex` à un endroit usuel.
     static func codexPresent(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                              environment: [String: String] = ProcessInfo.processInfo.environment,
                              applications: [String] = ["/Applications/Codex.app", "/opt/homebrew/bin/codex",
-                                                       "/usr/local/bin/codex"]) -> Bool {
+                                                       "/usr/local/bin/codex"],
+                             appInstalled: Bool = false) -> Bool {
         var directories = [home.appendingPathComponent(".codex").path]
         if let custom = environment["CODEX_HOME"], !custom.isEmpty {
             directories.append((custom as NSString).expandingTildeInPath)
@@ -113,11 +115,14 @@ struct CodexHookInstaller {
             return manager.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
         }
         let paths = applications + [home.appendingPathComponent(".local/bin/codex").path]
-        return hasDirectory || paths.contains { manager.fileExists(atPath: $0) }
+        return hasDirectory || appInstalled || paths.contains { manager.fileExists(atPath: $0) }
     }
 
     /// Détection réelle, jamais sous XCTest : un test ne dépend pas du Mac qui le lance.
-    static var codexOnThisMac: Bool { NSClassFromString("XCTestCase") == nil && codexPresent() }
+    static var codexOnThisMac: Bool {
+        NSClassFromString("XCTestCase") == nil
+            && codexPresent(appInstalled: NSWorkspace.shared.urlForApplication(withBundleIdentifier: CodexBinary.appBundleId) != nil)
+    }
 
     var hooksURL: URL { configDirectory.appendingPathComponent("hooks.json") }
     var configURL: URL { configDirectory.appendingPathComponent("config.toml") }
@@ -256,22 +261,21 @@ struct CodexHookInstaller {
         return hookScriptIsCurrent ? .installed : .scriptOutdated
     }
 
-    /// Lecture seule de `config.toml` : réglage, hooks en ligne, `notify`, revue des hooks. Absent : valeurs vides.
+    /// Lecture seule de `config.toml` : réglage, hooks en ligne, `notify`. Absent : valeurs vides.
     func configNotes() -> ConfigNotes {
         guard let text = try? String(contentsOf: configURL, encoding: .utf8) else { return ConfigNotes() }
-        return Self.configNotes(in: text, hooksPath: hooksURL.path)
+        return Self.configNotes(in: text)
     }
 
-    static func configNotes(in text: String, hooksPath: String) -> ConfigNotes {
+    static func configNotes(in text: String) -> ConfigNotes {
         var notes = ConfigNotes()
         var section = ""
         for raw in text.components(separatedBy: "\n") {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("[") {
                 section = line
-                if line.hasPrefix("[hooks.state.") || line.hasPrefix("[[hooks.state.") {
-                    if line.contains("\(hooksPath):") { notes.reviewed = true }
-                } else if line.hasPrefix("[hooks") || line.hasPrefix("[[hooks") {
+                if !line.hasPrefix("[hooks.state.") && !line.hasPrefix("[[hooks.state."),
+                   line.hasPrefix("[hooks") || line.hasPrefix("[[hooks") {
                     notes.inlineHooks = true
                 }
                 continue
@@ -285,6 +289,95 @@ struct CodexHookInstaller {
             if section.isEmpty, key == "notify" { notes.hasNotify = true }
         }
         return notes
+    }
+
+    // MARK: - Approbation (lecture seule)
+
+    /// Clés que Codex donne à nos hooks dans `hooks.state` : `<hooks.json>:<événement>:<groupe>:<rang>`, l'événement
+    /// en snake_case, le groupe et le rang étant leur position dans hooks.json (mesuré sur Codex 0.162).
+    func hookKeys(path: String? = nil) -> [String] {
+        guard let file = try? loadHooks(), case .object(let hooks)? = file["hooks"] else { return [] }
+        let prefix = path ?? hooksURL.path
+        var keys: [String] = []
+        for event in Self.events {
+            let groups = hooks.first { OrderedJSON.sameKey($0.key, event) }?.value.items ?? []
+            for (group, item) in groups.enumerated() {
+                for (rank, hook) in (item["hooks"]?.items ?? []).enumerated() where Self.isOurs(hook) {
+                    keys.append("\(prefix):\(Self.snake(event)):\(group):\(rank)")
+                }
+            }
+        }
+        return keys
+    }
+
+    static func snake(_ event: String) -> String {
+        event.reduce(into: "") { text, letter in
+            if letter.isUppercase, !text.isEmpty { text.append("_") }
+            text.append(contentsOf: letter.lowercased())
+        }
+    }
+
+    /// Nos hooks que `config.toml` ne marque pas comme approuvés (un `trusted_hash` par clé). Estimation : seul Codex sait
+    /// si un hachage est périmé (hook modifié depuis) ; `CodexHookSetup` la corrige avec la réponse de Codex.
+    func unapprovedCount() -> Int {
+        let text = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
+        let trusted = Self.trustedKeys(in: text)
+        let ours = Set(hookKeys() + hookKeys(path: Self.realPath(hooksURL.path)))
+        let approved = Self.events.filter { event in
+            ours.contains { key in trusted.contains(key) && key.contains(":\(Self.snake(event)):") }
+        }.count
+        return Self.events.count - approved
+    }
+
+    /// Clés des tables `[hooks.state."<clé>"]` qui portent un `trusted_hash` (forme que Codex écrit lui-même).
+    static func trustedKeys(in text: String) -> Set<String> {
+        var keys = Set<String>()
+        var current: String?
+        let prefix = "[hooks.state."
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                current = line.hasPrefix(prefix) ? unquotedKey(String(line.dropFirst(prefix.count))) : nil
+            } else if let current, line.hasPrefix("trusted_hash"),
+                      line.dropFirst("trusted_hash".count).trimmingCharacters(in: .whitespaces).hasPrefix("=") {
+                keys.insert(current)
+            }
+        }
+        return keys
+    }
+
+    /// `"clé"]` (début d'un nom de table TOML entre guillemets) -> `clé`, séquences `\\` et `\"` défaites.
+    private static func unquotedKey(_ text: String) -> String? {
+        guard text.hasPrefix("\"") else { return nil }
+        var key = ""
+        var escaped = false
+        for character in text.dropFirst() {
+            if escaped {
+                key.append(character == "n" ? "\n" : character)
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == "\"" {
+                return key
+            } else {
+                key.append(character)
+            }
+        }
+        return nil
+    }
+
+    /// Hook de Claude Notch tel que Codex le liste : notre script, dans ce hooks.json.
+    func isOurs(_ hook: CodexListedHook) -> Bool {
+        let paths = [hooksURL.path, Self.realPath(hooksURL.path)]
+        return hook.command.hasPrefix(hookCommand) && paths.contains(hook.sourcePath)
+    }
+
+    /// Chemin canonique, tel que Codex le donne dans les clés et `sourcePath` (/var -> /private/var, liens suivis).
+    /// `resolvingSymlinksInPath` de Foundation ramène /private/var à /var : on passe par `realpath`.
+    static func realPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     /// Mêmes clés et mêmes valeurs, à l'ordre des clés près.

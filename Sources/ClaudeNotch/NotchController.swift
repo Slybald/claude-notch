@@ -172,8 +172,8 @@ final class NotchController {
             openSettings: { [weak self] in self?.openSettings() }
         )
         claude.actions = actions
-        codex.openHost = { [weak self] bundleId in
-            if let bundleId { Self.bringToFront(bundleId: bundleId) }
+        codex.openHost = { [weak self] bundleId, link in
+            if let link { Self.open(link, inAppWithBundleId: bundleId) } else if let bundleId { Self.bringToFront(bundleId: bundleId) }
             self?.suppressUntilExit = true
             self?.collapse()
         }
@@ -584,6 +584,20 @@ final class NotchController {
         Self.bringToFront(bundleId: ProcessInspector.desktopBundleId)
         suppressUntilExit = true
         collapse()
+    }
+
+    /// Ouvre un lien profond dans l'app qui le gère (celle de `bundleId`), sinon dans l'app par défaut du lien ; si l'app
+    /// refuse le lien, elle est au moins amenée devant.
+    static func open(_ url: URL, inAppWithBundleId bundleId: String?) {
+        guard let bundleId, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+            NSWorkspace.shared.open(url)
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open([url], withApplicationAt: app, configuration: configuration) { _, error in
+            if error != nil { DispatchQueue.main.async { bringToFront(bundleId: bundleId) } }
+        }
     }
 
     /// Passe par LaunchServices : une app en arrière-plan ne peut plus toujours en activer une autre directement.

@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Codex tab with the ChatGPT app.** Codex ignores a hook until it is approved, and says nothing, so after "Install Codex
+  hooks" the tab stayed empty with no explanation. The tab and Settings › Codex now show the real state: *hooks not
+  installed*, *waiting for approval in Codex*, or *active*. While approval is pending, **Approve in Codex** asks Codex itself
+  (the same request as the **Review hooks** button of the ChatGPT app) to trust the Claude Notch hooks, and only those,
+  on your click; the app still never writes `config.toml`. The state is read without changing anything (`hooks/list`
+  of the app's own Codex, falling back to reading `config.toml`), a hook modified since its approval is reported, and the
+  tab updates by itself once the hooks are approved, here, in the app or with `/hooks`. Conversations already open when the
+  hooks are approved are not tracked: the tab says to start a new one.
+- **Codex in the ChatGPT app is recognised as such.** The ChatGPT app (which now contains Codex) counts as Codex being
+  present (the tab is on at first launch), its sessions read **ChatGPT**, and clicking one opens that conversation
+  (`codex://threads/<id>`) instead of only bringing the app to the front. Measured with the app's own Codex 0.162;
+  `docs/CODEX.md` and the README describe the approval of the hooks.
+
 ### Changed
 
 - **Mail tab: your latest received emails instead of only the unread ones.** It now lists the latest 3 to 5 emails of
