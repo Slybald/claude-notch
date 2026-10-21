@@ -36,7 +36,7 @@ l'amplitude, la continuité et la caméra.
    sauf l'accroche.
 3. **Fouetté et flou de vitesse** : au changement d'onglet, l'ancien contenu part du côté opposé et le nouveau arrive
    du côté de l'onglet choisi (avec flou) ; sur les mouvements rapides (pointe des grands mouvements de caméra, au-delà de 20 px par image, fouettés,
-   chute de la notch, carte, lien), chaque image est la moyenne de 5 instants sur une demi-image.
+   chute de la notch, carte, lien), chaque image est la moyenne de 8 instants sur une demi-image.
 
 ## Plans
 

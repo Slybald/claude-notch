@@ -28,11 +28,11 @@ La référence elle-même (vidéo et images) n'est pas dans le dépôt.
 cd promo
 npm install
 npm run studio                                      # aperçu interactif (compositions Promo4-16x9, Promo4-9x16, Promo3-…, Promo2-…)
-node scripts/render.mjs                             # v4 : out/v4/notch-promo-16x9.mp4 et -9x16.mp4 (+ versions 4K) ; --v=3 pour la v3
-node scripts/render.mjs --lang=fr                   # mêmes fichiers avec le suffixe -fr
+node scripts/render.mjs --gl=angle                 # v4 : out/v4/notch-promo-16x9.mp4 et -9x16.mp4 (+ versions 4K) ; --v=3 pour la v3
+node scripts/render.mjs --gl=angle --lang=fr       # mêmes fichiers avec le suffixe -fr
 node scripts/render.mjs --preview --target=16x9     # demi-résolution dans tmp/, pour relire vite
 node scripts/render.mjs --v=2                       # version 2 dans out/v2/ (claude-notch-*), --v=1 : version 1 dans out/
-node scripts/gif.mjs                                # ../docs/media/claude-notch.gif (boucle complète de la v4, 16:9)
+node scripts/gif.mjs --gl=angle                     # ../docs/media/claude-notch.gif (boucle complète de la v4, 16:9)
 node scripts/frames.mjs Promo4-16x9 en 100,200      # images isolées dans tmp/frames/ (numéros d'images à 60 i/s) ; 5ᵉ argument : échelle
 ```
 
@@ -50,8 +50,9 @@ master, `-crf 17` pour le 1080p, `-movflags +faststart`.
 | `../docs/media/claude-notch.gif` | boucle de 28,95 s pour le README, 16 i/s, 960 × 540 (versionnée, moins de 5 Mo) |
 
 `out/` et `tmp/` ne sont pas versionnés. La vidéo MP4 s'arrête sur la carte finale (image 1321) ; le GIF va jusqu'à
-l'image 1357, où la notch redevient fermée, pour que la boucle soit sans saut. Le flou de vitesse multiplie le coût des
-images rapides : compter une heure environ pour un rendu 4K complet (EN + FR, 2 formats) et le GIF.
+l'image 1357, où la notch redevient fermée, pour que la boucle soit sans saut. **Rendre la v4 avec `--gl=angle`**
+(Chrome sur le GPU) : les flous et ombres CSS, agrandis par la caméra et répétés par le flou de vitesse, sont environ
+30 fois plus lents en rendu logiciel (plusieurs heures au lieu de quelques minutes en 4K).
 
 ### Changer le nom de l'app
 
