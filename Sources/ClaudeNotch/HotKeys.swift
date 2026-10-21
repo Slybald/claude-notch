@@ -9,8 +9,14 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
     case controlCommandN
     case optionCommandJ
     case optionCommandK
+    /// Réservées à « Approuver au clavier » (touches fixes, pas dans les listes de choix).
+    case controlOptionY
+    case controlOptionN
 
     var id: String { rawValue }
+
+    /// Les choix offerts dans les réglages.
+    static let pickable: [HotKeyChoice] = allCases.filter { $0 != .controlOptionY && $0 != .controlOptionN }
 
     /// Code de touche virtuel et modificateurs au format Carbon ; nil pour `none`.
     var carbon: (keyCode: UInt32, modifiers: UInt32)? {
@@ -21,6 +27,8 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
         case .controlCommandN: return (UInt32(kVK_ANSI_N), UInt32(controlKey | cmdKey))
         case .optionCommandJ: return (UInt32(kVK_ANSI_J), UInt32(optionKey | cmdKey))
         case .optionCommandK: return (UInt32(kVK_ANSI_K), UInt32(optionKey | cmdKey))
+        case .controlOptionY: return (UInt32(kVK_ANSI_Y), UInt32(controlKey | optionKey))
+        case .controlOptionN: return (UInt32(kVK_ANSI_N), UInt32(controlKey | optionKey))
         }
     }
 
@@ -32,17 +40,28 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
         case .controlCommandN: return "⌃⌘N"
         case .optionCommandJ: return "⌥⌘J"
         case .optionCommandK: return "⌥⌘K"
+        case .controlOptionY: return "⌃⌥Y"
+        case .controlOptionN: return "⌃⌥N"
         }
     }
 }
 
+/// Ce que `ApprovalQueue` demande au centre de raccourcis (remplaçable dans les tests).
+protocol HotKeyRegistering: AnyObject {
+    @discardableResult
+    func set(_ choice: HotKeyChoice, for slot: HotKeyCenter.Slot, action: @escaping () -> Void) -> Bool
+}
+
 /// Raccourcis globaux par `RegisterEventHotKey` (Carbon) : aucune autorisation d'accessibilité, la touche est
 /// réservée à l'app tant qu'elle est enregistrée. Une case (`Slot`) par action.
-final class HotKeyCenter: ObservableObject {
+final class HotKeyCenter: ObservableObject, HotKeyRegistering {
     enum Slot: UInt32 {
         case togglePanel = 1
         case toggleHidden = 2
         case commandBar = 10
+        /// Enregistrées seulement pendant une demande à régler (`ApprovalQueue`).
+        case approve = 3
+        case deny = 4
     }
 
     static let shared = HotKeyCenter()

@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **Approve with the keyboard.** A permission request from Claude Code or Codex can be settled without the mouse:
+  **⌃⌥Y** allows, **⌃⌥N** denies the oldest waiting request, both agents in one queue ("1 of 3" on its card, the two keys
+  shown on its buttons). Off by default (Settings › Claude and › Codex › *Approve with the keyboard*; it needs *Reply
+  from the notch* / *Approve from the notch* on). Safeguards, because a reflex must never allow a command you have not read:
+  - the two combinations are only taken while a request waits (nothing is reserved the rest of the time), and macOS
+    refuses them if another app already owns them (the card then shows no key);
+  - a key only decides if that card is open in the notch and has been for more than a second. Otherwise the first press
+    just opens the notch on the right tab (without taking the keyboard, so typing elsewhere is not hijacked) and decides nothing;
+  - one request at a time: once it is settled, the next one starts its one second again, so a repeated press never
+    settles two requests; questions and plans still need the mouse;
+  - same deciders as a click: nothing is ever "always allowed", the timeouts and "first answer wins" are unchanged.
 - **Command bar.** A field in the notch with five one-key prefixes: `t 25` starts a timer (also `t 1h30`, or `25 min`
   without the prefix; `t` alone offers 25, 5 and 10 minutes and the Pomodoro), `n idea` creates a quick note,
   `c link` searches the clipboard history and copies the chosen entry again, `s presentation` applies a Quick Settings
