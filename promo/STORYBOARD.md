@@ -1,78 +1,100 @@
-# Claude Notch — storyboard minuté
+# Claude Notch — storyboard minuté, version 2
 
-Vidéo de présentation, 40 s, 30 images/s, **120 BPM** : un temps = 0,5 s = 15 images, une mesure = 2 s = 60 images.
-Toutes les coupes et les arrivées de texte tombent sur un temps. Même timeline pour le 16:9 (1920 × 1080, rendu
-en 4K) et le 9:16 (1080 × 1920) : seule la mise en page change (voir « Cadrage vertical »).
+Vidéo de présentation de **15,8 s** en **60 images/s**, muette, refaite dans le style de la vidéo de référence de
+l'utilisateur ([REFERENCE.md](REFERENCE.md) : analyse mesurée et tableau « v1 → à changer »). La v1 (40 s, mots géants
+sur fond crème, coupes sur 120 BPM) reste dans le code (`src/promo/`) et dans [STORYBOARD-v1.md](STORYBOARD-v1.md) ;
+ses trois concepts sont dans [concepts/](concepts/).
 
-## Idée forte
+## Idée
 
-Chaque MacBook a une zone noire au milieu du haut de l'écran qui ne sert à rien. Le problème qui disparaît :
-**ce trou devient la barre d'outils de tout le monde** (musique, réglages, fichiers, copies, minuteur, notes) et,
-pour qui code avec Claude Code, le poste de pilotage de ses sessions. La vidéo commence par la blague que tout
-propriétaire de MacBook connaît, puis le trou ouvre la bouche.
+> **Un seul objet noir au centre d'un champ vide. Un curseur le manipule, il se transforme en l'interface suivante.**
 
-## Les trois concepts (images-clés dans `concepts/`)
+Le problème qui disparaît : la zone noire du haut de l'écran ne sert à rien. Ici, **la notch est l'unique acteur** :
+elle s'ouvre, change d'onglet, reçoit un fichier, se replie, puis tombe au centre et devient la carte qui porte son
+nom. Aucun titre, aucune légende, aucun mot géant. Les textes sont ceux de l'interface recréée.
 
-| | Histoire en une phrase | Direction visuelle | Rythme | Références (idées, pas copies) |
-|---|---|---|---|---|
-| **A — « Le trou »** (retenu) | « Ton Mac a un trou dans l'écran. Il ne sert à rien. Plus maintenant. » La notch s'ouvre et devient utile. | Affiche typographique crème et noir, orange `#D97757` de l'app. Titres Bricolage Grotesque 800 condensé, légendes en JetBrains Mono. La notch, forme noire pendue au bord haut, est le seul objet. | 120 BPM, coupes sèches, un mot par temps. | Affiches suisses à très gros caractères ; pages produit « type d'abord » de minimal.gallery et godly.website ; le catalogue d'effets de kinetics.colorion.co m'a surtout servi de **liste de ce qu'il faut éviter** (machine à écrire, scramble, apparition en fondu). |
-| **B — « Le détour »** | « Sept détours pour faire une petite chose. Un seul geste vers le haut. » | Papier pointillé, un trait orange qui serpente d'une corvée à l'autre, puis un trait noir droit jusqu'à la notch. Mono + condensé. | 100 BPM, tracé qui se dessine. | Cartes de parcours et infographies de trajets (tracé en `stroke-dashoffset`). |
-| **C — « 9:00 → 18:00 »** | « Une journée de travail, une seule constante : la notch. » | Fond graphite, horloge géante en mono, frise horaire, l'onglet change avec l'heure. | 112 BPM, un onglet par heure. | Frises horaires d'éditeurs audio, chronos de film. |
+Ce qu'on reprend de la référence : un plan continu sans coupe ; fond gris chaud, noir pur, blanc ; objet grand (70 %
+de la largeur) et vide autour ; ressorts secs mesurés ; curseur qui déclenche chaque réaction ; sélecteur élastique ;
+contenu qui passe de flou à net ; rythme « geste → réaction → tenue » ; boucle fermée.
+Ce qu'on ne reprend pas : tout son contenu (pastille « Generate », lecteur, curseur de volume, interrupteur,
+segments, graphique, palette de commandes).
 
-**Choix : A.** Le gag du trou est compris en une seconde par tous les propriétaires de MacBook, il présente l'objet
-(la notch) avant même le produit, et la typographie lourde contre une petite forme noire donne un look d'affiche,
-pas de générateur. B est plus malin sur le papier mais montre le produit en dernier et oblige à inventer des
-parcours dans des fenêtres tierces (fausse interface). C est propre mais banal (« une journée avec… ») et son UI
-noire sur fond sombre manque de contraste.
-On garde de B le **geste unique vers le haut** : le curseur monte d'un trait vers la notch (plan 3).
+## Écarts voulus avec la référence
+
+| Référence | v2 | Pourquoi |
+|---|---|---|
+| Objet flottant au centre du cadre | Notch **accrochée au bord haut**, comme dans l'app ; seule la carte finale est au centre | C'est la vérité du produit : un panneau qui pend de l'écran |
+| Carré 1:1 | 16:9 et 9:16 | Formats demandés ; même composition, seule l'échelle change |
+| Aucune couleur vive | L'orange de l'app reste **dans** l'interface (onglet actif, tuile allumée, bouton Allow) | C'est la vraie interface |
+| Ressort de la référence | Même raideur, pas le ressort de l'app (response 0,42 / ζ 0,78) | Plus sec : c'est ce qui fait le style ; la notch de l'app est plus douce |
 
 ## Système visuel
 
-- Fond crème `#EFEAE0` (« bureau clair »), encre `#0B0B0B`, orange app `#D97757`. Une seule scène sur fond sombre
-  `#181818` (développeurs), amenée par la notch qui grossit jusqu'à remplir le cadre.
-- Interface recréée en composants vectoriels d'après les rendus et le code de l'app (mesures en pt, ressort
-  `notchSpring` de l'app : response 0,42, damping 0,78). Échelle 1,85 px par point en 16:9 (1,5 dans la scène sombre,
-  où le panneau Claude est plus haut), 1,6 en 9:16.
-- Hiérarchie : un seul élément principal bouge à la fois ; le panneau est l'acteur, le mot géant est le décor qui
-  change sur les temps.
+- Fond `#EDEDE8`, halo `#F1F1ED` au centre ; notch `#000` ; carte blanche `#FDFDFD` ; aucun autre fond.
+- Interface recréée en composants vectoriels (`src/ui/`) d'après les rendus et le code de l'app. Échelle : **2,25 px
+  par point** en 16:9 (panneau de 1 449 px, 75 % de la largeur), **1,55** en 9:16 (panneau de 998 px).
+- Ombre portée vers le bas, large et douce, proportionnelle au cadre.
+- Polices : Inter pour l'interface (tient la place de la police système de macOS) et pour la carte du nom,
+  JetBrains Mono pour le lien et les mentions.
+
+## Mouvement
+
+Un seul ressort de raideur 460 pour tous les morphings (REFERENCE.md § 7.1) : amortissement **0,68** pour agrandir
+(dépassement de 5 %), **1** pour réduire. Le curseur suit `cubic-bezier(0.5, 0.1, 0.2, 1)`, 0,3 à 0,6 s selon la
+distance, arrêt de 0,1 s avant chaque clic, traînée au-dessus de 650 px/s. Le contenu d'un onglet sort en 80 ms avec
+du flou ; le suivant entre en 130 ms de flou à net. La capsule de la barre d'onglets s'étire : bord avant d'abord,
+bord arrière 40 ms après.
 
 ## Plans
 
-Les temps sont comptés depuis le début (temps 0 = image 0).
+Temps en secondes depuis le début. Chaque réaction suit l'arrivée du curseur de 0,10 s (arrêt, puis clic).
 
-| # | Temps | Secondes | Images | Texte (EN / FR) | Ce qui bouge |
-|---|---|---|---|---|---|
-| 1 | 0–4 | 0,0–2,0 | 0–60 | « Your Mac / has a hole / in the screen. » — « Ton Mac / a un trou / dans l'écran. » | Notch noire seule en haut. Une ligne entre au temps 0, 1 et 2 (révélation par masque, 10 images, sortie expo). Au temps 2 la notch « bat » (ressort) : c'est elle, le trou. |
-| 2 | 4–6 | 2,0–3,0 | 60–90 | « It does / nothing. » — « Il ne / sert à rien. » | Coupe sèche : les 3 lignes tombent (6 images), 2 lignes les remplacent. Rien d'autre ne bouge : le vide fait la blague. |
-| 3 | 6–7 | 3,0–3,5 | 90–105 | « Until now. » (orange) — « Plus maintenant. » | Le curseur monte d'un trait depuis le bas du cadre jusqu'à la notch (1 geste, 16 images, arrivée image 104). La phrase orange remplace la précédente sur le temps et sort quand le curseur arrive. |
-| 4 | 7–12 | 3,5–6,0 | 105–180 | « Listen. » — « Écoute. » + « Now playing. Your week. » | La notch s'ouvre (ressort app, image 104) sur **Lecteur** : pochette, progression, calendrier. Un demi-temps de produit seul, puis le mot géant entre au temps 8. Curseur au repos sur la barre d'onglets. |
-| 5 | 12–18 | 6,0–9,0 | 180–270 | « Switch. » — « Bascule. » + « Wi-Fi, Bluetooth, caffeine. » | Le curseur survole l'onglet **Réglages rapides**, le panneau change de hauteur (ressort), clic sur Caféine : la tuile passe à l'orange. |
-| 6 | 18–26 | 9,0–13,0 | 270–390 | « Drop. » — « Dépose. » + « Files wait on the notch. » | Onglet **Étagère**. Un fichier traîne jusqu'au panneau (cadre pointillé orange « déposer »), se pose, les icônes s'écartent, le compteur passe de 5 à 6 éléments. |
-| 7 | 26–31 | 13,0–15,5 | 390–465 | « Reuse. » — « Reprends. » + « Your last copies, one click. » | Onglet **Presse-papiers**. Les lignes entrent en cascade (un temps sur deux), survol, clic : « Copié ». |
-| 8 | 31–36 | 15,5–18,0 | 465–540 | « Focus. » — « Concentre-toi. » + « Timer and Pomodoro. » | Onglet **Minuteur** : l'anneau avance, le compte à rebours défile. |
-| 9 | 36–40 | 18,0–20,0 | 540–600 | « Jot. » — « Note. » + « Quick notes. » | Onglet **Notes rapides** : la note se remplit par rafales de mots, sur les temps. |
-| 10 | 40–42 | 20,0–21,0 | 600–630 | — | **La notch grossit jusqu'à remplir le cadre** (le trou avale l'écran, 14 images), pendant qu'elle se replie en oreilles : main ambre à gauche, `2·2` à droite. Fond sombre. |
-| 11 | 42–48 | 21,0–24,0 | 630–720 | « Code with Claude Code? » (légende) puis « It asks. » — « Il demande. » | Les oreilles pulsent. Le curseur monte, le panneau s'ouvre sur **Claude** : trois sessions, la première bordée d'ambre. |
-| 12 | 48–52 | 24,0–26,0 | 720–780 | « You answer. » — « Tu réponds. » | Survol de la carte, la demande se déplie (`rm -rf build && …`), clic sur **Allow** : la carte passe en « Terminal ». |
-| 13 | 52–56 | 26,0–28,0 | 780–840 | « From the notch. » — « Depuis la notch. » + « Optional. Off until you turn it on. » | Survol de « mon-app » : bouton **Chat**, la conversation s'ouvre, le message se tape par rafales et part. |
-| 14 | 56–58 | 28,0–29,0 | 840–870 | — | Le rideau se rétracte vers le panneau, le fond redevient crème, la conversation se referme. |
-| 15 | 58–66 | 29,0–33,0 | 870–990 | « Yours. » — « À toi. » + « Press, hold, drag. Like home-screen apps. » | Appui long sur la barre (image 870) : les icônes oscillent, les `−` apparaissent, « Notes rapides » est glissée en 2e position (892–920), « Presse-papiers » masquée (942), clic sur **OK** (964). |
-| 16 | 66–80 | 33,0–40,0 | 990–1200 | « Claude Notch. » + « Your notch finally has a job. » + 3 pastilles (« Everything stays on your Mac », « Signed automatic updates », « Setup in four steps ») + lien | Le panneau se replie en notch à oreilles (coche verte, `1·0`). Titre géant au temps 67, légende 69, une pastille par temps (70, 71, 72), lien au temps 74. Au temps 76 les oreilles alternent (comme dans l'app, toutes les 4 s). Dernier plan fixe 2 s. Mention en petit : projet indépendant, non affilié à Anthropic. |
+| # | Début – fin | Durée | Geste du curseur | Réaction et transformation |
+|---|---|---|---|---|
+| 1 | 0,00 – 0,68 | 0,68 | Entre du bas à droite, se pose sur la notch (0,5 s). | Notch fermée seule en haut du cadre. À 0,68 elle s'ouvre sur **Lecteur** : forme 0,2 s avec dépassement, contenu net à 0,95. |
+| 2 | 0,68 – 2,25 | 1,57 | Va sur la pause, clique à 1,50. | L'icône pause devient lecture. Tenue. |
+| 3 | 2,25 – 3,90 | 1,65 | Clique l'onglet **Réglages rapides** (2,25), puis la tuile Caféine (3,05). | La capsule s'étire d'un onglet à l'autre, le panneau grandit (ressort), flou → net ; la tuile passe à l'orange (« Éveillé · 1 h »). |
+| 4 | 3,90 – 6,05 | 2,15 | Clique **Étagère** (3,90), sort du panneau, prend un fichier (4,50), le glisse (4,75), le dépose (5,20). | Les cinq éléments entrent en cascade ; cadre pointillé orange au survol ; l'élément se pose, 5 → 6. |
+| 5 | 6,05 – 7,60 | 1,55 | Clique **Presse-papiers** (6,05), survole une copie, clique (6,85). | Le panneau grandit, les lignes entrent une à une (50 ms) ; la ligne passe à « Copié ». |
+| 6 | 7,60 – 8,40 | 0,80 | Clique **Minuteur** (7,60). | Le panneau rétrécit (ressort critique) ; la bague se trace, le compte à rebours se met en place. |
+| 7 | 8,40 – 10,15 | 1,75 | Clique **Notes rapides** (8,40). | La note se remplit par rafales de mots (8,70 – 9,60). À 9,45 l'icône de l'onglet Claude devient une main ambre : Claude attend. |
+| 8 | 10,15 – 11,75 | 1,60 | Traverse la barre d'onglets, clique **Claude** (10,15), puis **Allow** (11,25). | La demande se déplie (10,55) ; au clic elle se replie et la carte passe en « Terminal ». |
+| 9 | 11,75 – 12,65 | 0,90 | Sort du cadre par le bas à droite. | Le panneau se replie en notch à oreilles : coche verte à gauche, `1·0` à droite. |
+| 10 | 12,65 – 15,80 | 3,15 | — | La notch **tombe** (0,45 s) et devient la carte noire : étoile orange, « Claude Notch », « Your notch finally has a job. » (texte net à 13,17). À 13,50 la carte blanche du lien `github.com/Slybald/claude-notch` en sort ; mentions « Free and open source · macOS 13+ » et « projet indépendant, non affilié à Anthropic » à 13,70. Tenue de 2,3 s. |
+| 11 | 15,80 – 16,50 | 0,70 | — | **Boucle du GIF seulement** : la carte remonte, redevient la notch fermée, état identique à l'image 0. La vidéo MP4 s'arrête à 15,80 sur la carte finale. |
+
+Rythme : 9 temps forts en 12,65 s avant la carte finale, soit **1,4 s en moyenne** (référence : 1,55 s). Le plus court
+dure 0,8 s (Minuteur), le plus long 2,15 s (Étagère, où le fichier fait un aller-retour).
 
 ## Accroche et appel à l'action
 
-- Accroche : le gag du trou (plans 1–3), produit réel visible à 3,5 s, mais la notch est à l'écran dès l'image 0.
-- Appel à l'action : nom, « Free and open source · macOS 13+ » et `github.com/Slybald/claude-notch`.
-
-## Tempo et musique
-
-- **120 BPM**, 4/4, premier temps sur l'image 0. Les coupes tombent sur les images 0, 15, 30, 45, 60…
-- La piste audio est prévue dans la composition : déposer le fichier choisi dans `public/music.mp3` ; le script
-  de rendu le détecte (voir `README.md`). Morceaux proposés : voir `README.md`.
-- Pas d'effets sonores ajoutés : la vidéo est livrée muette.
+- Accroche : la notch est à l'écran dès l'image 0 et **s'ouvre à 0,68 s** ; l'interface réelle est visible avant 1 s.
+- Appel à l'action : nom, tagline, `github.com/Slybald/claude-notch`, « gratuit et open source », sur la carte finale
+  tenue 2,3 s.
 
 ## Cadrage vertical (9:16)
 
-Pas un zoom : même timeline, mise en page refaite. La notch et son panneau (échelle 1,6) restent accrochés au haut
-du cadre, centrés ; le mot géant passe dessous, sur la moitié basse, sur 1 à 2 lignes ; la légende en mono se
-place entre le panneau et le mot. Les scènes à fond sombre et les pastilles finales sont recomposées en colonne.
+Même timeline, mise en page refaite : panneau à l'échelle 1,55 (998 px sur 1 080), accroché au haut du cadre ; le
+curseur attend et prend le fichier dans la zone libre sous le panneau (y = 760) ; la carte du nom (900 × 196 px) et la
+carte du lien (820 × 116 px) sont centrées à y = 770 ; les mentions sont en bas. Un recadrage plus serré (panneau plus
+large que le cadre, caméra qui suit le curseur) a été essayé et abandonné : il coupe le texte aux bords. La zone
+haute peut être recouverte par l'interface des réseaux sociaux (Reels, TikTok, Shorts).
+
+## Retiré par rapport à la v1
+
+Les mots géants, le calage sur 120 BPM, la scène sombre « développeurs » avec le rideau, la conversation avec Claude,
+le mode édition des onglets (appui long, glisser, masquer). Raison : le style de référence n'a ni texte autour de
+l'objet ni changement d'ambiance, et ses temps forts durent 1 à 2,5 s. Le mode édition tiendrait seul 3 s : il peut
+faire une vidéo à part.
+
+## Son
+
+Aucun. La référence n'a pas de piste audio ; la vidéo est livrée muette, sans musique.
+
+## Vérité de l'interface
+
+Rien d'inventé : onglets, textes, mesures et couleurs viennent des rendus de l'app et de ses fichiers de traduction.
+Les données affichées (morceau, fichiers, copies) sont fictives, comme dans les captures de l'app. Les gestes montrés
+sont des fonctions réelles : pause, tuile Caféine, dépôt d'un fichier sur l'étagère, copie d'un élément, minuteur,
+note, réponse à une demande d'autorisation. Le dépôt se fait ici sur le panneau déplié ; le README annonce aussi le
+dépôt sur la notch repliée, non montré.

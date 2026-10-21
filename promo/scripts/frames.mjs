@@ -1,4 +1,4 @@
-// Images extraites de la composition : node scripts/frames.mjs <Promo16x9|Promo9x16> <fr|en> 10,40,... [dossier]
+// Images extraites de la composition : node scripts/frames.mjs <Promo16x9|Promo9x16|Promo2-16x9|Promo2-9x16> <fr|en> 10,40,... [dossier]
 import path from "node:path";
 import fs from "node:fs";
 import { open, root } from "./lib.mjs";
