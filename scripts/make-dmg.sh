@@ -2,7 +2,7 @@
 # Crée, à partir de build/Oriel.app (lancer scripts/build.sh avant), deux images disque de la même app :
 #   build/Oriel-<version>.dmg        avec Oriel.app : celle à télécharger, et celle de la mise à jour automatique d'Oriel ;
 #   build/ClaudeNotch-<version>.dmg  avec ClaudeNotch.app : la seule que la mise à jour automatique des versions 1.1.0 à
-#                                    1.9.0 sait installer (l'app se renomme Oriel.app à son lancement, docs/RENAME.md).
+#                                    1.9.0 sait installer (l'app se renomme Oriel.app à son lancement).
 # Chacune est vérifiée (hdiutil verify, montage en lecture seule) et accompagnée de son SHA-256 dans <dmg>.sha256.
 set -eu
 

@@ -2,7 +2,7 @@ import Foundation
 import IOKit
 
 // Accès au SMC (System Management Controller) par IOKit, partagé par l'app (lecture) et l'outil `fanctl` (écriture,
-// en root). Format de l'échange mesuré sur un MacBook Pro M3 Pro : voir docs/FANS.md.
+// en root). Format de l'échange mesuré sur un MacBook Pro M3 Pro.
 
 /// Une valeur lue : type SMC (« flt  », « ui8  »…) et octets bruts.
 public struct SMCValue: Equatable {

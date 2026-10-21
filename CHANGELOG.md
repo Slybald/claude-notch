@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [2.0.0] - 2026-10-21
 
 **Claude Notch is now Oriel.** Same app, same settings, same data: the automatic update installs it in place and it
-renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). Entries below use the new name.
+renames itself at its first launch (see *Changed* below). Entries below use the new name.
 
 ### Added
 
@@ -28,7 +28,7 @@ renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). E
   helper, with only `auto` or `hold`. The helper checks every request against the bounds read from the Mac.
 - Safety: macOS gets control back when the app quits or crashes, freezes for 30 s, on sleep or session change, above
   105 °C, or when macOS itself takes a fan back. "Remove the authorization" (Settings › Quick Settings) and
-  uninstalling remove the helper and its rule. Details and measurements: [docs/FANS.md](docs/FANS.md).
+  uninstalling remove the helper and its rule.
 - **Agenda tab and a live countdown on the collapsed notch.** The next appointment becomes an index tab that counts
   down: a discreet calendar icon and `14 min` from 15 minutes before, amber with a camera and `4 min` from 5 minutes
   before, green `now` during the meeting, then it goes away. An amber tab stays unfolded even in *Retracted* mode, and
@@ -99,7 +99,7 @@ renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). E
   at its first launch the app renames itself `Oriel.app`, points open-at-login to the new path and restarts (one
   instance only). macOS permissions, settings, hooks and data are kept: the bundle identifier
   (`io.github.slybald.claudenotch`), the signing certificate, the data and log folders and the hook scripts keep their
-  names. An older `ClaudeNotch.app` found next to `Oriel.app` is moved to the Trash. Details in `docs/RENAME.md`.
+  names. An older `ClaudeNotch.app` found next to `Oriel.app` is moved to the Trash.
 - **Two disk images per release.** `Oriel-<v>.dmg` (with `Oriel.app`) is the one to download. A second signed image,
   `ClaudeNotch-<v>.dmg` (the same app in a `ClaudeNotch.app` folder), is still published because versions 1.1.0 to
   1.9.0 only look for that name when they update themselves.
@@ -168,7 +168,7 @@ renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). E
 - **Codex in the ChatGPT app is recognised as such.** The ChatGPT app (which now contains Codex) counts as Codex being
   present (the tab is on at first launch), its sessions read **ChatGPT**, and clicking one opens that conversation
   (`codex://threads/<id>`) instead of only bringing the app to the front. Measured with the app's own Codex 0.162;
-  `docs/CODEX.md` and the README describe the approval of the hooks.
+  the README describes the approval of the hooks.
 
 ### Changed
 
@@ -205,8 +205,6 @@ renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). E
   and key order kept, nothing written if nothing changes, an invalid file is refused) and **Remove the hooks** takes only
   ours away; Uninstall Claude Notch removes them too. `config.toml` and its `notify` are never touched. Codex runs a new
   hook only after you trust it with `/hooks`; the settings say so.
-- `docs/CODEX.md`: what is possible with Codex and why (hooks, `notify`, session files, app-server, approvals), measured on
-  Codex 0.154.
 
 ### Not possible
 
@@ -221,15 +219,13 @@ renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). E
   reply; **Mail** shows the unread count of Apple Mail and the latest unread messages, and opens one on click.
   Messages needs Full Disk Access (macOS has no dialog for it: the tab explains it and links to System Settings),
   Contacts for names, and Automation to reply. Mail needs Automation and is never launched by Claude Notch. Nothing
-  is stored or sent outside the Mac, and no permission is asked before you open the tab. Feasibility, measures and
-  limits: [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+  is stored or sent outside the Mac, and no permission is asked before you open the tab. Limits are listed in
+  the README.
 - Profiles: Developer, Student, Creative and Minimal. A profile is a starting point (which tabs, in which order, how
   the panel opens, the ears) inside the same app: one update, one signature. The first step of the setup assistant
   offers them (optional, nothing changes without a choice), and **Settings › General › Change Profile…** shows what a
   profile will show and hide and changes nothing until you confirm. Your tab data and the hooks are never touched.
   Claude and Codex are only offered when they are found on the Mac.
-- `docs/EDITIONS.md` compares three ways to make "editions" (profiles, separate builds, installable modules) and
-  explains why profiles come first.
 
 ### Fixed
 

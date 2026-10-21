@@ -16,7 +16,7 @@ import SwiftUI
 final class Updater: ObservableObject, @unchecked Sendable {
     static let shared = Updater()
 
-    /// Dépôt renommé (docs/RENAME.md) : les versions jusqu'à 1.9.0 lisent encore claude-notch, que GitHub redirige ici.
+    /// Dépôt renommé : les versions jusqu'à 1.9.0 lisent encore claude-notch, que GitHub redirige ici.
     static let latestReleaseURL = URL(string: "https://api.github.com/repos/Slybald/oriel/releases/latest")!
     /// Clé publique Ed25519 (base64). La privée signe les DMG dans la CI (scripts/update-signing.swift).
     static let publicKey = "KKwGDnHEGrzmG6F26Dco+/RUrliwrPPztW0ceaG5/UA="
