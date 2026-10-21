@@ -259,6 +259,7 @@ extension Preferences {
 /// d'office seulement si Codex est détecté, aucun travail de fond une fois désactivé.
 final class CodexModule: NotchModule {
     static let replyKey = "codex.replyFromNotch"
+    static let quotaKey = "codex.showQuota"
 
     let id = ModuleRegistry.codexId
     let title = "Codex"
@@ -267,6 +268,8 @@ final class CodexModule: NotchModule {
     let store: CodexStore
     let approvals: CodexApprovals
     let setup: CodexHookSetup
+    /// Quota du compte ChatGPT : lu par Codex, seulement panneau ouvert (voir `CodexUsageStore`).
+    let usage: CodexUsageStore
     private let defaults: UserDefaults
 
     /// « Approuver depuis la notch » : coupé par défaut ; coupé, les demandes sont rendues tout de suite à Codex.
@@ -274,6 +277,15 @@ final class CodexModule: NotchModule {
         didSet {
             defaults.set(replyFromNotch, forKey: Self.replyKey)
             if !replyFromNotch { approvals.releaseAll() }
+        }
+    }
+
+    /// Jauge de quota dans l'onglet : allumée par défaut (rien à installer, une lecture par Codex lui-même) ; éteinte, aucun
+    /// processus Codex n'est lancé pour elle.
+    @Published var showsQuota: Bool {
+        didSet {
+            defaults.set(showsQuota, forKey: Self.quotaKey)
+            if !showsQuota { usage.forget() } else if isStarted { usage.start() }
         }
     }
 
@@ -286,14 +298,18 @@ final class CodexModule: NotchModule {
     var openSettings: () -> Void = {}
 
     private var cancellables = Set<AnyCancellable>()
+    /// Entre `start()` et `stop()` : le panneau est ouvert.
+    private var isStarted = false
 
     init(store: CodexStore = CodexStore(), approvals: CodexApprovals = CodexApprovals(), setup: CodexHookSetup = .shared,
-         defaults: UserDefaults = .standard) {
+         usage: CodexUsageStore = CodexUsageStore(), defaults: UserDefaults = .standard) {
         self.store = store
         self.approvals = approvals
         self.setup = setup
+        self.usage = usage
         self.defaults = defaults
         replyFromNotch = defaults.bool(forKey: Self.replyKey)
+        showsQuota = defaults.object(forKey: Self.quotaKey) as? Bool ?? true
         approvals.isEnabled = { [weak self] in self?.replyFromNotch ?? false }
         store.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         approvals.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
@@ -326,22 +342,26 @@ final class CodexModule: NotchModule {
     var needsAttention: Bool { store.indicator == .attention }
 
     func start() {
+        isStarted = true
         // hooks.json et config.toml ont pu changer depuis (Codex, l'utilisateur).
         setup.refresh()
         setup.watch(true)
         setup.verify()
+        if showsQuota { usage.start() }
     }
 
     func stop() {
+        isStarted = false
         setup.watch(false)
+        usage.stop()
     }
 
     func makeView() -> AnyView {
-        AnyView(CodexPanel(module: self, store: store, approvals: approvals, setup: setup))
+        AnyView(CodexPanel(module: self, store: store, approvals: approvals, setup: setup, usage: usage))
     }
 
     func makeCompactView() -> AnyView? {
-        AnyView(CodexCompactView(module: self, store: store, approvals: approvals))
+        AnyView(CodexCompactView(module: self, store: store, approvals: approvals, usage: usage))
     }
 
     func makeSettingsView() -> AnyView? {
@@ -362,6 +382,7 @@ final class CodexModule: NotchModule {
         } else {
             approvals.releaseAll()
             store.stop()
+            usage.forget()
             lastEventAt = nil
             setup.forgetProof()
         }
@@ -404,7 +425,11 @@ final class CodexModule: NotchModule {
             "timer": store.isTicking,
             "replyFromNotch": replyFromNotch,
             "approvals": approvals.debugInfo,
+            "showsQuota": showsQuota,
         ]
+        info["quota"] = usage.snapshot.map { snapshot in
+            snapshot.windows.map { ["percent": $0.usedPercent, "minutes": $0.minutes ?? 0] }
+        }
         info["lastEventAt"] = lastEventAt.map { ISO8601DateFormatter().string(from: $0) }
         return info
     }

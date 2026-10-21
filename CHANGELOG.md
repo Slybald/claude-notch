@@ -43,6 +43,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   waking from sleep) and plans ONE wake-up at the next threshold (start − 15 min, − 5 min, start, end), one per minute
   during the 15-minute countdown. Between two wake-ups the CPU is at zero. Many changes in a row (an iCloud sync) cost a
   single re-read.
+- **Quota gauges** in the Claude and Codex tabs: a thin ring, the percentage used and the reset time of the 5-hour and
+  7-day windows, amber from 80 % and red from 95 %, also in the summary that unfolds from the collapsed tab. Nothing is
+  shown when a tab is off or when the agent gives no figure.
+- **Claude** (Settings › Claude › Show quota, off by default): Claude Code only gives the quota to its `statusLine`, so a small
+  relay takes its place in `~/.claude/settings.json` (timestamped backup), sends `rate_limits` to the app and then runs your
+  previous command with the same data. Turning it off, or uninstalling, puts your command back exactly. Pro and Max only.
+  Measured with Claude Code 2.1.304. Only percentages and reset times are kept, in memory.
+- **Codex** (Settings › Codex › Show quota, on by default): read from Codex itself (`account/rateLimits/read`, ChatGPT
+  sign-in) only while the panel is open, at most once a minute, then every 5 minutes. Measured with Codex 0.154 and 0.162.
 
 ### Fixed
 

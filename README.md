@@ -40,6 +40,8 @@ Interface available in English and French (follows the system language). Screens
   time: the first answer wins. Never "always allow" from the notch. Return sends, Esc closes.
 - **Codex tab** (optional, see [Codex tab](#codex-tab)): the sessions of OpenAI's Codex (CLI or app), working, waiting for
   an approval or done, with the last message; allow or deny a command or a patch from the notch.
+- **Quota gauges** (optional, see [Quota gauges](#quota-gauges)): a thin ring and the percentage used of the 5-hour and
+  7-day windows in the Claude and Codex tabs, with the time they reset. Amber from 80 %, red from 95 %.
 - **Tasks**: progress bar and current task of Claude Code's task list; the chevron unfolds the whole list.
 - **Subagents**: number of subagents running in each session.
 - **Click to go back**: clicking a card brings the host app to the front (Terminal, iTerm2, Ghostty, VS Code,
@@ -166,6 +168,25 @@ No code is loaded into the app and nothing is run from a tab: the only action is
 Only programs of your account that read the token file can call it, never a web page; a script's tab always says which
 program sent it and can never pass for a Claude or Codex request. HTTP details, limits and the security model:
 [docs/API.md](docs/API.md).
+
+## Quota gauges
+
+A thin ring, the percentage used and the time of the next reset, for the 5-hour and 7-day windows, under the sessions of
+the **Claude** tab and of the **Codex** tab (and in the summary that unfolds when you hover their collapsed tab). Amber
+from 80 %, red from 95 %. Nothing is shown when a tab is off, or when the agent gives no figure.
+
+- **Claude** (Settings › Claude › Show quota, off by default). Claude Code gives the quota (`rate_limits`) to its
+  `statusLine` and nowhere else, and allows one `statusLine` command only. So the switch puts a small relay in its place in
+  `~/.claude/settings.json` (timestamped backup first). The relay sends the data to the app (127.0.0.1, with the token),
+  then runs **your previous command** with the same data, so your status line does not change (without one, it prints
+  `5h 39% · 7d 63%`). Turning the switch off, or uninstalling Claude Notch, puts your command back. Only for claude.ai Pro
+  and Max subscribers, and only after the first answer of a session. The figures belong to the account, so any session
+  updates them. The app keeps the percentages and reset times in memory; the rest of what the status line receives
+  (folder, model, session) is dropped. Measured with Claude Code 2.1.304: nothing before the first answer, then both windows.
+- **Codex** (Settings › Codex › Show quota, on by default). Nothing to install: while the panel is open, the app asks Codex
+  itself (`codex app-server`, request `account/rateLimits/read`, about 1 s) at most once a minute, then every 5 minutes.
+  Measured with the Codex command 0.154 and the ChatGPT app's Codex 0.162. It needs a ChatGPT sign-in: with an API key Codex
+  answers with an error and no gauge shows. A summary seen on a collapsed tab hides a figure older than 15 minutes.
 
 ## Notch settings
 
@@ -294,12 +315,16 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   or files. Pausing the capture stops the checks until the next launch.
 - What the app reads: the hook events (Claude Code and Codex), the end of the transcript of a running session (to detect Esc),
   Claude Code's task files, the process list (to find the host app), the track playing and its artwork (Player),
-  the events of the calendars you chose to show, the state of Wi-Fi and Bluetooth, and the battery level.
+  the events of the calendars you chose to show, the state of Wi-Fi and Bluetooth, and the battery level. With the quota on:
+  the percentages and reset times that Claude Code gives to its status line (relayed, kept in memory) and that Codex
+  returns when asked.
 - What the app writes: the logs and token files in `~/Library/Application Support/ClaudeNotch/` (see
   [Shared logs](#shared-logs)), and the data of the tabs in the same folder: `shelf.json` (references to your
   files), `notes.json`, `timer.json`, and `clipboard-history.json` only if you keep the history. These files are
   readable by your account only. Also the hooks in `~/.claude` when you ask for it, and the Codex hooks (`~/.codex/hooks.json` and
-  `~/.codex/hooks/codex-notch-hook.sh`) when you ask for it; `~/.codex/config.toml` is only read (to show the state of the
+  `~/.codex/hooks/codex-notch-hook.sh`) when you ask for it, and, when you turn the Claude quota on, `claude-notch-statusline.sh`
+  and a copy of your previous status line command (readable by you only) in `~/.claude/hooks/` and the `statusLine` of
+  `~/.claude/settings.json`; `~/.codex/config.toml` is only read (to show the state of the
   hooks), never written by the app: the approval of the hooks, when you click **Approve in Codex**, is written by Codex
   itself (the app starts `codex app-server` for a moment, with a minimal environment). During an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
@@ -433,6 +458,10 @@ hooks it already receives:
   do (measured with the app's own Codex 0.162). The ChatGPT app window itself was not driven; the link that opens a
   conversation (`codex://threads/<id>`) comes from the app's own routing. No free message to a running session, no answer to Codex's own questions (no hook for them), and a card
   stays on "needs your approval" after an approval given in the terminal until the tool ends.
+- Quota gauges: Claude's figure only arrives when a session that has the relay answers (Pro and Max, terminal sessions;
+  whether the Code tab of Claude Desktop runs the `statusLine` was not checked, the documentation only describes it for
+  the terminal), and is lost when the app restarts until the next answer. A project or local `settings.json` that sets its
+  own `statusLine` bypasses the relay. Codex's figure is read when the panel opens, so it can be a few minutes old.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -560,6 +589,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
   Jamais de « toujours autoriser » depuis la notch. Entrée envoie, Échap ferme.
 - **Onglet Codex** (optionnel, voir [Onglet Codex](#onglet-codex)) : les sessions de Codex (OpenAI, CLI ou app), qui travaillent,
   attendent une approbation ou ont fini, avec le dernier message ; autoriser ou refuser une commande ou un patch depuis la notch.
+- **Jauges de quota** (optionnelles, voir [Jauges de quota](#jauges-de-quota)) : un anneau fin et le pourcentage utilisé des
+  fenêtres de 5 heures et de 7 jours dans les onglets Claude et Codex, avec l'heure de remise à zéro. Ambre dès 80 %, rouge dès 95 %.
 - **Tâches** : barre de progression et tâche en cours de la liste de Claude Code ; le chevron déplie la liste.
 - **Sous-agents** : nombre de sous-agents en cours dans chaque session.
 - **Clic → retour à la session** : un clic sur une carte ramène l'app hôte au premier plan (Terminal, iTerm2,
@@ -686,6 +717,27 @@ Aucun code n'est chargé dans l'app et un intercalaire ne lance rien : la seule 
 tu as nommée. Seuls les programmes de ton compte qui lisent le fichier du jeton peuvent l'appeler, jamais une page web ;
 l'intercalaire d'un script dit toujours de quel programme il vient et ne peut pas se faire passer pour une demande de
 Claude ou de Codex. Détails HTTP, limites et modèle de sécurité : [docs/API.md](docs/API.md).
+
+### Jauges de quota
+
+Un anneau fin, le pourcentage utilisé et l'heure de la prochaine remise à zéro, pour les fenêtres de 5 heures et de 7 jours,
+sous les sessions de l'onglet **Claude** et de l'onglet **Codex** (et dans le résumé qui se déplie quand tu survoles leur
+intercalaire). Ambre dès 80 %, rouge dès 95 %. Rien n'apparaît quand un onglet est désactivé, ni quand l'agent ne donne aucun
+chiffre.
+
+- **Claude** (Réglages › Claude › Afficher le quota, désactivé par défaut). Claude Code donne le quota (`rate_limits`) à sa
+  `statusLine` et nulle part ailleurs, et n'accepte qu'une seule commande de `statusLine`. Le réglage met donc un petit relais à
+  sa place dans `~/.claude/settings.json` (sauvegarde horodatée d'abord). Le relais envoie les données à l'app (127.0.0.1, avec
+  le jeton), puis relance **ta commande précédente** avec les mêmes données : ta ligne d'état ne change pas (sans commande, il
+  affiche `5h 39% · 7d 63%`). Couper le réglage, ou désinstaller Claude Notch, remet ta commande. Seulement pour les abonnés
+  Pro et Max de claude.ai, et seulement après la première réponse d'une session. Les chiffres sont ceux du compte : n'importe
+  quelle session les met à jour. L'app garde les pourcentages et les heures en mémoire ; le reste de ce que reçoit la ligne
+  d'état (dossier, modèle, session) est jeté. Mesuré avec Claude Code 2.1.304 : rien avant la première réponse, puis les deux fenêtres.
+- **Codex** (Réglages › Codex › Afficher le quota, activé par défaut). Rien à installer : panneau ouvert, l'app interroge
+  Codex lui-même (`codex app-server`, requête `account/rateLimits/read`, environ 1 s) au plus une fois par minute, puis toutes
+  les 5 minutes. Mesuré avec la commande Codex 0.154 et le Codex de l'app ChatGPT 0.162. Il faut un compte ChatGPT : avec une clé
+  d'API, Codex répond par une erreur et aucune jauge ne s'affiche. Un résumé vu sur un intercalaire replié cache un chiffre de
+  plus de 15 minutes.
 
 ### Réglages de la notch
 
@@ -821,13 +873,15 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
 - Ce que l'app lit : les événements de hook, la fin du transcript d'une session en cours (pour détecter
   Esc), les fichiers de tâches de Claude Code, la liste des processus (pour trouver l'app hôte), le morceau en cours
   et sa pochette (Lecteur), les événements des calendriers que tu as choisi d'afficher, l'état du Wi-Fi et du
-  Bluetooth, et le niveau de la batterie.
+  Bluetooth, et le niveau de la batterie. Avec le quota activé : les pourcentages et heures de remise à zéro que Claude Code
+  donne à sa ligne d'état (relayés, gardés en mémoire) et que Codex renvoie quand on le lui demande.
 - Ce que l'app écrit : les journaux et les fichiers du jeton dans `~/Library/Application Support/ClaudeNotch/`
   (voir [Registres partagés](#registres-partagés)), et les données des onglets dans le même dossier :
   `shelf.json` (les références à tes fichiers), `notes.json`, `timer.json`, et `clipboard-history.json` seulement
   si tu gardes l'historique. Ces fichiers ne sont lisibles que par ton compte. Il y a aussi les hooks dans
   `~/.claude` quand tu le demandes, les hooks Codex (`~/.codex/hooks.json` et `~/.codex/hooks/codex-notch-hook.sh`) quand tu
-  le demandes (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit par l'app : l'approbation des
+  le demandes, `claude-notch-statusline.sh` et une copie de ta commande de ligne d'état précédente (lisible par toi seul) dans
+  `~/.claude/hooks/`, et la `statusLine` de `~/.claude/settings.json`, quand tu actives le quota de Claude (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit par l'app : l'approbation des
   hooks, quand tu cliques sur **Approuver dans Codex**, est écrite par Codex lui-même, que l'app lance un instant avec un
   environnement minimal) et, pendant une mise à jour, le DMG dans
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
@@ -971,6 +1025,11 @@ partir de hooks qu'elle reçoit déjà :
   interactif et le moteur de l'app ChatGPT, si (mesuré avec le Codex 0.162 de l'app). La fenêtre de l'app ChatGPT elle-même
   n'a pas été pilotée ; le lien qui ouvre une conversation (`codex://threads/<id>`) vient du routage de l'app. Pas de message libre à une session en cours, pas de réponse aux questions propres de Codex (aucun hook), et
   la carte reste sur « Attend ton approbation » après une approbation donnée dans le terminal, jusqu'à la fin de l'outil.
+- Jauges de quota : le chiffre de Claude n'arrive que quand une session munie du relais répond (Pro et Max, sessions de
+  terminal ; on n'a pas vérifié si l'onglet Code de Claude Desktop exécute la `statusLine`, la documentation ne la décrit que
+  pour le terminal), et il est perdu au redémarrage de l'app jusqu'à la réponse suivante. Un `settings.json` de projet ou local
+  qui impose sa propre `statusLine` contourne le relais. Le chiffre de Codex est lu à l'ouverture du panneau : il peut avoir
+  quelques minutes.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app

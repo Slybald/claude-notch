@@ -16,6 +16,9 @@ final class ClaudeModule: NotchModule {
     let hooks: HookSetup
     /// Demandes tenues et messages (« Répondre depuis la notch »), alimentés par le serveur de hooks.
     let replies: ReplyCenter
+    /// Quota du compte (relais de statusLine) et réglage du relais : jauge de l'onglet, du résumé et de l'intercalaire.
+    let usage: ClaudeUsageStore
+    let quota: StatusLineSetup
     /// Saisies en cours dans les cartes de réponse.
     let drafts = ReplyDrafts()
     /// Posées par `NotchController.start()` (elles referment le panneau).
@@ -27,13 +30,16 @@ final class ClaudeModule: NotchModule {
     @Published var openChecklists: Set<String> = []
 
     init(store: SessionStore, monitor: ClaudeMonitor, tools: ToolsFeed, prefs: Preferences,
-         hooks: HookSetup = .shared, replies: ReplyCenter = .shared) {
+         hooks: HookSetup = .shared, replies: ReplyCenter = .shared, usage: ClaudeUsageStore = .shared,
+         quota: StatusLineSetup = .shared) {
         self.store = store
         self.monitor = monitor
         self.tools = tools
         self.prefs = prefs
         self.hooks = hooks
         self.replies = replies
+        self.usage = usage
+        self.quota = quota
     }
 
     func start() {
@@ -75,16 +81,17 @@ final class ClaudeModule: NotchModule {
     }
 
     func makeView() -> AnyView {
-        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools, replies: replies, drafts: drafts))
+        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools, replies: replies, drafts: drafts,
+                             usage: usage))
     }
 
     func makeCompactView() -> AnyView? {
-        AnyView(ClaudeCompactView(module: self, store: store, replies: replies, prefs: prefs,
+        AnyView(ClaudeCompactView(module: self, store: store, replies: replies, prefs: prefs, usage: usage,
                                   activate: { [weak self] in self?.actions.activate($0) }))
     }
 
     func makeSettingsView() -> AnyView? {
-        AnyView(ClaudeSettingsView(prefs: prefs, setup: hooks))
+        AnyView(ClaudeSettingsView(prefs: prefs, setup: hooks, quota: quota))
     }
 
     func makeTabIcon() -> AnyView? {
@@ -127,6 +134,7 @@ struct ClaudePanel: View {
     @ObservedObject var tools: ToolsFeed
     @ObservedObject var replies: ReplyCenter
     @ObservedObject var drafts: ReplyDrafts
+    @ObservedObject var usage: ClaudeUsageStore
 
     @Environment(\.notchContentMaxHeight) private var contentMaxHeight
     @State private var listHeight: CGFloat = 0
@@ -184,6 +192,10 @@ struct ClaudePanel: View {
             }
             if monitor.desktopRunning {
                 DesktopRow(frontmost: monitor.desktopFrontmost, open: { module.actions.openDesktop() })
+                    .countedBelowList(spacing: Self.spacing)
+            }
+            if let windows = usage.snapshot?.live(at: Date()) {
+                QuotaStrip(windows: windows)
                     .countedBelowList(spacing: Self.spacing)
             }
         }
@@ -286,6 +298,7 @@ struct ClaudeCompactView: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var replies: ReplyCenter
     @ObservedObject var prefs: Preferences
+    @ObservedObject var usage: ClaudeUsageStore
     let activate: (Session) -> Void
 
     static let maxSessions = 4
@@ -315,6 +328,9 @@ struct ClaudeCompactView: View {
                     .font(.system(size: 10.5))
                     .foregroundColor(Palette.secondary)
                     .padding(.leading, 26)
+            }
+            if let windows = usage.snapshot?.live(at: Date()) {
+                QuotaStrip(windows: windows, title: "Claude")
             }
         }
     }
@@ -358,6 +374,7 @@ struct ClaudeCompactView: View {
 struct ClaudeSettingsView: View {
     @ObservedObject var prefs: Preferences
     @ObservedObject var setup: HookSetup
+    @ObservedObject var quota: StatusLineSetup
 
     var body: some View {
         SettingsPane {
@@ -383,6 +400,7 @@ struct ClaudeSettingsView: View {
                 }
             }
             if prefs.replyFromNotch { ApprovalKeysSettings(prefs: prefs) }
+            quotaSection
             Section {
                 LabeledContent("État") {
                     Text(statusText)
@@ -406,7 +424,44 @@ struct ClaudeSettingsView: View {
                 SettingsNote(L("Les hooks relaient chaque événement de Claude Code à l'app, en local (127.0.0.1)."))
             }
         }
-        .onAppear { setup.refresh() }
+        .onAppear {
+            setup.refresh()
+            quota.refresh()
+        }
+    }
+
+    /// Jauges de quota : le relais de `statusLine` ne se pose que sur ce réglage, et se retire de la même façon.
+    private var quotaSection: some View {
+        Section {
+            Toggle(isOn: Binding(get: { quota.isOn }, set: { quota.setOn($0) })) {
+                Text("Afficher le quota (5 h et 7 jours)", tableName: "Claude")
+            }
+            .disabled(quota.status == .unsupported)
+            if let message = quota.message {
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundColor(quota.messageIsError ? Palette.amber : Palette.secondary)
+            }
+            if quota.status == .unsupported {
+                Label(L("La « statusLine » de settings.json n'est pas une simple commande : rien n'a été modifié.",
+                        table: "Claude"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(Palette.amber)
+            }
+        } header: {
+            Text("Quota", tableName: "Claude")
+        } footer: {
+            VStack(alignment: .leading, spacing: 2) {
+                SettingsNote(L("Claude Code ne donne le quota qu'à sa « statusLine » (une seule commande possible, abonnés Pro et Max).",
+                               table: "Claude"))
+                SettingsNote(quota.chainsPrevious
+                             ? L("Ta commande de statusLine continue de tourner : le relais la relance avec les mêmes données.",
+                                 table: "Claude")
+                             : L("Sans statusLine existante, le relais affiche seulement « 5h 39% · 7d 63% ».", table: "Claude"))
+                SettingsNote(L("Sauvegarde horodatée de settings.json, retrait en un clic. Seuls les pourcentages sont gardés, en mémoire.",
+                               table: "Claude"))
+            }
+        }
     }
 
     private var statusText: String {

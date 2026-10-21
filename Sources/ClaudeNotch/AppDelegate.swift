@@ -99,6 +99,7 @@ final class AppCore {
         }
         server.codex = notch.codex
         server.api = notch.registry.external
+        server.onClaudeStatus = { data in DispatchQueue.main.async { ClaudeUsageStore.shared.ingest(data) } }
         self.server = server
         // Onglet Codex : même principe, indépendant de celui de Claude.
         notch.registry.$enabled
@@ -139,6 +140,7 @@ final class AppCore {
             monitor.stop()
             store.stop()
             ReplyCenter.shared.releaseAll()
+            ClaudeUsageStore.shared.forget()
         }
     }
 
@@ -193,6 +195,7 @@ final class AppCore {
         state["notch"] = notch?.debugInfo
         state["codex"] = notch?.codex.debugInfo
         state["api"] = notch?.registry.external.debugInfo
+        state["claudeQuota"] = ClaudeUsageStore.shared.snapshot.map { $0.windows.map { ["percent": $0.usedPercent, "minutes": $0.minutes ?? 0] } }
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged
         tools["permissionsLogged"] = activityLog.permissionsLogged

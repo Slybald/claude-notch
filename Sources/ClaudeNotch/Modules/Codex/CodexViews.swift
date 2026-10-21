@@ -64,6 +64,7 @@ struct CodexPanel: View {
     @ObservedObject var store: CodexStore
     @ObservedObject var approvals: CodexApprovals
     @ObservedObject var setup: CodexHookSetup
+    @ObservedObject var usage: CodexUsageStore
 
     @Environment(\.notchContentMaxHeight) private var contentMaxHeight
     @State private var listHeight: CGFloat = 0
@@ -77,6 +78,9 @@ struct CodexPanel: View {
                 emptyState
             } else {
                 sessionList(sessions)
+            }
+            if module.showsQuota, let windows = usage.snapshot?.live(at: Date()) {
+                QuotaStrip(windows: windows)
             }
         }
     }
@@ -402,7 +406,10 @@ struct CodexCompactView: View {
     let module: CodexModule
     @ObservedObject var store: CodexStore
     @ObservedObject var approvals: CodexApprovals
+    @ObservedObject var usage: CodexUsageStore
 
+    /// Codex n'est relu que panneau ouvert : au-delà de 15 min, l'intercalaire ne montre plus la mesure.
+    static let quotaMaxAge: TimeInterval = 15 * 60
     static let maxSessions = 4
 
     var body: some View {
@@ -427,6 +434,9 @@ struct CodexCompactView: View {
                     .font(.system(size: 10.5))
                     .foregroundColor(Palette.secondary)
                     .padding(.leading, 26)
+            }
+            if module.showsQuota, let windows = usage.snapshot?.live(at: Date(), maxAge: Self.quotaMaxAge) {
+                QuotaStrip(windows: windows, title: "Codex")
             }
         }
     }
@@ -487,6 +497,18 @@ struct CodexSettingsView: View {
                 }
             }
             if module.replyFromNotch { ApprovalKeysSettings(prefs: prefs) }
+            Section {
+                Toggle(isOn: $module.showsQuota) {
+                    Text("Afficher le quota (5 h et 7 jours)", tableName: "Codex")
+                }
+            } header: {
+                Text("Quota", tableName: "Codex")
+            } footer: {
+                VStack(alignment: .leading, spacing: 2) {
+                    SettingsNote(L("Lu par Codex lui-même (compte ChatGPT), seulement panneau ouvert : au plus une fois par minute, "
+                                   + "puis toutes les 5 min. Rien sans compte ChatGPT.", table: "Codex"))
+                }
+            }
             Section {
                 LabeledContent("État") {
                     HStack(spacing: 6) {
