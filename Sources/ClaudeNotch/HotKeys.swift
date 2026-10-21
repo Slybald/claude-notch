@@ -8,6 +8,7 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
     case controlOptionSpace
     case controlCommandN
     case optionCommandJ
+    case optionCommandK
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
         case .controlOptionSpace: return (UInt32(kVK_Space), UInt32(controlKey | optionKey))
         case .controlCommandN: return (UInt32(kVK_ANSI_N), UInt32(controlKey | cmdKey))
         case .optionCommandJ: return (UInt32(kVK_ANSI_J), UInt32(optionKey | cmdKey))
+        case .optionCommandK: return (UInt32(kVK_ANSI_K), UInt32(optionKey | cmdKey))
         }
     }
 
@@ -29,6 +31,7 @@ enum HotKeyChoice: String, CaseIterable, Identifiable {
         case .controlOptionSpace: return L("⌃⌥Espace")
         case .controlCommandN: return "⌃⌘N"
         case .optionCommandJ: return "⌥⌘J"
+        case .optionCommandK: return "⌥⌘K"
         }
     }
 }
@@ -39,6 +42,7 @@ final class HotKeyCenter: ObservableObject {
     enum Slot: UInt32 {
         case togglePanel = 1
         case toggleHidden = 2
+        case commandBar = 10
     }
 
     static let shared = HotKeyCenter()

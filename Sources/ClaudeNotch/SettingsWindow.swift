@@ -254,8 +254,11 @@ private struct GeneralSettings: View {
             Section("Raccourcis") {
                 hotKeyPicker(L("Ouvrir ou fermer le panneau"), selection: $prefs.toggleHotKey, slot: .togglePanel)
                 hotKeyPicker(L("Masquer ou réafficher la notch"), selection: $prefs.hideHotKey, slot: .toggleHidden)
+                hotKeyPicker(L("Barre de commande"), selection: $prefs.commandHotKey, slot: .commandBar)
                 SettingsNote(L("Partout, sans autorisation. Panneau ouvert au clavier : ← → ou ⌘1…9 pour les "
                     + "onglets, Échap pour fermer."))
+                SettingsNote(L("Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche "
+                    + "dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎."))
             }
             Section("Plein écran") {
                 Picker("Quand une app est en plein écran", selection: $prefs.fullScreenBehavior) {

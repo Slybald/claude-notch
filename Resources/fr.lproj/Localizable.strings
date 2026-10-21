@@ -382,3 +382,8 @@
 "%d autre activité" = "%d autre activité";
 "%d autres activités" = "%d autres activités";
 "Ouvre l'onglet correspondant" = "Ouvre l'onglet correspondant";
+
+/* Barre de commande */
+"Barre de commande…" = "Barre de commande…";
+"Barre de commande" = "Barre de commande";
+"Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎." = "Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎.";
