@@ -83,6 +83,37 @@ final class ModuleRegistry: ObservableObject {
         prefs.tabOrder = ids
     }
 
+    // MARK: - Mode édition de la notch (même stockage que Réglages › Onglets)
+
+    /// Ordre et onglets activés lus dans les réglages eux-mêmes : `ordered` et `enabled` ne sont relus qu'au tour
+    /// de boucle suivant.
+    private var savedOrder: [String] { Self.order(modules, by: prefs.tabOrder).map { $0.id } }
+    private var enabledIds: [String] { savedOrder.filter { isEnabled($0) } }
+
+    /// Onglets masqués, dans l'ordre des réglages (menu « + » de la notch).
+    var hidden: [any NotchModule] { ordered.filter { !isEnabled($0.id) } }
+
+    /// Glisser dans la barre : l'onglet `id` passe à la place `index` parmi les onglets affichés.
+    func moveTab(_ id: String, to index: Int) {
+        let order = TabEditing.move(id, to: index, order: savedOrder, enabled: enabledIds)
+        if order != savedOrder { prefs.tabOrder = order }
+    }
+
+    /// « − » de la notch : masque l'onglet, sauf le dernier affiché. Son module s'arrête, comme depuis les réglages.
+    @discardableResult
+    func hideTab(_ id: String) -> Bool {
+        guard TabEditing.canHide(id, enabled: enabledIds) else { return false }
+        setEnabled(id, false)
+        return true
+    }
+
+    /// « + » de la notch : remet un onglet masqué, en bout de barre (là où est le « + »).
+    func showTab(_ id: String) {
+        guard module(id) != nil, !isEnabled(id) else { return }
+        prefs.tabOrder = savedOrder.filter { $0 != id } + [id]
+        setEnabled(id, true)
+    }
+
     /// Le panneau s'ouvre ou se ferme : démarre ou arrête les modules concernés.
     func setPanelOpen(_ open: Bool) {
         guard open != panelOpen else { return }
@@ -161,6 +192,41 @@ final class ModuleRegistry: ObservableObject {
         ]
         info["ears"] = moduleEars.map { "\($0.symbol) \($0.text)" }
         return info
+    }
+}
+
+/// Mode édition des onglets dans la notch (appui long sur la barre, comme les apps sur iPhone) : règles pures.
+enum TabEditing {
+    /// Durée de l'appui long qui ouvre le mode.
+    static let pressDuration: TimeInterval = 0.5
+
+    /// Ordre complet des réglages quand l'onglet affiché `id` passe à la place `index` parmi les onglets affichés
+    /// (`enabled`, dans l'ordre). Les onglets masqués gardent leurs cases : seuls les affichés s'y redistribuent.
+    static func move(_ id: String, to index: Int, order: [String], enabled: [String]) -> [String] {
+        guard let from = enabled.firstIndex(of: id) else { return order }
+        var moved = enabled
+        moved.remove(at: from)
+        moved.insert(id, at: min(max(index, 0), moved.count))
+        let shown = Set(enabled)
+        var next = moved.makeIterator()
+        return order.map { shown.contains($0) ? next.next() ?? $0 : $0 }
+    }
+
+    /// On masque un onglet affiché tant qu'il en reste un autre : la barre n'est jamais vide.
+    static func canHide(_ id: String, enabled: [String]) -> Bool {
+        enabled.count > 1 && enabled.contains(id)
+    }
+
+    /// Place visée par l'onglet `from` déplacé de `translation` points (une case = `slot` points), dans la barre.
+    static func dropIndex(from: Int, translation: CGFloat, slot: CGFloat, count: Int) -> Int {
+        min(max(from + Int((translation / slot).rounded()), 0), max(count - 1, 0))
+    }
+
+    /// Décalage, en cases, de l'onglet `index` pendant qu'un autre glisse de `from` vers `to` : il s'écarte.
+    static func shift(_ index: Int, from: Int, to: Int) -> Int {
+        if from < index, index <= to { return -1 }
+        if to <= index, index < from { return 1 }
+        return 0
     }
 }
 

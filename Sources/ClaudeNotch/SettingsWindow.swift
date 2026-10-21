@@ -380,7 +380,8 @@ private struct TabsSettings: View {
                 Text("Onglets")
             } footer: {
                 SettingsNote(L("Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, "
-                    + "même en arrière-plan."))
+                    + "même en arrière-plan. Dans la notch, un appui long sur les onglets permet aussi de les "
+                    + "déplacer et de les masquer."))
             }
             Section {
                 Picker("Onglet à l'ouverture", selection: $prefs.defaultTab) {
