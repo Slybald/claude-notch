@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [1.9.0] - 2026-10-21
+## [Unreleased]
 
 ### Added
 
@@ -17,6 +17,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   Measured with Claude Code 2.1.304. Only percentages and reset times are kept, in memory.
 - **Codex** (Settings › Codex › Show quota, on by default): read from Codex itself (`account/rateLimits/read`, ChatGPT
   sign-in) only while the panel is open, at most once a minute, then every 5 minutes. Measured with Codex 0.154 and 0.162.
+
+## [1.9.0] - 2026-10-21
+
+### Added
+
 - **Approve with the keyboard.** A permission request from Claude Code or Codex can be settled without the mouse:
   **⌃⌥Y** allows, **⌃⌥N** denies the oldest waiting request, both agents in one queue ("1 of 3" on its card, the two keys
   shown on its buttons). Off by default (Settings › Claude and › Codex › *Approve with the keyboard*; it needs *Reply
