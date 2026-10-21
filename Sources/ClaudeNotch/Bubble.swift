@@ -824,7 +824,9 @@ struct FerroState: Equatable {
                                 phase: phase)
         case .relax(let start, let s0):
             let k = Ferro.relax(from: 1, t: date.timeIntervalSince(start))
-            let r = Ferro.reachOut(gap: gap, bridged: false) * k
+            let reach = Ferro.reachOut(gap: gap, bridged: false)
+            // Lâchée juste après une rupture : le ressort du pont rompu continue.
+            let r = reach * k + (1 - reach) * Ferro.recoil(date.timeIntervalSince(bridgeChanged))
             return Ferro.shapes(notch: notch, center: center, radius: BubbleGeometry.radius, reachOut: r, waist: 0,
                                 spikes: Ferro.spikeHeight * pow(max(0, s0 * k), 1.3), bulge: bulge * max(0, k),
                                 phase: phase)
