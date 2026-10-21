@@ -231,34 +231,30 @@ final class CodexHookInstallerTests: XCTestCase {
 
     func testConfigNotes() {
         let path = "/Users/demo/.codex/hooks.json"
-        let none = CodexHookInstaller.configNotes(in: "model = \"x\"\n", hooksPath: path)
+        let none = CodexHookInstaller.configNotes(in: "model = \"x\"\n")
         XCTAssertEqual(none, CodexHookInstaller.ConfigNotes())
 
-        let notify = CodexHookInstaller.configNotes(in: "notify = [\"a\", \"b\"]\n[features]\nmulti_agent = true\n", hooksPath: path)
+        let notify = CodexHookInstaller.configNotes(in: "notify = [\"a\", \"b\"]\n[features]\nmulti_agent = true\n")
         XCTAssertTrue(notify.hasNotify)
         XCTAssertFalse(notify.hooksDisabled)
 
         // `notify` dans une table n'est pas le `notify` racine.
-        XCTAssertFalse(CodexHookInstaller.configNotes(in: "[tui]\nnotify = true\n", hooksPath: path).hasNotify)
+        XCTAssertFalse(CodexHookInstaller.configNotes(in: "[tui]\nnotify = true\n").hasNotify)
 
-        XCTAssertTrue(CodexHookInstaller.configNotes(in: "[features]\nhooks = false\n", hooksPath: path).hooksDisabled)
-        XCTAssertTrue(CodexHookInstaller.configNotes(in: "[features]\ncodex_hooks = false # ancien nom\n", hooksPath: path).hooksDisabled)
-        XCTAssertFalse(CodexHookInstaller.configNotes(in: "[features]\nhooks = true\n", hooksPath: path).hooksDisabled)
-        XCTAssertFalse(CodexHookInstaller.configNotes(in: "[other]\nhooks = false\n", hooksPath: path).hooksDisabled)
+        XCTAssertTrue(CodexHookInstaller.configNotes(in: "[features]\nhooks = false\n").hooksDisabled)
+        XCTAssertTrue(CodexHookInstaller.configNotes(in: "[features]\ncodex_hooks = false # ancien nom\n").hooksDisabled)
+        XCTAssertFalse(CodexHookInstaller.configNotes(in: "[features]\nhooks = true\n").hooksDisabled)
+        XCTAssertFalse(CodexHookInstaller.configNotes(in: "[other]\nhooks = false\n").hooksDisabled)
 
-        let inline = CodexHookInstaller.configNotes(in: "[[hooks.Stop]]\nmatcher = \"x\"\n", hooksPath: path)
+        let inline = CodexHookInstaller.configNotes(in: "[[hooks.Stop]]\nmatcher = \"x\"\n")
         XCTAssertTrue(inline.inlineHooks)
-        XCTAssertFalse(inline.reviewed)
 
-        // Format relevé : la revue dans Codex (/hooks) écrit `hooks.state."<fichier>:<événement>:<groupe>:<hook>"`.
-        let reviewed = """
+        // Format relevé : l'approbation dans Codex écrit `hooks.state."<fichier>:<événement>:<groupe>:<hook>"`.
+        let state = CodexHookInstaller.configNotes(in: """
         [hooks.state."\(path):stop:0:0"]
         trusted_hash = "sha256:abc"
-        """
-        let state = CodexHookInstaller.configNotes(in: reviewed, hooksPath: path)
-        XCTAssertTrue(state.reviewed)
+        """)
         XCTAssertFalse(state.inlineHooks, "hooks.state n'est pas un hook en ligne")
-        XCTAssertFalse(CodexHookInstaller.configNotes(in: reviewed, hooksPath: "/Users/autre/.codex/hooks.json").reviewed)
     }
 
     // MARK: - Détection
@@ -284,6 +280,10 @@ final class CodexHookInstallerTests: XCTestCase {
         XCTAssertFalse(CodexHookInstaller.codexPresent(home: bare, environment: [:], applications: [app.path]))
         try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
         XCTAssertTrue(CodexHookInstaller.codexPresent(home: bare, environment: [:], applications: [app.path]))
+        // L'app ChatGPT (bundle com.openai.codex) suffit, sans ~/.codex ni commande.
+        XCTAssertFalse(CodexHookInstaller.codexPresent(home: try makeTemporaryDirectory(self), environment: [:], applications: []))
+        XCTAssertTrue(CodexHookInstaller.codexPresent(home: try makeTemporaryDirectory(self), environment: [:], applications: [],
+                                                      appInstalled: true))
         XCTAssertFalse(CodexHookInstaller.codexOnThisMac, "jamais le vrai Mac sous XCTest")
     }
 

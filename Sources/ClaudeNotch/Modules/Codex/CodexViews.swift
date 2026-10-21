@@ -81,21 +81,9 @@ struct CodexPanel: View {
         }
     }
 
-    /// Ce qu'il reste à faire pour voir une session : poser les hooks, les valider dans Codex, lancer Codex.
+    /// Ce qu'il reste à faire pour voir une session : poser les hooks, les approuver dans Codex, ouvrir une conversation.
     private var emptyState: some View {
-        let installed = setup.status == .installed || setup.status == .scriptOutdated || setup.status == .outdated
-        let detail: String
-        var action: ModuleAction?
-        if !installed {
-            detail = L("Pose les hooks Codex dans les réglages pour suivre tes sessions.", table: "Codex")
-            action = ModuleAction(title: L("Ouvrir les réglages", table: "Codex"), symbol: "gearshape", run: module.openSettings)
-        } else if module.lastEventAt == nil, !setup.notes.reviewed {
-            detail = L("Dans Codex, tape /hooks pour valider les hooks de Claude Notch.", table: "Codex")
-        } else {
-            detail = L("Lance `codex` dans un terminal ou ouvre l'app Codex.", table: "Codex")
-        }
-        return ModuleEmptyState(symbol: "chevron.left.forwardslash.chevron.right",
-                                title: L("Aucune session Codex", table: "Codex"), detail: detail, action: action)
+        CodexSetupState(module: module, setup: setup)
             .padding(.vertical, 12)
     }
 
@@ -127,6 +115,88 @@ struct CodexPanel: View {
 private struct CodexListHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+// MARK: - Parcours d'installation
+
+/// Onglet sans session : l'étape où en est l'utilisateur (hooks absents, à approuver dans Codex, prêts) et le bouton qui
+/// la fait avancer. Se met à jour tout seul (`CodexHookSetup.watch`).
+struct CodexSetupState: View {
+    @ObservedObject var module: CodexModule
+    @ObservedObject var setup: CodexHookSetup
+
+    var body: some View {
+        let content = Self.content(for: setup.flow, message: setup.message, messageIsError: setup.messageIsError)
+        VStack(spacing: 8) {
+            ModuleEmptyState(symbol: content.symbol, tint: content.warning ? Palette.amber : Palette.accent,
+                             title: content.title, detail: content.detail, progress: setup.isWorking,
+                             action: setup.isWorking ? nil : action(for: content.action))
+            if setup.messageIsError, let message = setup.message {
+                Text(verbatim: message)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(Palette.amber)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    enum Action { case settings, approve }
+
+    struct Content: Equatable {
+        var symbol: String
+        var title: String
+        var detail: String
+        var warning = false
+        var action: Action?
+    }
+
+    /// Textes de chaque étape (testés sans vue).
+    static func content(for flow: CodexHookSetup.Flow, message: String?, messageIsError: Bool) -> Content {
+        let symbol = "chevron.left.forwardslash.chevron.right"
+        switch flow {
+        case .notInstalled:
+            return Content(symbol: symbol, title: L("Hooks Codex non posés", table: "Codex"),
+                           detail: L("Pose les hooks Codex dans les réglages pour suivre tes sessions.", table: "Codex"),
+                           action: .settings)
+        case .needsUpdate:
+            return Content(symbol: symbol, title: L("Hooks Codex à mettre à jour", table: "Codex"),
+                           detail: L("Mets-les à jour dans les réglages, puis approuve-les dans Codex.", table: "Codex"),
+                           warning: true, action: .settings)
+        case .disabled:
+            return Content(symbol: "exclamationmark.triangle.fill", title: L("Hooks coupés dans Codex", table: "Codex"),
+                           detail: L("config.toml contient [features] hooks = false : Codex n'exécute aucun hook.", table: "Codex"),
+                           warning: true)
+        case .unreadable:
+            return Content(symbol: "exclamationmark.triangle.fill", title: L("hooks.json illisible", table: "Codex"),
+                           detail: L("Corrige-le ou ouvre les réglages pour voir pourquoi.", table: "Codex"), warning: true,
+                           action: .settings)
+        case .pendingApproval:
+            return Content(symbol: "hand.raised.fill", title: L("À approuver dans Codex", table: "Codex"),
+                           detail: L("Codex ignore les hooks de Claude Notch tant que tu ne les as pas approuvés.\n"
+                                     + "1. Clique sur « Approuver dans Codex ».\n"
+                                     + "2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex).", table: "Codex"),
+                           warning: true, action: .approve)
+        case .active:
+            let confirmation = messageIsError ? nil : message
+            return Content(symbol: symbol, title: L("Aucune session Codex", table: "Codex"),
+                           detail: confirmation ?? L("Ouvre une nouvelle conversation dans l'app ChatGPT ou lance codex dans un "
+                                                     + "terminal. Les conversations déjà ouvertes ne sont pas suivies.",
+                                                     table: "Codex"))
+        }
+    }
+
+    private func action(for action: Action?) -> ModuleAction? {
+        switch action {
+        case .settings:
+            return ModuleAction(title: L("Ouvrir les réglages", table: "Codex"), symbol: "gearshape", run: module.openSettings)
+        case .approve:
+            return ModuleAction(title: L("Approuver dans Codex", table: "Codex"), symbol: "checkmark.shield",
+                                style: .prominent, run: setup.approve)
+        case nil:
+            return nil
+        }
+    }
 }
 
 // MARK: - Carte de session
@@ -404,14 +474,22 @@ struct CodexSettingsView: View {
             }
             Section {
                 LabeledContent("État") {
-                    Text(verbatim: statusText)
-                        .foregroundColor(setup.status == .installed ? Palette.green : Palette.amber)
+                    HStack(spacing: 6) {
+                        if setup.isWorking { ProgressView().controlSize(.small) }
+                        Text(verbatim: statusText)
+                            .foregroundColor(setup.flow == .active ? Palette.green : Palette.amber)
+                    }
                 }
                 if setup.notes.hooksDisabled {
                     warning(L("Les hooks sont coupés dans config.toml ([features] hooks = false).", table: "Codex"))
                 }
-                if setup.status == .installed, !setup.notes.reviewed, module.lastEventAt == nil {
-                    warning(L("À valider dans Codex : tape /hooks, puis fais confiance aux hooks de Claude Notch.", table: "Codex"))
+                if case .pendingApproval = setup.flow {
+                    warning(L("Codex ignore ces hooks tant qu'ils ne sont pas approuvés.", table: "Codex"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        SettingsNote(L("1. Clique sur « Approuver dans Codex ».", table: "Codex"))
+                        SettingsNote(L("2. Ouvre une nouvelle conversation dans l'app ChatGPT (ou lance codex) : "
+                                       + "les conversations déjà ouvertes ne sont pas suivies.", table: "Codex"))
+                    }
                 }
                 if let last = module.lastEventAt {
                     LabeledContent {
@@ -420,8 +498,19 @@ struct CodexSettingsView: View {
                         Text("Dernier événement", tableName: "Codex")
                     }
                 }
+                if setup.canApprove {
+                    HStack {
+                        Button(action: setup.approve) { Text("Approuver dans Codex", tableName: "Codex") }
+                            .buttonStyle(.borderedProminent)
+                        Spacer()
+                    }
+                }
                 HStack {
                     Button(action: setup.install) { installLabel }
+                    if setup.status == .installed {
+                        Button { setup.verify(force: true) } label: { Text("Vérifier", tableName: "Codex") }
+                            .disabled(setup.isWorking)
+                    }
                     Spacer()
                     if setup.status != .notInstalled {
                         Button(action: setup.uninstall) { Text("Retirer les hooks", tableName: "Codex") }
@@ -438,15 +527,23 @@ struct CodexSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 2) {
                     SettingsNote(L("Les hooks relaient chaque événement de Codex à l'app, en local (127.0.0.1).", table: "Codex"))
-                    SettingsNote(L("Seul ~/.codex/hooks.json est écrit (sauvegarde horodatée) : config.toml et ton notify ne sont pas touchés.",
-                                   table: "Codex"))
+                    SettingsNote(L("Claude Notch n'écrit que ~/.codex/hooks.json (sauvegarde horodatée) ; ton notify n'est jamais "
+                                   + "touché.", table: "Codex"))
+                    SettingsNote(L("« Approuver » demande à Codex lui-même d'inscrire l'approbation de ces hooks dans config.toml "
+                                   + "(la requête du bouton « Review hooks » de l'app). Tu peux aussi les revoir toi-même : "
+                                   + "« Review hooks » dans l'app, /hooks dans le terminal.", table: "Codex"))
                     if setup.notes.inlineHooks {
                         SettingsNote(L("config.toml contient aussi des hooks : Codex charge les deux fichiers.", table: "Codex"))
                     }
                 }
             }
         }
-        .onAppear { setup.refresh() }
+        .onAppear {
+            setup.refresh()
+            setup.watch(true)
+            setup.verify()
+        }
+        .onDisappear { setup.watch(false) }
     }
 
     @ViewBuilder
@@ -459,10 +556,12 @@ struct CodexSettingsView: View {
     }
 
     private var statusText: String {
-        switch setup.status {
-        case .installed: return L("Installés")
-        case .outdated, .scriptOutdated: return L("À mettre à jour")
+        switch setup.flow {
+        case .active: return L("Actifs", table: "Codex")
+        case .pendingApproval: return L("En attente d'approbation dans Codex", table: "Codex")
+        case .needsUpdate: return L("À mettre à jour")
         case .notInstalled: return L("Non installés")
+        case .disabled: return L("Coupés dans config.toml", table: "Codex")
         case .unreadable(let message): return String(format: L("hooks.json illisible : %@", table: "Codex"), message)
         }
     }

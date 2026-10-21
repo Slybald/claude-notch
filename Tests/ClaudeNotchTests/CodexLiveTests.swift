@@ -21,7 +21,9 @@ final class CodexLiveTests: XCTestCase {
         let hooksRun: [String]
     }
 
+    /// `CLAUDE_NOTCH_CODEX_BIN` (par exemple le `codex` embarqué dans l'app ChatGPT), sinon la commande `codex`.
     private func codexExecutable() throws -> String {
+        if let custom = ProcessInfo.processInfo.environment["CLAUDE_NOTCH_CODEX_BIN"] { return custom }
         let candidates = ["/opt/homebrew/bin/codex", "/usr/local/bin/codex",
                           FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/codex").path]
         return try XCTUnwrap(candidates.first { FileManager.default.isExecutableFile(atPath: $0) }, "codex introuvable")
@@ -99,6 +101,13 @@ final class CodexLiveTests: XCTestCase {
         XCTAssertEqual(session.toolCount >= 1, true, "PostToolUse reçu")
         XCTAssertEqual(session.model?.isEmpty, false)
         XCTAssertNotNil(session.pid, "le processus Codex est identifié")
+        XCTAssertEqual(session.projectName, "work-allow", "projet = dossier de travail")
+        if codex.contains("/ChatGPT.app/") {
+            // Le serveur de l'app ChatGPT : la session est présentée comme venant de l'app, et « Ouvrir » ira à sa conversation.
+            XCTAssertEqual(session.hostBundleId, "com.openai.codex")
+            XCTAssertEqual(session.sourceLabel, "ChatGPT")
+            XCTAssertEqual(CodexModule.deepLink(for: session), URL(string: "codex://threads/\(allowed.thread)"))
+        }
 
         // Refusé : la commande ne tourne pas.
         let denied = try run("deny", client: "accept") { module.decide($0, .deny) }
@@ -110,5 +119,43 @@ final class CodexLiveTests: XCTestCase {
         XCTAssertEqual(terminal.clientApprovals, 1, "Codex pose sa question : le terminal garde la main")
         XCTAssertTrue(terminal.marker)
         XCTAssertTrue(module.approvals.requests.isEmpty)
+    }
+
+    /// Le vrai `codex app-server` (celui de l'app ChatGPT, ou `CLAUDE_NOTCH_CODEX_BIN`) contre `CodexAppServer` : lister
+    /// les hooks, les approuver (config.toml du CODEX_HOME jetable seulement), les relire. Aucun tour, aucun quota.
+    func testRealAppServerListsThenApprovesOurHooks() throws {
+        guard ProcessInfo.processInfo.environment["CLAUDE_NOTCH_CODEX_LIVE"] == "1" else {
+            throw XCTSkip("CLAUDE_NOTCH_CODEX_LIVE non défini")
+        }
+        let override = ProcessInfo.processInfo.environment["CLAUDE_NOTCH_CODEX_BIN"].map { URL(fileURLWithPath: $0) }
+        guard let codex = override ?? CodexBinary.find() else { throw XCTSkip("Codex introuvable") }
+        let realConfig = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
+        let realBefore = try? Data(contentsOf: realConfig)
+
+        let home = try makeTemporaryDirectory(self).appendingPathComponent("codex-home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        let installer = CodexHookInstaller(configDirectory: home,
+                                           bundledHook: repositoryRoot.appendingPathComponent("hooks/codex-notch-hook.sh"))
+        try installer.install()
+        let setup = CodexHookSetup(installer: { installer }, service: { _ in
+            CodexAppServer(executable: codex, home: home, timeout: 90)
+        })
+        setup.refresh()
+        XCTAssertEqual(setup.flow, .pendingApproval(8), "estimation d'après config.toml : rien d'approuvé")
+
+        setup.verify(force: true)
+        XCTAssertTrue(spin(timeout: 100) { !setup.isWorking }, "hooks/list")
+        XCTAssertEqual(setup.flow, .pendingApproval(8), "Codex confirme : huit hooks neufs, ignorés (\(setup.message ?? "-"))")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: installer.configURL.path), "lister n'écrit rien")
+
+        setup.approve()
+        XCTAssertTrue(spin(timeout: 100) { !setup.isWorking }, "config/batchWrite")
+        XCTAssertEqual(setup.flow, .active, setup.message ?? "-")
+        XCTAssertEqual(installer.unapprovedCount(), 0, "config.toml porte maintenant huit trusted_hash, écrits par Codex")
+
+        let hooks = try CodexAppServer(executable: codex, home: home, timeout: 90).hooks(approving: nil).filter(installer.isOurs)
+        XCTAssertEqual(hooks.count, 8)
+        XCTAssertTrue(hooks.allSatisfy { $0.trustStatus == "trusted" && $0.enabled })
+        XCTAssertEqual(try? Data(contentsOf: realConfig), realBefore, "le vrai config.toml n'a pas bougé")
     }
 }

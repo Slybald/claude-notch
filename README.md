@@ -118,14 +118,23 @@ opened before the update gets replies only after it restarts.
 
 ## Codex tab
 
-Codex has hooks of its own, so the tab works like Claude's. Details and measurements: [docs/CODEX.md](docs/CODEX.md).
+Codex has hooks of its own, so the tab works like Claude's. It follows Codex wherever it runs: the **ChatGPT app**
+(which now contains Codex), the `codex` command in a terminal, or an editor. Details and measurements:
+[docs/CODEX.md](docs/CODEX.md).
 
-1. **Settings › Codex › Install Codex hooks**. This adds one entry per event to `~/.codex/hooks.json` (timestamped
-   backup first, your own hooks stay) and copies `codex-notch-hook.sh` to `~/.codex/hooks/`. `config.toml` and its
-   `notify` are never touched.
-2. In Codex, type `/hooks` once and trust the Claude Notch hooks: Codex skips a new hook until you have reviewed it.
-3. Each card shows the project, the host app, the model, what Codex is doing (the command or the file), and its last
-   message. Click a card to bring the host app to the front.
+1. **Settings › Codex › Install Codex hooks** (the tab's button opens it). This adds one entry per event to
+   `~/.codex/hooks.json` (timestamped backup first, your own hooks stay) and copies `codex-notch-hook.sh` to
+   `~/.codex/hooks/`. Your `notify` is never touched.
+2. **Approve the hooks in Codex.** Codex ignores a new hook until it is approved, and says nothing about it. The tab and
+   Settings › Codex show where you are (*not installed*, *waiting for approval in Codex*, *active*). While approval is
+   pending, click **Approve in Codex**: the app asks Codex itself to trust the 8 Claude Notch hooks, and only those (the
+   request behind the **Review hooks** button of the ChatGPT app). You can also review them yourself there, or with
+   `/hooks` in a terminal. The tab updates on its own as soon as they are approved.
+3. **Start a new conversation** in the ChatGPT app (or run `codex`). Conversations that were already open when the hooks
+   were approved are not tracked.
+4. Each card shows the project, the app (ChatGPT, Terminal, VS Code…), the model, what Codex is doing (the command or
+   the file), and its last message. Click a card to bring that app to the front; for a ChatGPT app session it opens
+   the conversation itself.
 
 **Approve from the notch** (Settings › Codex, off by default): when Codex asks to run a command or apply a patch, the
 card shows it, with **Allow**, **Deny** and **In the terminal**. Unlike Claude Code, Codex waits for the notch before
@@ -211,7 +220,8 @@ needs one. It is shown once, and not after an update from a version that was alr
 
 - macOS 13 Ventura or later, Apple silicon or Intel.
 - For the Claude tab only: Claude Code (CLI, or the Code tab of Claude Desktop).
-- For the Codex tab only: Codex (CLI or app), version 0.154 tested, with hooks on (the default).
+- For the Codex tab only: Codex (the ChatGPT app, or the `codex` command), versions 0.154 (command) and 0.162 (app)
+  tested, with hooks on (the default).
 - Claude Code configuration in `~/.claude`. `CLAUDE_CONFIG_DIR` is not supported by the app: the hooks are
   always installed in `~/.claude`.
 
@@ -265,7 +275,8 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   files), `notes.json`, `timer.json`, and `clipboard-history.json` only if you keep the history. These files are
   readable by your account only. Also the hooks in `~/.claude` when you ask for it, and the Codex hooks (`~/.codex/hooks.json` and
   `~/.codex/hooks/codex-notch-hook.sh`) when you ask for it; `~/.codex/config.toml` is only read (to show the state of the
-  hooks), never written. During an update the DMG in
+  hooks), never written by the app: the approval of the hooks, when you click **Approve in Codex**, is written by Codex
+  itself (the app starts `codex app-server` for a moment, with a minimal environment). During an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
   the old one. The messages you type are sent to the Claude Code session only, never stored.
 
@@ -386,9 +397,11 @@ hooks it already receives:
   hook until its next turn ends: the held hooks reconnect by themselves when the app comes back within 30 seconds
   (hooks started by an older script do not), and otherwise a message is queued and the conversation says it will
   go on Claude's next turn, with an **Open** button.
-- Codex: a new hook only runs after you trust it with `/hooks` in Codex. `codex exec` never asks for approvals, so
-  nothing is held there; the interactive CLI and the app's engine do. The Codex app's own window was not driven during
-  development. No free message to a running session, no answer to Codex's own questions (no hook for them), and a card
+- Codex: a new hook only runs after it is approved (**Approve in Codex**, or **Review hooks** in the ChatGPT app, or `/hooks`
+  in a terminal), and only in conversations started after that. Changing a hook (an update of Claude Notch) makes Codex ask
+  again. `codex exec` never asks for approvals, so nothing is held there; the interactive CLI and the ChatGPT app's engine
+  do (measured with the app's own Codex 0.162). The ChatGPT app window itself was not driven; the link that opens a
+  conversation (`codex://threads/<id>`) comes from the app's own routing. No free message to a running session, no answer to Codex's own questions (no hook for them), and a card
   stays on "needs your approval" after an approval given in the terminal until the tool ends.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
@@ -594,15 +607,23 @@ Une session ouverte avant la mise à jour ne reçoit les réponses qu'après son
 
 ### Onglet Codex
 
-Codex a ses propres hooks : l'onglet marche comme celui de Claude. Détails et mesures : [docs/CODEX.md](docs/CODEX.md).
+Codex a ses propres hooks : l'onglet marche comme celui de Claude. Il suit Codex où qu'il tourne : l'**app ChatGPT**
+(qui contient maintenant Codex), la commande `codex` dans un terminal, ou un éditeur. Détails et mesures :
+[docs/CODEX.md](docs/CODEX.md).
 
-1. **Réglages › Codex › Installer les hooks Codex**. Une entrée par événement est ajoutée à `~/.codex/hooks.json`
-   (sauvegarde horodatée d'abord, tes hooks restent) et `codex-notch-hook.sh` est copié dans `~/.codex/hooks/`.
-   `config.toml` et son `notify` ne sont jamais touchés.
-2. Dans Codex, tape `/hooks` une fois et fais confiance aux hooks de Claude Notch : Codex ignore un hook neuf tant que
-   tu ne l'as pas validé.
-3. Chaque carte montre le projet, l'app hôte, le modèle, ce que fait Codex (la commande ou le fichier) et son dernier
-   message. Un clic sur la carte ramène l'app hôte devant.
+1. **Réglages › Codex › Installer les hooks Codex** (le bouton de l'onglet l'ouvre). Une entrée par événement est ajoutée à
+   `~/.codex/hooks.json` (sauvegarde horodatée d'abord, tes hooks restent) et `codex-notch-hook.sh` est copié dans
+   `~/.codex/hooks/`. Ton `notify` n'est jamais touché.
+2. **Approuve les hooks dans Codex.** Codex ignore un hook neuf tant qu'il n'est pas approuvé, sans rien dire.
+   L'onglet et Réglages › Codex montrent où tu en es (*non posés*, *en attente d'approbation dans Codex*, *actifs*).
+   Tant que l'approbation attend, clique sur **Approuver dans Codex** : l'app demande à Codex lui-même de faire confiance
+   aux 8 hooks de Claude Notch, et seulement à eux (la requête du bouton **Review hooks** de l'app ChatGPT). Tu peux aussi
+   les revoir toi-même là, ou avec `/hooks` dans un terminal. L'onglet se met à jour tout seul dès qu'ils sont approuvés.
+3. **Ouvre une nouvelle conversation** dans l'app ChatGPT (ou lance `codex`). Les conversations déjà ouvertes quand les
+   hooks ont été approuvés ne sont pas suivies.
+4. Chaque carte montre le projet, l'app (ChatGPT, Terminal, VS Code…), le modèle, ce que fait Codex (la commande ou le
+   fichier) et son dernier message. Un clic sur la carte ramène cette app devant ; pour une session de l'app ChatGPT,
+   il ouvre la conversation elle-même.
 
 **Approuver depuis la notch** (Réglages › Codex, désactivé par défaut) : quand Codex demande à lancer une commande ou à
 appliquer un patch, la carte l'affiche, avec **Autoriser**, **Refuser** et **Dans le terminal**. Contrairement à Claude
@@ -691,7 +712,8 @@ aussi s'installer plus tard depuis **Réglages › Claude** ; une session déjà
 
 - macOS 13 Ventura ou plus récent, Apple silicon ou Intel.
 - Pour l'onglet Claude seulement : Claude Code (CLI, ou onglet Code de Claude Desktop).
-- Pour l'onglet Codex seulement : Codex (CLI ou app), version 0.154 testée, hooks activés (par défaut).
+- Pour l'onglet Codex seulement : Codex (l'app ChatGPT ou la commande `codex`), versions 0.154 (commande) et 0.162 (app)
+  testées, hooks activés (par défaut).
 - Configuration de Claude Code dans `~/.claude`. `CLAUDE_CONFIG_DIR` n'est pas pris en charge par l'app :
   les hooks sont toujours installés dans `~/.claude`.
 
@@ -749,7 +771,9 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
   `shelf.json` (les références à tes fichiers), `notes.json`, `timer.json`, et `clipboard-history.json` seulement
   si tu gardes l'historique. Ces fichiers ne sont lisibles que par ton compte. Il y a aussi les hooks dans
   `~/.claude` quand tu le demandes, les hooks Codex (`~/.codex/hooks.json` et `~/.codex/hooks/codex-notch-hook.sh`) quand tu
-  le demandes (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit) et, pendant une mise à jour, le DMG dans
+  le demandes (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit par l'app : l'approbation des
+  hooks, quand tu cliques sur **Approuver dans Codex**, est écrite par Codex lui-même, que l'app lance un instant avec un
+  environnement minimal) et, pendant une mise à jour, le DMG dans
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
   l'ancienne. Les messages que tu tapes partent à la session Claude Code seulement, sans être enregistrés.
 
@@ -879,9 +903,11 @@ partir de hooks qu'elle reçoit déjà :
   tour : les hooks tenus se reconnectent seuls si l'app revient dans les 30 secondes (pas ceux lancés par un
   ancien script), sinon un message reste en file et la conversation dit qu'il partira au prochain tour de Claude,
   avec un bouton **Ouvrir**.
-- Codex : un hook neuf ne tourne qu'après ta validation par `/hooks` dans Codex. `codex exec` ne demande jamais d'approbation :
-  rien n'y est tenu ; le CLI interactif et le moteur de l'app, si. La fenêtre de l'app Codex elle-même n'a pas été pilotée
-  pendant le développement. Pas de message libre à une session en cours, pas de réponse aux questions propres de Codex (aucun hook), et
+- Codex : un hook neuf ne tourne qu'une fois approuvé (**Approuver dans Codex**, ou **Review hooks** dans l'app ChatGPT, ou
+  `/hooks` dans un terminal), et seulement dans les conversations démarrées ensuite. Modifier un hook (une mise à jour de
+  Claude Notch) fait que Codex le redemande. `codex exec` ne demande jamais d'approbation : rien n'y est tenu ; le CLI
+  interactif et le moteur de l'app ChatGPT, si (mesuré avec le Codex 0.162 de l'app). La fenêtre de l'app ChatGPT elle-même
+  n'a pas été pilotée ; le lien qui ouvre une conversation (`codex://threads/<id>`) vient du routage de l'app. Pas de message libre à une session en cours, pas de réponse aux questions propres de Codex (aucun hook), et
   la carte reste sur « Attend ton approbation » après une approbation donnée dans le terminal, jusqu'à la fin de l'outil.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
