@@ -395,6 +395,7 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
         <IndexTabs
           tabs={idx}
           fade={tabsFade}
+          halfWidth={L.w / 2 / S}
           unfold={{
             id: "media",
             p: unfoldP,

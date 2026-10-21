@@ -124,7 +124,9 @@ export const IndexTabs: React.FC<{
   tabs: IdxTab[];
   fade?: number;
   unfold?: { id: string; p: number; title: string; detail: React.ReactNode; detailH: number };
-}> = ({ tabs, fade = 1, unfold }) => {
+  /** Demi-largeur du cadre en pt : la carte déployée est réduite pour y tenir (EarTabsLayout.cardWidth, marge de 6 pt). */
+  halfWidth?: number;
+}> = ({ tabs, fade = 1, unfold, halfWidth = Infinity }) => {
   const items = layoutIdx(tabs);
   return (
     <div style={{ position: "absolute", left: 0, top: 0, opacity: fade, fontFamily: FONT.ui }}>
@@ -133,7 +135,8 @@ export const IndexTabs: React.FC<{
         const appear = it.tab.appear ?? 1;
         if (appear <= 0.001) return null;
         const cardH = unfold && unfold.id === it.tab.id ? 32 + unfold.detailH + 10 : 0;
-        const w = mix(it.width, CARD_W, open);
+        const cw = Math.max(it.width, Math.min(CARD_W, halfWidth - 6 - it.inner));
+        const w = mix(it.width, cw, open);
         const h = mix(it.height, cardH, open);
         // Le prolongement sous la notch (12 pt contre elle, 2 pt entre intercalaires) évite un filet clair à la jointure.
         const ov = (it.rank === 0 ? 12 : 2) * (1 - clamp01(open * 6));
@@ -162,14 +165,14 @@ export const IndexTabs: React.FC<{
               <div style={{ position: "absolute", left: PAD + 1, right: PAD + 1, bottom: 2, height: 2, borderRadius: 1, background: it.tab.accent, opacity: 0.9 }} />
             </div>
             {open > 0.02 && unfold && (
-              <div style={{ position: "absolute", left: it.side === "left" ? w - CARD_W : ov, top: 0, width: CARD_W, opacity: clamp01((open - 0.3) * 3) }}>
+              <div style={{ position: "absolute", left: it.side === "left" ? w - cw : ov, top: 0, width: cw, opacity: clamp01((open - 0.3) * 3) }}>
                 <div style={{ height: 32, display: "flex", alignItems: "center", gap: 6, padding: "0 12px" }}>
                   <div style={{ width: ICON_W, display: "flex", justifyContent: "center" }}>{it.tab.icon}</div>
                   <span style={{ fontSize: F(12), fontWeight: 600, color: "#fff" }}>{unfold.title}</span>
                   <div style={{ flex: 1 }} />
                   {it.tab.text}
                 </div>
-                <div style={{ padding: "0 10px" }}>{unfold.detail}</div>
+                <div style={{ padding: "0 10px", width: cw, boxSizing: "border-box" }}>{unfold.detail}</div>
               </div>
             )}
           </div>
@@ -196,13 +199,13 @@ export const SummaryRow: React.FC<{ name: string; status: string; detail?: strin
 );
 
 /** Détail de l'intercalaire de lecture déployé : pochette, titre, artiste, précédent / pause / suivant (74 pt). */
-export const MediaCardDetail: React.FC<{ title: string; artist: string; width?: number }> = ({ title, artist, width = CARD_W - 20 }) => (
-  <div style={{ position: "relative", width, height: 74, borderRadius: 12, background: C.card }}>
+export const MediaCardDetail: React.FC<{ title: string; artist: string }> = ({ title, artist }) => (
+  <div style={{ position: "relative", width: "100%", height: 74, borderRadius: 12, background: C.card, overflow: "hidden" }}>
     <div style={{ position: "absolute", left: 10, top: 9, width: 34, height: 34, borderRadius: 8, background: "#DD2DF5", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: 17, height: 17, borderRadius: 9, background: "rgba(255,255,255,0.4)" }} />
     </div>
-    <div style={{ position: "absolute", left: 54, top: 10, lineHeight: "16px" }}>
-      <div style={{ fontSize: F(13.5), fontWeight: 700, color: "#fff" }}>{title}</div>
+    <div style={{ position: "absolute", left: 52, top: 10, lineHeight: "16px", whiteSpace: "nowrap" }}>
+      <div style={{ fontSize: F(13), fontWeight: 700, color: "#fff" }}>{title}</div>
       <div style={{ fontSize: F(12), color: C.secondary }}>{artist}</div>
     </div>
     <div style={{ position: "absolute", left: 0, right: 0, top: 50, display: "flex", justifyContent: "center", alignItems: "center", gap: 36 }}>
