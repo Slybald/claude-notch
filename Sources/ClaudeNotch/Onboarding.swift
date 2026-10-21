@@ -38,6 +38,7 @@ final class HookSetup: ObservableObject {
         if claudeEnabled {
             refresh()
             silentUpdate()
+            StatusLineSetup.shared.updateScriptIfNeeded()
         }
         let window = Self.launchWindow(claudeEnabled: claudeEnabled, status: status, welcomeShown: prefs.welcomeShown)
         // L'assistant ne vient qu'une fois ; une mise à jour ratée le repousse au lancement suivant.
@@ -197,6 +198,9 @@ final class HookSetup: ObservableObject {
             // n'empêche pas la désinstallation).
             let codexInstaller = CodexHookInstaller.standard
             let codexHooks = [.installed, .outdated, .scriptOutdated].contains(codexInstaller.status())
+            // Le relais de statusLine des jauges de quota part aussi, et la commande d'origine revient.
+            let relayInstaller = StatusLineInstaller.standard
+            let quotaRelay = [.installed, .scriptOutdated].contains(relayInstaller.status())
             let alert = NSAlert()
             alert.alertStyle = .warning
             alert.messageText = L("Désinstaller Claude Notch ?")
@@ -209,6 +213,10 @@ final class HookSetup: ObservableObject {
                 alert.informativeText += "\n\n" + L("Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json "
                                                       + "(sauvegarde horodatée à côté).", table: "Codex")
             }
+            if quotaRelay {
+                alert.informativeText += "\n\n" + L("Le relais de statusLine des jauges de quota sera aussi retiré de "
+                                                      + "~/.claude/settings.json, et ta commande d'origine remise.", table: "Claude")
+            }
             alert.addButton(withTitle: L("Désinstaller"))
             alert.addButton(withTitle: L("Annuler"))
             alert.buttons.first?.hasDestructiveAction = true
@@ -216,6 +224,7 @@ final class HookSetup: ObservableObject {
 
             do {
                 try installer.uninstall()
+                if quotaRelay { try relayInstaller.uninstall() }
                 if codexHooks { try codexInstaller.uninstall() }
             } catch {
                 refresh()

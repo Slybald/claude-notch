@@ -98,6 +98,7 @@ final class AppCore {
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
         server.codex = notch.codex
+        server.onClaudeStatus = { data in DispatchQueue.main.async { ClaudeUsageStore.shared.ingest(data) } }
         self.server = server
         // Onglet Codex : même principe, indépendant de celui de Claude.
         notch.registry.$enabled
@@ -138,6 +139,7 @@ final class AppCore {
             monitor.stop()
             store.stop()
             ReplyCenter.shared.releaseAll()
+            ClaudeUsageStore.shared.forget()
         }
     }
 
@@ -191,6 +193,7 @@ final class AppCore {
         state["sessionTimer"] = store.isTicking
         state["notch"] = notch?.debugInfo
         state["codex"] = notch?.codex.debugInfo
+        state["claudeQuota"] = ClaudeUsageStore.shared.snapshot.map { $0.windows.map { ["percent": $0.usedPercent, "minutes": $0.minutes ?? 0] } }
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged
         tools["permissionsLogged"] = activityLog.permissionsLogged

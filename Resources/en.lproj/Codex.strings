@@ -92,3 +92,9 @@
 "Codex ne voit pas les hooks de Claude Notch (hooks.json non chargé)." = "Codex does not see the Claude Notch hooks (hooks.json not loaded).";
 "Hooks approuvés. Ouvre une nouvelle conversation Codex pour les voir à l'œuvre." = "Hooks approved. Start a new Codex conversation to see them at work.";
 "Codex n'a pas approuvé %d hooks." = "Codex did not approve %d hooks.";
+
+/* Quota */
+"pas de quota pour ce compte" = "no quota for this account";
+"Afficher le quota (5 h et 7 jours)" = "Show quota (5 h and 7 days)";
+"Quota" = "Quota";
+"Lu par Codex lui-même (compte ChatGPT), seulement panneau ouvert : au plus une fois par minute, puis toutes les 5 min. Rien sans compte ChatGPT." = "Read by Codex itself (ChatGPT account), only while the panel is open: at most once a minute, then every 5 min. Nothing without a ChatGPT account.";

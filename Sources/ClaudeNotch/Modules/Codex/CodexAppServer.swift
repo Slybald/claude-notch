@@ -24,6 +24,11 @@ protocol CodexHooksService {
     func hooks(approving: ((CodexListedHook) -> Bool)?) throws -> [CodexListedHook]
 }
 
+/// Le quota du compte ChatGPT, tel que Codex le donne. Un protocole pour que les tests y mettent un double.
+protocol CodexQuotaService {
+    func rateLimits() throws -> QuotaSnapshot
+}
+
 enum CodexServiceError: LocalizedError, Equatable {
     case noCodex
     case launch(String)
@@ -74,7 +79,7 @@ enum CodexBinary {
 /// Client minimal de `codex app-server` (JSON-RPC, un message par ligne sur stdio). Lance un processus Codex le temps
 /// d'une demande, puis l'arrête. Lit les hooks (`hooks/list`) et, sur demande explicite seulement, écrit leur
 /// approbation par `config/batchWrite` : la requête même que le bouton « Review hooks » de l'app Codex envoie.
-struct CodexAppServer: CodexHooksService {
+struct CodexAppServer: CodexHooksService, CodexQuotaService {
     let executable: URL
     /// `CODEX_HOME` : le dossier dont on veut lire les hooks.
     let home: URL
@@ -100,7 +105,36 @@ struct CodexAppServer: CodexHooksService {
         return listed
     }
 
+    /// `account/rateLimits/read` : les fenêtres du compte ChatGPT (5 h et 7 jours), lues par Codex avec sa
+    /// propre connexion, comme le fait l'app Codex pour son écran d'usage. Avec une clé d'API (pas de compte ChatGPT),
+    /// Codex répond par une erreur : pas de jauge.
+    func rateLimits() throws -> QuotaSnapshot {
+        let session = try Session(executable: executable, home: home, timeout: Self.quotaTimeout)
+        defer { session.close() }
+        try session.initialize()
+        return try Self.parseRateLimits(session.request("account/rateLimits/read", [:]), now: Date())
+    }
+
+    /// Une lecture de quota qui ne répond pas en 15 s est abandonnée (mesuré : 1,2 s).
+    static let quotaTimeout: TimeInterval = 15
+
     // MARK: - Messages (purs)
+
+    /// Réponse de `account/rateLimits/read` : `rateLimits.primary` et `secondary` (`usedPercent`, `windowDurationMins`,
+    /// `resetsAt` en secondes). Tolérant : une fenêtre sans pourcentage ou sans heure de remise à zéro est ignorée.
+    static func parseRateLimits(_ result: [String: Any], now: Date) throws -> QuotaSnapshot {
+        guard let limits = result["rateLimits"] as? [String: Any] else {
+            throw CodexServiceError.failure(L("réponse inattendue", table: "Codex"))
+        }
+        let windows: [QuotaWindow] = ["primary", "secondary"].compactMap { key in
+            guard let raw = limits[key] as? [String: Any], let used = (raw["usedPercent"] as? NSNumber)?.doubleValue,
+                  let reset = (raw["resetsAt"] as? NSNumber)?.doubleValue, reset > 0 else { return nil }
+            return QuotaWindow(usedPercent: used, resetsAt: Date(timeIntervalSince1970: reset),
+                               minutes: (raw["windowDurationMins"] as? NSNumber)?.intValue)
+        }
+        guard !windows.isEmpty else { throw CodexServiceError.failure(L("pas de quota pour ce compte", table: "Codex")) }
+        return QuotaSnapshot(windows: windows.sorted { ($0.minutes ?? .max) < ($1.minutes ?? .max) }, updatedAt: now)
+    }
 
     /// `hooks.state."<clé>".trusted_hash = "<hachage>"` pour chaque hook.
     static func edits(trusting hooks: [CodexListedHook]) -> [[String: Any]] {

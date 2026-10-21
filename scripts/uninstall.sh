@@ -7,6 +7,9 @@ CONFIG_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 
 /usr/bin/python3 -I "$ROOT/scripts/hooks_config.py" uninstall
 rm -f "$CONFIG_DIR/hooks/claude-notch-hook.sh"
+if grep -qs claude-notch-statusline.sh "$CONFIG_DIR/settings.json"; then
+    echo "Relais de statusLine encore posé dans $CONFIG_DIR/settings.json : retire-le d'abord (Réglages > Claude > Jauges de quota)."
+fi
 if grep -qs codex-notch-hook.sh "$HOME/.codex/hooks.json"; then
     echo "Hooks Codex encore posés dans ~/.codex/hooks.json : retire-les d'abord (Réglages > Codex > Retirer les hooks)."
 fi
