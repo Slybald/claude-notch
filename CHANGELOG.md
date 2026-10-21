@@ -6,6 +6,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **Index tabs on the collapsed notch.** Each activity (Claude, now playing, timer, Codex, unread messages, caffeine…)
+  gets its own small tab against the notch, left and right, the most important closest to it (three per side at most,
+  then a "+N"). This replaces the 1.2.2 rotation, where Claude and the other ears took turns every 4 seconds: index tabs
+  sit side by side. Each tab shows its icon and a very short text (`1·6`, `4:59`, equalizer bars) with its own shape,
+  height (a staircase away from the notch) and a discreet accent color.
+- Hover a tab and it unfolds with its details: the track with its controls, the timer with its phase and a pause button,
+  the Claude sessions and their state. Click it to open the panel on that tab. The centre of the notch still opens the
+  whole panel, and the two zones never overlap.
+- **Settings › Appearance › Collapsed Notch › Index Tabs** replaces "Alternate Claude and the Other Ears": *Always
+  Visible* (default: the information is readable at a glance, same footprint as the old ears in the usual case) or
+  *Retracted* (a thin sliver until you hover, for a quiet notch). An alert (Claude or Codex waiting for you) always stays
+  visible. The old setting carries over once: on (or never set) becomes *Always Visible*, off becomes *Retracted*.
+
+### Removed
+
+- The 4-second timer and `EarsRotation` of the alternating ears: nothing runs at rest on the collapsed notch.
+
 ### Fixed
 
 - **Codex tab with the ChatGPT app.** Codex ignores a hook until it is approved, and says nothing, so after "Install Codex

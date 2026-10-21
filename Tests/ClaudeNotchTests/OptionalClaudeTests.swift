@@ -42,13 +42,17 @@ final class OptionalClaudeTests: XCTestCase {
         store.stop()
     }
 
-    /// Notch sans l'onglet Claude : pas d'indicateur Claude dans les oreilles, même avec une session au travail.
+    /// Notch sans l'onglet Claude : pas d'intercalaire Claude, même avec une session au travail.
     func testNoClaudeEarsWhenTabDisabled() {
         let notch = NotchHarness(self, store: .working(1))
-        XCTAssertEqual(notch.measure().width, 185 + 72 + 12, accuracy: 1, "oreilles Claude")
+        func tabs() -> [String] {
+            notch.registry.earTabs(claude: notch.store.indicator, claudeEars: notch.store.ears).map { $0.id }
+        }
+        XCTAssertEqual(tabs(), ["claude"], "intercalaire Claude")
         notch.prefs.tabEnabled["claude"] = false
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         XCTAssertFalse(notch.registry.isClaudeEnabled)
+        XCTAssertEqual(tabs(), [])
         XCTAssertEqual(notch.measure().width, 185 + 12, accuracy: 1, "replié : exactement la notch")
     }
 }

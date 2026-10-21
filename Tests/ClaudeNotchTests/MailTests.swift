@@ -300,8 +300,8 @@ final class MailTests: XCTestCase {
         registry.setPanelOpen(false)
         XCTAssertTrue(registry.running.contains("mail"), "un script a réussi : il continue replié")
         XCTAssertEqual(registry.moduleEars?.text, "4")
-        let slots = EarsRotation.slots(claude: .done, modules: registry.earsEntries, showEars: true, alternate: true)
-        XCTAssertEqual(slots.map { $0.id }, ["claude", "mail"])
+        let tabs = EarTabs.tabs(claude: .done, claudeEars: nil, modules: registry.earsEntries, showEars: true)
+        XCTAssertEqual(tabs.map { $0.id }, ["claude", "mail"])
 
         registry.setEnabled("mail", false)
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))

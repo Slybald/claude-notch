@@ -65,16 +65,26 @@ final class CodexModuleTests: XCTestCase {
         XCTAssertFalse(module.keepsRunningWhenCollapsed)
     }
 
-    /// Les oreilles de Codex entrent dans l'alternance existante comme celles de n'importe quel module.
-    func testEarsJoinTheExistingRotation() {
+    /// Les oreilles de Codex ont leur intercalaire comme celles de n'importe quel module ; une approbation attendue
+    /// est une alerte (elle reste déployée en mode « Rétractés »).
+    func testEarsGetTheirOwnTab() {
         let codex = ModuleEarsEntry(id: "codex", ears: ModuleEars(symbol: "x", text: "1", priority: 6))
         let timer = ModuleEarsEntry(id: "timer", ears: ModuleEars(symbol: "timer", text: "4:59", priority: 5))
-        let slots = EarsRotation.slots(claude: .working, modules: [timer, codex], showEars: true, alternate: true)
-        XCTAssertEqual(slots.map(\.id), ["claude", "codex", "timer"], "Claude, puis les modules par priorité décroissante")
-        XCTAssertEqual(EarsRotation.slots(claude: .none, modules: [timer, codex], showEars: true, alternate: true).map(\.id),
-                       ["codex"], "sans Claude : le module de plus haute priorité, seul")
-        XCTAssertEqual(EarsRotation.slots(claude: .attention, modules: [codex], showEars: true, alternate: true).map(\.id),
-                       ["claude"], "Claude qui attend reste seul")
+        func ids(_ claude: NotchIndicator, _ modules: [ModuleEarsEntry]) -> [String] {
+            EarTabs.tabs(claude: claude, claudeEars: nil, modules: modules, showEars: true).map(\.id)
+        }
+        XCTAssertEqual(ids(.working, [timer, codex]), ["claude", "codex", "timer"], "Claude, puis par priorité décroissante")
+        XCTAssertEqual(ids(.none, [timer, codex]), ["codex", "timer"])
+        XCTAssertEqual(ids(.attention, [codex]), ["claude", "codex"])
+    }
+
+    func testWaitingForApprovalIsAnAlertTab() {
+        let module = makeModule()
+        send(module, CodexFixtures.event("UserPromptSubmit", ["prompt": "x"]))
+        XCTAssertEqual(module.ears?.alert, false, "au travail : pas une alerte")
+        module.store.markWaiting(sessionId: CodexFixtures.session, tool: CodexTools.describe(name: "Bash", input: ["command": "ls"]),
+                                 context: CodexFixtures.terminal, cwd: nil)
+        XCTAssertEqual(module.ears?.alert, true, "une approbation attend : alerte")
     }
 
     func testRegistryStartsTheModuleOnlyWhileUseful() throws {

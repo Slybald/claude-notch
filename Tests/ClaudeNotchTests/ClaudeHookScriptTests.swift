@@ -305,7 +305,9 @@ final class ClaudeHookScriptTests: XCTestCase {
         XCTAssertTrue(hook.finish(timeout: 12))
         XCTAssertEqual(hook.status, 0)
         XCTAssertEqual(hook.stderr, "")
-        XCTAssertGreaterThan(hook.duration, 2, "il a attendu le retour de l'app")
+        // Le script compte en secondes entières (`date +%s`) : avec 2 s de délai, il attend entre 1 et 2 s selon l'instant
+        // où la connexion tombe. Au moins une pause d'une seconde : il a bien attendu le retour de l'app.
+        XCTAssertGreaterThan(hook.duration, 1, "il a attendu le retour de l'app")
 
         // App déjà arrêtée au départ : pas de nouvelle tentative, la session n'attend rien.
         let absent = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "30"])

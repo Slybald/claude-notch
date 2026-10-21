@@ -132,6 +132,7 @@ final class MediaModule: NotchModule {
 
     func makeView() -> AnyView { AnyView(MediaPanel(module: self)) }
     func makeCompactView() -> AnyView? { AnyView(MediaCompactView(module: self)) }
+    func makeTabDetailView() -> AnyView? { AnyView(MediaTabDetailView(module: self)) }
     func makeSettingsView() -> AnyView? { AnyView(MediaSettingsView(module: self)) }
 
     // MARK: Lecture
