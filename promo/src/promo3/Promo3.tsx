@@ -132,6 +132,13 @@ export const Promo3: React.FC<Promo3Props> = ({ format, lang }) => {
 
 /** Position de l'icône glissée (pt) et progression, partagées par l'icône et le curseur. */
 const dragE = (t: number) => CURSOR_EASE(clamp01((t - T.drag) / (T.drop2 - T.drag)));
+/** Instant où l'icône glissée passe le milieu de la place `slot` : l'onglet qui l'occupe s'écarte alors d'une place. */
+const crossAt = (slot: number) => {
+  const thr = slot * PITCH + PITCH / 2;
+  for (let tt = T.drag; tt < T.drop2; tt += 0.01) if (lerp(7 * PITCH, 2 * PITCH, dragE(tt)) <= thr) return tt;
+  return T.drop2;
+};
+const CROSS = [2, 3, 4, 5, 6].map(crossAt);
 
 const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => {
   const f = useCurrentFrame();
@@ -309,13 +316,12 @@ const Scene3: React.FC<{ format: Format3; lang: Lang }> = ({ format, lang }) => 
   const editing = t >= T.edit && t < T.done;
   const badge = R(T.edit, T.edit + 0.14) * (editing ? 1 : 0);
   const dragMove = t < T.drag ? 0 : dragE(t);
-  const shiftP = clamp01(sp2(f, T.drag + 0.24, SNAP));
   const addP = clamp01(sp2(f, T.pick2, SNAP));
   const xs: Partial<Record<TabId, number>> = {};
   ORDER0.forEach((id, i) => {
     let x = i * PITCH;
     if (id === "notes") x = lerp(7 * PITCH, 2 * PITCH, dragMove);
-    else if (["player", "quick", "shelf", "clip", "timer"].includes(id)) x = x + PITCH * shiftP;
+    else if (i >= 2 && i <= 6) x = x + PITCH * clamp01(sp2(f, CROSS[i - 2], SNAP));
     xs[id] = x;
   });
   xs.messages = 9 * PITCH;
