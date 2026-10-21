@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Onglet « Mail » : le nombre de messages non lus d'Apple Mail et les derniers non-lus (expéditeur, objet, heure).
-/// Désactivé par défaut. Textes dans Resources/{en,fr}.lproj/Mail.strings ; réglages dans UserDefaults sous
+/// Onglet « Mail » : le nombre de messages non lus d'Apple Mail et les 3 à 5 derniers mails reçus (expéditeur, objet,
+/// début du texte, heure), avec une réponse rapide. Désactivé par défaut. Textes dans Resources/{en,fr}.lproj/Mail.strings ; réglages dans UserDefaults sous
 /// « mail.… ». Voir docs/MESSAGES-MAIL.md.
 ///
 /// - Mail n'a pas d'API de lecture hors AppleScript (autorisation « Automatisation », demandée par macOS au premier
@@ -11,6 +11,8 @@ import SwiftUI
 /// - Au repos : rien tant que l'onglet est désactivé. Activé et replié (après une première lecture réussie,
 ///   `armed`) : un observateur de lancement / arrêt de Mail, et seulement tant que Mail tourne un script de
 ///   compteur toutes les 2 minutes ; la liste n'est lue que panneau ouvert. Mail fermé : aucun minuteur.
+/// - Une réponse ne part QUE sur `sendReply()`, appelé par le clic sur « Envoyer » ou Entrée dans le champ : jamais
+///   à l'ouverture du champ, ni à un rafraîchissement, ni à la fermeture. Le texte tapé reste en mémoire.
 /// - Aucune autorisation n'est demandée avant l'ouverture de l'onglet, et alors sur un clic de « Autoriser ».
 ///   Rien n'est enregistré ni envoyé hors du Mac.
 final class MailModule: NotchModule {
@@ -22,26 +24,49 @@ final class MailModule: NotchModule {
     /// Sous Messages (0) : une pastille de plus ne doit pas passer avant une conversation.
     static let earsPriority = -1
     static let pollInterval: TimeInterval = 120
-    /// Non-lus détaillés quand l'onglet est ouvert (on en montre `maxShown`) : l'ordre des messages de Mail n'est
-    /// pas garanti, on trie ici.
-    static let fetchLimit = 12
-    static let maxShown = 8
+    /// Combien de derniers mails reçus l'onglet montre (réglage, 5 par défaut).
+    static let recentRange = 3...5
+    static let defaultRecent = 5
+    /// Assez long pour que l'utilisateur réponde à la fenêtre d'autorisation de macOS, et pour une boîte lente.
+    static let replyTimeout: TimeInterval = 60
+    static let sentFlash: TimeInterval = 2.5
 
     // MARK: État
 
     @Published private(set) var state: MailState = .unknown
     @Published private(set) var unread = 0
     @Published private(set) var messages: [MailMessage] = []
+    /// La liste a été lue au moins une fois depuis l'ouverture de l'onglet : avant, l'onglet attend au lieu de
+    /// montrer une boîte vide.
+    @Published private(set) var listLoaded = false
+
+    // MARK: Réponse en cours
+
+    /// Le mail auquel on répond ; son champ est ouvert sous sa ligne. Gardé hors de `messages` : une relecture de la
+    /// liste ne doit pas faire disparaître un message pendant qu'on lui écrit.
+    @Published private(set) var replyTarget: MailMessage?
+    @Published var draft = ""
+    @Published private(set) var replyState: MailReplyState = .idle
 
     // MARK: Réglages
 
     @Published var showBadge: Bool { didSet { defaults.set(showBadge, forKey: Key.badge) } }
     /// Expéditeur et objet dans la liste ; coupé, seul le nombre reste (écran partagé).
     @Published var showSubjects: Bool { didSet { defaults.set(showSubjects, forKey: Key.subjects) } }
+    /// 3 à 5 ; une valeur hors bornes (réglage édité à la main) est ramenée dans les bornes.
+    @Published var recentCount: Int {
+        didSet {
+            let clamped = Self.clampedCount(recentCount)
+            if clamped != recentCount { recentCount = clamped; return }
+            defaults.set(recentCount, forKey: Key.count)
+            if oldValue != recentCount, isStarted, openViews > 0 { refresh() }
+        }
+    }
 
     private enum Key {
         static let badge = "mail.showBadge"
         static let subjects = "mail.showSubjects"
+        static let count = "mail.recentCount"
         static let armed = "mail.armed"
     }
 
@@ -60,6 +85,7 @@ final class MailModule: NotchModule {
     private var generation = 0
     private var observers: [NSObjectProtocol] = []
     private var cancelPoll: (() -> Void)?
+    private var cancelSentFlash: (() -> Void)?
 
     init(defaults: UserDefaults = .standard,
          runner: AppleScriptRunner = ModuleEnvironment.isTesting ? InertAppleScriptRunner() : OsascriptRunner(),
@@ -80,10 +106,16 @@ final class MailModule: NotchModule {
         self.openURL = openURL
         showBadge = defaults.object(forKey: Key.badge) as? Bool ?? true
         showSubjects = defaults.object(forKey: Key.subjects) as? Bool ?? true
+        recentCount = Self.clampedCount(defaults.object(forKey: Key.count) as? Int ?? Self.defaultRecent)
+    }
+
+    private static func clampedCount(_ count: Int) -> Int {
+        min(max(count, recentRange.lowerBound), recentRange.upperBound)
     }
 
     deinit {
         cancelPoll?()
+        cancelSentFlash?()
         observers.forEach(workspace.removeObserver)
     }
 
@@ -118,6 +150,8 @@ final class MailModule: NotchModule {
         observers.forEach(workspace.removeObserver)
         observers = []
         messages = []
+        listLoaded = false
+        resetReply()
     }
 
     func makeView() -> AnyView { AnyView(MailPanel(module: self)) }
@@ -154,6 +188,7 @@ final class MailModule: NotchModule {
         guard isMailRunning() else {
             unread = 0
             messages = []
+            listLoaded = false
             state = .notRunning
             return
         }
@@ -168,9 +203,10 @@ final class MailModule: NotchModule {
         default:
             break
         }
-        let wantsList = openViews > 0
+        // Texte masqué dans les réglages : on ne lit même pas le début des messages.
+        let wantsList = openViews > 0 && showSubjects
         let current = generation
-        runner.run(MailScript.source, arguments: [String(wantsList ? Self.fetchLimit : 0)],
+        runner.run(MailScript.source, arguments: [String(wantsList ? recentCount : 0)],
                    timeout: interactive ? 60 : 20) { [weak self] result in
             guard let self, isStarted, current == generation else { return }
             apply(result, wantsList: wantsList)
@@ -184,10 +220,14 @@ final class MailModule: NotchModule {
             case .notRunning?:
                 unread = 0
                 messages = []
+                listLoaded = false
                 state = .notRunning
             case .reading(let reading)?:
                 unread = reading.unread
-                if wantsList || reading.unread == 0 { messages = Array(reading.messages.prefix(Self.maxShown)) }
+                if wantsList {
+                    messages = pinningReplyTarget(Array(reading.messages.prefix(recentCount)))
+                    listLoaded = true
+                }
                 armed = true
                 state = reading.accounts == 0 ? .noAccount : .ready
             case nil:
@@ -200,6 +240,12 @@ final class MailModule: NotchModule {
             state = .failed
         }
         schedulePoll()
+    }
+
+    /// Le mail auquel on écrit reste dans la liste même si de nouveaux mails l'ont fait sortir des derniers reçus.
+    private func pinningReplyTarget(_ list: [MailMessage]) -> [MailMessage] {
+        guard let target = replyTarget, !list.contains(where: { $0.id == target.id }) else { return list }
+        return (list + [target]).sorted { $0.date > $1.date }
     }
 
     /// Un seul rendez-vous à la fois, et seulement tant que Mail tourne et répond.
@@ -222,6 +268,70 @@ final class MailModule: NotchModule {
 
     func tabDisappeared() {
         openViews = max(0, openViews - 1)
+    }
+
+    // MARK: Réponse
+
+    /// Ouvre (ou ferme, si c'est déjà lui) le champ de réponse sous un mail. N'envoie rien.
+    func beginReply(_ message: MailMessage) {
+        guard replyState != .sending, !message.id.isEmpty else { return }
+        if replyTarget?.id == message.id { return resetReply() }
+        resetReply()
+        replyTarget = message
+    }
+
+    /// Échap : ferme le champ et jette le texte. Sans effet pendant un envoi (on veut voir son issue).
+    func cancelReply() {
+        guard replyState != .sending else { return }
+        resetReply()
+    }
+
+    /// LE seul chemin d'envoi : clic sur « Envoyer » ou Entrée dans le champ. Texte vide : rien.
+    func sendReply() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        runReply(text: text, send: true)
+    }
+
+    /// « Ouvrir dans Mail » : la fenêtre de réponse de Mail s'ouvre avec le texte déjà tapé, rien n'est envoyé.
+    func openReplyInMail() {
+        runReply(text: draft.trimmingCharacters(in: .whitespacesAndNewlines), send: false)
+    }
+
+    private func runReply(text: String, send: Bool) {
+        guard let target = replyTarget, replyState != .sending else { return }
+        // Mail s'est fermé depuis : le script ne s'exécute même pas, il n'y a pas de quoi le relancer par mégarde.
+        guard isMailRunning() else {
+            replyState = .failed(.notRunning)
+            return
+        }
+        replyState = .sending
+        cancelSentFlash?()
+        cancelSentFlash = nil
+        runner.run(MailScript.replySource, arguments: [target.id, text, send ? "send" : "draft"],
+                   timeout: Self.replyTimeout) { [weak self] result in
+            guard let self, isStarted, replyTarget?.id == target.id else { return }
+            if let failure = MailScript.replyFailure(result) {
+                replyState = .failed(failure)
+            } else if send {
+                draft = ""
+                replyState = .sent
+                cancelSentFlash = scheduler.after(Self.sentFlash) { [weak self] in
+                    self?.cancelSentFlash = nil
+                    if self?.replyState == .sent { self?.resetReply() }
+                }
+            } else {
+                resetReply()
+            }
+        }
+    }
+
+    private func resetReply() {
+        cancelSentFlash?()
+        cancelSentFlash = nil
+        replyTarget = nil
+        draft = ""
+        replyState = .idle
     }
 
     // MARK: Actions
