@@ -18,3 +18,6 @@ export async function open() {
     },
   };
 }
+
+/** Dernière image de la vidéo v2 : fin de la pastille finale (voir `CTA_END` dans src/promo2/Promo2.tsx : 15,8 s à 60 i/s). */
+export const CTA_END_FRAME = 948;

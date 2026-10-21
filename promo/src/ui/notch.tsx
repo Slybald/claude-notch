@@ -72,14 +72,16 @@ export const NotchBody: React.FC<{
   bottom?: number;
   shadow?: boolean;
   fill?: string;
+  /** Remplace l'ombre par défaut de l'app (valeur CSS de `filter`). */
+  shadowFilter?: string;
   children?: React.ReactNode;
-}> = ({ w, h, top = 12, bottom = 24, shadow = true, fill = "#000", children }) => (
+}> = ({ w, h, top = 12, bottom = 24, shadow = true, fill = "#000", shadowFilter, children }) => (
   <div
     style={{
       position: "relative",
       width: w,
       height: h,
-      filter: shadow ? "drop-shadow(0 6px 14px rgba(0,0,0,0.45))" : undefined,
+      filter: shadow ? (shadowFilter ?? "drop-shadow(0 6px 14px rgba(0,0,0,0.45))") : undefined,
     }}
   >
     <div
@@ -130,9 +132,11 @@ export const TabBar: React.FC<{
   opacities?: Partial<Record<TabId, number>>;
   lifted?: TabId | null;
   activeX?: number;
+  /** Capsule imposée (pt) : position et largeur, pour l'étirement entre deux onglets. */
+  capsule?: { x: number; w: number };
   /** Nombre d'onglets compté pour la largeur de la barre. */
   count?: number;
-}> = ({ order, active, frame = 0, editing, badge = 1, claudeState, xs = {}, opacities = {}, lifted, activeX, count }) => {
+}> = ({ order, active, frame = 0, editing, badge = 1, claudeState, xs = {}, opacities = {}, lifted, activeX, capsule, count }) => {
   const pitch = 29;
   const idx = order.indexOf(active);
   const capsuleX = activeX ?? (idx < 0 ? 0 : (xs[active] ?? idx * pitch));
@@ -141,9 +145,9 @@ export const TabBar: React.FC<{
       <div
         style={{
           position: "absolute",
-          left: capsuleX,
+          left: capsule?.x ?? capsuleX,
           top: 0,
-          width: 27,
+          width: capsule?.w ?? 27,
           height: 22,
           borderRadius: 11,
           background: "rgba(255,255,255,0.12)",
