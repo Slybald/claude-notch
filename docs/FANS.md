@@ -9,7 +9,7 @@ macOS 27.0.1, on 2026-10-21. [Français plus bas](#ventilateurs-dans-la-notch).
 |---|---|---|
 | Read fan speeds and bounds | SMC through IOKit (`AppleSMC`), no privileges | **Measured** |
 | Read CPU / GPU temperatures | SMC keys `Tp…`, `Te…`, `Tg…` (`flt `) | **Measured** |
-| Set a fixed speed | SMC writes, **root only** → small helper `fanctl` started with `sudo -n` | Code ready, real write: see [Write trial](#write-trial) |
+| Set a fixed speed | SMC writes, **root only** → small helper `fanctl` started with `sudo -n` | **Measured** (see [Write trial](#write-trial)) |
 | Fanless Mac (MacBook Air) | `FNum` = 0 → no card | By design |
 | Intel Mac | different keys (`FS!`, `fpe2`) | Read-only card, fixed speed not offered |
 | M5 | reported to use `F0md` (lower case) and no `Ftst` | Not supported: read-only |
@@ -32,11 +32,12 @@ macOS 27.0.1, on 2026-10-21. [Français plus bas](#ventilateurs-dans-la-notch).
   about 105 °C with both fans around 4,000–4,400 rpm: macOS lets this chip run that hot. Some `Tf…` keys read negative
   values and are ignored.
 
-## Assumed (from open-source projects, not yet observed here)
+## Assumed (from open-source projects, not observed here)
 
-- Writing `F<n>Md` = 1 may be refused on M3 and later while macOS keeps control; writing `Ftst` = 1 unlocks it after a
-  few seconds (projects retry for 3 to 10 s). The helper tries `F<n>Md` = 1 first, then `Ftst` = 1 and retries every
-  100 ms for at most 10 s, then writes `F<n>Tg`.
+- Writing `F<n>Md` = 1 may be refused on some M3/M4 Macs or macOS versions while macOS keeps control; writing
+  `Ftst` = 1 unlocks it after a few seconds (projects retry for 3 to 10 s). **Not needed on the M3 Pro tested**, where
+  `F<n>Md` = 1 was accepted at once. The helper keeps the fallback: `F<n>Md` = 1 first, then `Ftst` = 1 and a retry
+  every 100 ms for at most 10 s, then `F<n>Tg`.
 - Back to automatic: `F<n>Md` = 0 for every fan, then `Ftst` = 0.
 - The SMC does **not** enforce `Mn`/`Mx`: the bounds are checked by the app and checked again by the helper.
 - Waking from sleep resets `Ftst` (control is lost); a reboot resets everything. Behaviour after the controlling
@@ -70,7 +71,24 @@ macOS 27.0.1, on 2026-10-21. [Français plus bas](#ventilateurs-dans-la-notch).
 
 ## Write trial
 
-Not done yet: no SMC write happens on the development Mac without the owner's explicit agreement.
+Done once on the MacBook Pro M3 Pro (macOS 27.0.1), with the owner's explicit agreement, on 2026-10-21. The Mac was
+under heavy load (several builds), so macOS was running the fans at about 6,000 and 6,480 rpm.
+
+1. Install through the app's own code path (one administrator prompt): helper `root:wheel 0755`, rule `0440`; the app
+   then reports the helper as installed (same SHA-256 as the bundled one). The helper was the ad hoc signed build from
+   `scripts/build.sh`, without hardened runtime: its writes took effect.
+2. `sudo -n fanctl hold` with `fan 0 3500` and `fan 1 3500`, SMC read every second from another process:
+   - `F0Md` and `F1Md` went to 1 at once, **`Ftst` stayed 0** (no unlock needed), `F<n>Tg` = 3500;
+   - actual speeds: 5,636 / 6,007 after 1 s, 3,954 / 4,091 after 2 s, 3,559 / 3,564 after 3 s, then 3,470–3,510;
+   - macOS did not take the fans back during the hold (mode stayed 1).
+3. After about 11 s, before the scripted `auto`, the helper answered **`auto temperature`**: with the fans slowed
+   below what macOS wanted, the hottest probe reached 105 °C and the safety gave control back. `F0Md`, `F1Md` and
+   `Ftst` read 0; macOS set its own targets again (5,964 / 6,441) and the fans were back above 5,400 rpm within a
+   second. The extra `fanctl auto` also succeeded.
+4. Removal through the app's own code path (second prompt): helper and rule deleted, fans still automatic.
+
+Lesson kept in the design: the fixed speed starts from the current speed, so it never drops abruptly on its own; a
+speed chosen below what macOS wants under load is ended by the temperature safety.
 
 ## Projects consulted
 
@@ -99,8 +117,8 @@ Résumé en français. Mesures en lecture seule sur un MacBook Pro M3 Pro, macOS
   performance), `Te…` (efficacité), `Tg…` (GPU). En automatique et sous forte charge, la plus chaude a atteint environ
   105 °C, ventilateurs vers 4000 tr/min. Un appel au SMC coûte environ 1 ms : lecture hors du fil principal, toutes
   les 2 s, seulement onglet affiché.
-- **Supposé** (projets libres ci-dessus, pas encore observé ici) : sur M3 et suivantes, `F<n>Md` = 1 peut être refusé
-  tant que `Ftst` ne vaut pas 1 ; le SMC n'impose pas les bornes ; la veille remet `Ftst` à 0.
+- **Supposé** (projets libres ci-dessus) : sur certains M3/M4, `F<n>Md` = 1 peut être refusé tant que `Ftst` ne vaut
+  pas 1 (pas le cas sur le M3 Pro essayé) ; le SMC n'impose pas les bornes ; la veille remet `Ftst` à 0.
 - **Écriture** : seulement par l'outil `fanctl`, installé une fois sur clic (mot de passe administrateur) dans
   /Library/PrivilegedHelperTools, avec une règle sudoers qui n'autorise que `fanctl auto` et `fanctl hold`. L'outil
   vérifie chaque ligne (ventilateur existant, vitesse entre le minimum et le maximum lus dans le SMC).
@@ -108,4 +126,7 @@ Résumé en français. Mesures en lecture seule sur un MacBook Pro M3 Pro, macOS
   de session, au-delà de 105 °C (sauf ventilateurs déjà au maximum), si macOS reprend la main, ou sur un signal ;
   « Rendre la main à macOS » toujours visible ; retrait de l'outil et de la règle par « Retirer l'autorisation » et à
   la désinstallation.
-- **Essai d'écriture réel** : pas encore fait, il attend l'accord du propriétaire du Mac.
+- **Essai d'écriture réel** (fait une fois, avec l'accord du propriétaire, Mac très chargé, ventilateurs à environ
+  6000 tr/min) : installation par le code de l'app, `F0Md` = `F1Md` = 1 acceptés tout de suite sans `Ftst`, vitesses
+  calées à 3500 tr/min en 3 s ; au bout d'environ 11 s, la sécurité de température (105 °C) a rendu la main d'elle-même,
+  modes relus à 0, macOS a remonté les ventilateurs aussitôt ; retrait de l'outil et de la règle vérifié.
