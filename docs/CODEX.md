@@ -80,12 +80,22 @@ stdio as a child process, on the default `~/.codex`. Measured with that very bin
   per hook whether `config.toml` has a `trusted_hash` for its key. Then `codex app-server` is started for a moment
   (the app's own binary first, else the `codex` command; minimal environment, `CODEX_HOME` set) and `hooks/list` tells
   the truth (`modified` included). This runs by itself only while approval is pending (at most every 30 s); once the hooks
-  are active no Codex process is started unless you press **Check**. The tab says: *hooks not installed* → *to approve in Codex* → *active*. Any hook event
+  are active no Codex process is started for the hooks unless you press **Check** (the quota gauge below starts its own, short
+  one while the panel is open). The tab says: *hooks not installed* → *to approve in Codex* → *active*. Any hook event
   received also proves they run. While approval is pending and a view is shown, two `stat` calls every 2.5 s notice an
   approval made elsewhere (`/hooks`, the app), so the tab updates by itself; nothing runs when it is not pending.
 - **Approve, only on a click.** **Approve in Codex** (tab or Settings) starts `codex app-server`, lists the hooks, and
   sends `config/batchWrite` for the hooks whose command is our script *and* whose file is this `hooks.json`, nothing else,
   then lists again. Codex writes `config.toml` itself; the app never does.
+- **Quota gauge** (Settings › Codex › Show quota, on by default). `account/rateLimits/read` returns `rateLimits.primary` and
+  `secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` in seconds), `planType` and `credits`; the schema comes from
+  `codex app-server generate-json-schema`. Measured with the app's Codex 0.162 and the `codex` command 0.154 on a ChatGPT
+  sign-in: `primary` 300 min (5 h), `secondary` 10 080 min (7 days), the same figures from both, answered in 1.2 s,
+  one extra notification (`remoteControl/status/changed`) and no token in the answer. Codex reads it with its own sign-in;
+  the app starts `codex app-server` (same binary, minimal environment) and sends this one request. Only while the panel is
+  open: at once if the last figure is older than a minute, then every 5 minutes, one timer, stopped when the panel closes. An
+  error (API key, no sign-in, no Codex) keeps the last figure and waits 15 minutes. The `account/rateLimits/updated`
+  notification only reaches a client that owns a thread, so it is not used.
 
 ## What was not used, and why
 
@@ -178,12 +188,22 @@ L'app Codex fait maintenant partie de **ChatGPT** (`/Applications/ChatGPT.app`, 
   pour chaque hook, présence d'un `trusted_hash` à sa clé. Puis `codex app-server` est lancé un instant (le binaire de
   l'app d'abord, sinon la commande `codex` ; environnement minimal, `CODEX_HOME` posé) et `hooks/list` dit la vérité
   (`modified` compris), tout seul seulement tant que l'approbation attend (au plus toutes les 30 s) ; une fois les hooks actifs,
-  aucun processus Codex n'est lancé sans que tu appuies sur **Vérifier**. L'onglet dit : *hooks non posés* → *à approuver dans Codex* → *actifs*. Un événement de hook reçu
+  aucun processus Codex n'est lancé pour les hooks sans que tu appuies sur **Vérifier** (la jauge de quota, plus bas, lance le
+  sien, bref, tant que le panneau est ouvert). L'onglet dit : *hooks non posés* → *à approuver dans Codex* → *actifs*. Un événement de hook reçu
   prouve aussi qu'ils tournent. Tant que l'approbation attend et qu'une vue est affichée, deux `stat` toutes les 2,5 s
   repèrent une approbation faite ailleurs (`/hooks`, l'app) : l'onglet se met à jour tout seul ; rien ne tourne hors attente.
 - **Approuver, sur un clic seulement.** **Approuver dans Codex** (onglet ou réglages) lance `codex app-server`, liste les
   hooks, envoie `config/batchWrite` pour ceux dont la commande est notre script *et* dont le fichier est ce `hooks.json`,
   rien d'autre, puis relit. Codex écrit `config.toml` lui-même ; l'app jamais.
+- **Jauge de quota** (Réglages › Codex › Afficher le quota, activé par défaut). `account/rateLimits/read` renvoie
+  `rateLimits.primary` et `secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` en secondes), `planType` et `credits` ;
+  le schéma vient de `codex app-server generate-json-schema`. Mesuré avec le Codex de l'app 0.162 et la commande `codex` 0.154
+  sur un compte ChatGPT : `primary` 300 min (5 h), `secondary` 10 080 min (7 jours), les mêmes chiffres des deux, réponse
+  en 1,2 s, une notification en plus (`remoteControl/status/changed`) et aucun jeton dans la réponse. Codex la lit avec sa propre
+  connexion ; l'app lance `codex app-server` (même binaire, environnement minimal) et n'envoie que cette requête. Seulement
+  panneau ouvert : tout de suite si le dernier chiffre a plus d'une minute, puis toutes les 5 minutes, un seul minuteur, arrêté
+  à la fermeture. Une erreur (clé d'API, pas de connexion, pas de Codex) garde le dernier chiffre et attend 15 minutes. La
+  notification `account/rateLimits/updated` n'arrive qu'à un client qui possède un fil : elle n'est pas utilisée.
 
 ## Pas utilisé
 
