@@ -245,6 +245,55 @@ final class TabEditingGestureTests: XCTestCase {
         XCTAssertLessThan(after, before + 1, "rien ne reste après le mode")
     }
 
+    private func popUpButtons(_ view: NSView? = nil) -> [NSPopUpButton] {
+        guard let view = view ?? window.contentView else { return [] }
+        return ((view as? NSPopUpButton).map { [$0] } ?? []) + view.subviews.flatMap { popUpButtons($0) }
+    }
+
+    /// Le « + » est un vrai menu AppKit, rempli par SwiftUI à son ouverture : grisé sans onglet masqué, puis ouvert
+    /// par un clic. Pendant le suivi du menu (boucle bloquante), un minuteur relève les éléments, en choisit un et
+    /// ferme le menu ; l'onglet choisi revient en bout de barre.
+    func testPlusMenuListsHiddenTabs() throws {
+        longPress(tabCenter(0))
+        // Le « … » disparaît avec la transition d'entrée : il ne reste que le « + ».
+        let deadline = Date().addingTimeInterval(2)
+        while popUpButtons().count > 1, Date() < deadline { wait(0.05) }
+        XCTAssertEqual(popUpButtons().count, 1)
+        XCTAssertFalse(try XCTUnwrap(popUpButtons().first).isEnabled, "rien de masqué : « + » grisé")
+
+        let hiddenIds = [shown[1], shown[3]]
+        hiddenIds.forEach { notch.registry.hideTab($0) }
+        wait(0.5)
+        let plus = try XCTUnwrap(popUpButtons().first)
+        XCTAssertTrue(plus.isEnabled)
+        let expected = hiddenIds.compactMap { notch.registry.module($0)?.title }
+
+        var titles: [String] = []
+        let timer = Timer(timeInterval: 0.3, repeats: true) { timer in
+            guard let menu = plus.menu, !menu.items.isEmpty else { return }
+            timer.invalidate()
+            titles = menu.items.filter { !$0.isHidden && !$0.isSeparatorItem }.map { $0.title }
+            if let index = menu.items.firstIndex(where: { $0.title == expected.last }) {
+                menu.performActionForItem(at: index)
+            }
+            menu.cancelTracking()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        // Garde-fou : le menu se ferme quoi qu'il arrive.
+        let guardTimer = Timer(timeInterval: 3, repeats: false) { _ in plus.menu?.cancelTracking() }
+        RunLoop.main.add(guardTimer, forMode: .common)
+        let point = tabCenter(shown.count)
+        send(.leftMouseDown, point)
+        send(.leftMouseUp, point)
+        timer.invalidate()
+        guardTimer.invalidate()
+        wait(0.5)
+
+        XCTAssertEqual(titles, expected, "les onglets masqués, dans l'ordre des réglages")
+        XCTAssertEqual(shown.last, hiddenIds[1], "remis en bout de barre")
+        XCTAssertTrue(notch.model.isEditingTabs, "on reste dans le mode")
+    }
+
     func testDoneButtonLeaves() {
         longPress(tabCenter(0))
         click(CGPoint(x: contentRight - 20, y: headerY))
