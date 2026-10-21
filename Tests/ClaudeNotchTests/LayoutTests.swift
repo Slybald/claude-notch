@@ -129,6 +129,19 @@ final class LayoutTests: XCTestCase {
         }
     }
 
+    /// La carte qui propose les réponses (volets fermés) et une conversation ouverte ne font pas déborder le panneau.
+    func testRepliesPromptAndConversationFitInPanel() {
+        let notch = NotchHarness(self, store: .working(8))
+        notch.model.isExpanded = true
+        notch.prefs.replyPromptDismissed = false
+        XCTAssertLessThanOrEqual(notch.measure().height, 461, "carte + 8 sessions")
+
+        notch.prefs.replyFromNotch = true
+        notch.claude.drafts.composing = "s0"
+        notch.claude.drafts.messages["s0"] = "Bonjour"
+        XCTAssertLessThanOrEqual(notch.measure().height, 461, "conversation ouverte")
+    }
+
     /// Les onglets vides ne débordent pas, quelle que soit la taille du panneau.
     func testEveryTabFitsInPanel() {
         for size in PanelSize.allCases {

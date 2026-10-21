@@ -15,8 +15,6 @@
 "Réponds dans %@" = "Réponds dans %@";
 
 /* Message */
-"Écrire" = "Écrire";
-"Envoyer un message à Claude" = "Envoyer un message à Claude";
 "Message à Claude…" = "Message à Claude…";
 "Envoyer (Entrée)" = "Envoyer (Entrée)";
 "Fermer (Échap)" = "Fermer (Échap)";
@@ -48,3 +46,19 @@
 "Hooks à mettre à jour pour répondre depuis la notch" = "Hooks à mettre à jour pour répondre depuis la notch";
 "Réponses" = "Réponses";
 "Redémarre les sessions ouvertes avant la mise à jour des hooks." = "Redémarre les sessions ouvertes avant la mise à jour des hooks.";
+
+/* Conversation */
+"Converser" = "Converser";
+"Voir la conversation et écrire à Claude" = "Voir la conversation et écrire à Claude";
+"Rien de dit pour l'instant" = "Rien de dit pour l'instant";
+"Afficher tout" = "Afficher tout";
+"Réduire" = "Réduire";
+"Toi" = "Toi";
+"Agent" = "Agent";
+"Agent %@" = "Agent %@";
+"Ouvrir" = "Ouvrir";
+"Active les réponses pour écrire à Claude d'ici" = "Active les réponses pour écrire à Claude d'ici";
+"Réponds à Claude sans quitter la notch" = "Réponds à Claude sans quitter la notch";
+"Autorise une action, réponds à une question ou écris à Claude depuis ici. Rien ne part sans ton clic ; le terminal ou Claude Desktop gardent toujours la main." = "Autorise une action, réponds à une question ou écris à Claude depuis ici. Rien ne part sans ton clic ; le terminal ou Claude Desktop gardent toujours la main.";
+"Activer" = "Activer";
+"Plus tard" = "Plus tard";

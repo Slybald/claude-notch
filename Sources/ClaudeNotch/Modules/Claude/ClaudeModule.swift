@@ -62,8 +62,20 @@ final class ClaudeModule: NotchModule {
         drafts.prune(keeping: replies.requests.map(\.id))
     }
 
+    /// « Activer » (carte du haut, conversation) : le réglage, puis les hooks si besoin. Déjà posés : rien d'autre ;
+    /// d'une version précédente : mis à jour ; absents : la fenêtre d'installation, le choix reste à l'utilisateur.
+    func enableReplies() {
+        prefs.replyFromNotch = true
+        hooks.refresh()
+        switch HookSetup.repairNeeded(for: hooks.status) {
+        case .none: break
+        case .update: hooks.update()
+        case .install: hooks.showOnboarding()
+        }
+    }
+
     func makeView() -> AnyView {
-        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools, replies: replies))
+        AnyView(ClaudePanel(module: self, store: store, monitor: monitor, tools: tools, replies: replies, drafts: drafts))
     }
 
     func makeCompactView() -> AnyView? {
@@ -114,6 +126,7 @@ struct ClaudePanel: View {
     @ObservedObject var monitor: ClaudeMonitor
     @ObservedObject var tools: ToolsFeed
     @ObservedObject var replies: ReplyCenter
+    @ObservedObject var drafts: ReplyDrafts
 
     @Environment(\.notchContentMaxHeight) private var contentMaxHeight
     @State private var listHeight: CGFloat = 0
@@ -124,17 +137,28 @@ struct ClaudePanel: View {
     private static let minListHeight: CGFloat = 120
 
     /// Sans la section outils, on retombe toujours sur 296 (les autres lignes tiennent dans la marge). Une carte
-    /// de réponse à l'écran : toute la hauteur disponible, pour que ses boutons restent visibles.
+    /// de réponse ou une conversation à l'écran : toute la hauteur disponible, pour que leurs boutons restent visibles.
     private var listMaxHeight: CGFloat {
-        let cap = module.prefs.replyFromNotch && !replies.requests.isEmpty ? contentMaxHeight : Self.maxListHeight
+        let needsRoom = module.prefs.replyFromNotch && !replies.requests.isEmpty || drafts.composing != nil
+        let cap = needsRoom ? contentMaxHeight : Self.maxListHeight
         return min(cap, max(Self.minListHeight, contentMaxHeight - rowsBelowList))
     }
 
     private var untrackedCount: Int { monitor.cliPids.subtracting(store.trackedPids).count }
 
+    /// Réponses coupées et jamais écartées : une carte les propose, volet des outils fermé (ouvert, la carte ferait
+    /// déborder le panneau).
+    private var proposesReplies: Bool {
+        !module.prefs.replyFromNotch && !module.prefs.replyPromptDismissed && module.toolsPane == nil
+    }
+
     var body: some View {
         let sessions = store.sortedSessions
         VStack(alignment: .leading, spacing: Self.spacing) {
+            if proposesReplies {
+                ReplyPromptCard(enable: { module.enableReplies() }, later: { module.prefs.replyPromptDismissed = true })
+                    .countedBelowList(spacing: Self.spacing)
+            }
             if sessions.isEmpty {
                 EmptyStateView()
             } else {
@@ -169,19 +193,28 @@ struct ClaudePanel: View {
     private func sessionList(_ sessions: [Session]) -> some View {
         let estimate = CGFloat(sessions.count) * 72
         return TimelineView(.periodic(from: .now, by: 1)) { context in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 8) {
-                    ForEach(sessions) { session in
-                        ReplyableSessionCard(replies: module.replies, drafts: module.drafts, prefs: module.prefs,
-                                             session: session, now: context.date,
-                                             showTasks: checklistBinding(session.id),
-                                             onTap: { module.actions.activate(session) },
-                                             decide: { module.decide($0, $1) })
+            ScrollViewReader { scroll in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 8) {
+                        ForEach(sessions) { session in
+                            ReplyableSessionCard(replies: module.replies, drafts: module.drafts, prefs: module.prefs,
+                                                 session: session, now: context.date,
+                                                 showTasks: checklistBinding(session.id),
+                                                 onTap: { module.actions.activate(session) },
+                                                 decide: { module.decide($0, $1) },
+                                                 enable: { module.enableReplies() })
+                                .id(session.id)
+                        }
                     }
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                    })
                 }
-                .background(GeometryReader { proxy in
-                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
-                })
+                // La conversation qui s'ouvre vient en haut de la liste, champ de message compris.
+                .onChange(of: drafts.composing) { id in
+                    guard let id else { return }
+                    withAnimation(notchSpring) { scroll.scrollTo(id, anchor: .top) }
+                }
             }
             .frame(height: min(listHeight > 0 ? listHeight : estimate, listMaxHeight))
             .mask(listFade(overflowing: tools.hasContent && listHeight > listMaxHeight + 1))
@@ -271,7 +304,8 @@ struct ClaudeCompactView: View {
                 row(session)
                 if prefs.replyFromNotch,
                    SessionReplyArea.hasContent(session, replies: replies, drafts: module.drafts, compact: true) {
-                    SessionReplyArea(replies: replies, drafts: module.drafts, session: session, compact: true,
+                    SessionReplyArea(replies: replies, drafts: module.drafts, prefs: prefs, session: session,
+                                     compact: true, open: { activate(session) }, enable: { module.enableReplies() },
                                      decide: { module.decide($0, $1) })
                 }
             }

@@ -57,7 +57,7 @@ enum NotchKeyboard {
 
 // MARK: - Sous la carte de session
 
-/// Carte de session, avec « Écrire » au survol, puis la zone de réponse.
+/// Carte de session, avec « Converser » au survol, puis la zone de réponse.
 struct ReplyableSessionCard: View {
     @ObservedObject var replies: ReplyCenter
     @ObservedObject var drafts: ReplyDrafts
@@ -67,23 +67,31 @@ struct ReplyableSessionCard: View {
     @Binding var showTasks: Bool
     let onTap: () -> Void
     let decide: (ReplyCenter.Request, ReplyCenter.Decision) -> Void
+    let enable: () -> Void
 
     @State private var hovering = false
 
-    private var canWrite: Bool {
-        prefs.replyFromNotch && session.phase != .ended && replies.request(for: session.id) == nil
-            && drafts.composing != session.id && !replies.headless.contains(session.id)
+    private var canConverse: Bool {
+        session.phase != .ended && replies.request(for: session.id) == nil && drafts.composing != session.id
+    }
+
+    /// La conversation s'ouvre même réponses coupées (on y lit ce que Claude a dit) ; le reste, seulement réponses
+    /// activées.
+    private var showsArea: Bool {
+        drafts.composing == session.id
+            || (prefs.replyFromNotch && SessionReplyArea.hasContent(session, replies: replies, drafts: drafts))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             SessionCard(session: session, now: now, showTasks: $showTasks, onTap: onTap)
                 .overlay(alignment: .topTrailing) {
-                    if hovering, canWrite { writeButton }
+                    if hovering, canConverse { conversationButton }
                 }
                 .onHover { hovering = $0 }
-            if prefs.replyFromNotch, SessionReplyArea.hasContent(session, replies: replies, drafts: drafts) {
-                SessionReplyArea(replies: replies, drafts: drafts, session: session, decide: decide)
+            if showsArea {
+                SessionReplyArea(replies: replies, drafts: drafts, prefs: prefs, session: session, open: onTap,
+                                 enable: enable, decide: decide)
             }
         }
         .animation(notchSpring, value: replies.request(for: session.id)?.id)
@@ -91,13 +99,13 @@ struct ReplyableSessionCard: View {
     }
 
     /// Recouvre l'heure de la carte, le temps du survol.
-    private var writeButton: some View {
+    private var conversationButton: some View {
         Button {
             drafts.composing = session.id
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "text.bubble")
-                Text("Écrire", tableName: "Claude")
+                Text("Converser", tableName: "Claude")
             }
             .font(.system(size: 10.5, weight: .semibold))
             .foregroundColor(Palette.accent)
@@ -107,7 +115,7 @@ struct ReplyableSessionCard: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(L("Envoyer un message à Claude", table: "Claude"))
+        .help(L("Voir la conversation et écrire à Claude", table: "Claude"))
         .padding(.top, 8)
         .padding(.trailing, 10)
         .transition(.opacity)
@@ -118,8 +126,12 @@ struct ReplyableSessionCard: View {
 struct SessionReplyArea: View {
     @ObservedObject var replies: ReplyCenter
     @ObservedObject var drafts: ReplyDrafts
+    @ObservedObject var prefs: Preferences
     let session: Session
     var compact = false
+    /// Ouvre la session dans son app (Claude Desktop, terminal).
+    let open: () -> Void
+    let enable: () -> Void
     let decide: (ReplyCenter.Request, ReplyCenter.Decision) -> Void
 
     static func hasContent(_ session: Session, replies: ReplyCenter, drafts: ReplyDrafts, compact: Bool = false) -> Bool {
@@ -134,11 +146,13 @@ struct SessionReplyArea: View {
                             engage: { replies.engage(request.id) }, decide: { decide(request, $0) })
                     .transition(.opacity.combined(with: .move(edge: .top)))
             } else if !compact, drafts.composing == session.id {
-                MessageComposer(replies: replies, drafts: drafts, session: session)
+                ConversationView(replies: replies, drafts: drafts, prefs: prefs, session: session, open: open,
+                                 enable: enable)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             } else if session.phase.needsAttention {
-                ReplyStatusLine(icon: "arrow.up.forward.app", color: Palette.secondary,
-                                text: String(format: L("Réponds dans %@", table: "Claude"), session.sourceLabel))
+                ReplyActionLine(icon: "arrow.up.forward.app",
+                                text: String(format: L("Réponds dans %@", table: "Claude"), session.replyTarget),
+                                button: L("Ouvrir", table: "Claude"), action: open)
             }
             if let count = replies.queued[session.id]?.count, count > 0 {
                 HStack(spacing: 6) {
@@ -511,6 +525,8 @@ struct MessageComposer: View {
     @ObservedObject var replies: ReplyCenter
     @ObservedObject var drafts: ReplyDrafts
     let session: Session
+    /// Seul : sa propre carte. Dans la conversation : la carte de la conversation l'entoure déjà.
+    var framed = true
 
     @FocusState private var focused: Bool
 
@@ -562,8 +578,8 @@ struct MessageComposer: View {
             .lineLimit(1)
             .padding(.leading, 2)
         }
-        .padding(8)
-        .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Color.white.opacity(0.07)))
+        .padding(framed ? 8 : 0)
+        .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Color.white.opacity(framed ? 0.07 : 0)))
         .onAppear {
             NotchKeyboard.take()
             DispatchQueue.main.async { focused = true }

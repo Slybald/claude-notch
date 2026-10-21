@@ -16,6 +16,8 @@ final class NotchHarness {
         _ = NSApplication.shared
         self.store = store
         prefs = Preferences(defaults: makeEphemeralDefaults(testCase))
+        // Sans la carte qui propose les réponses : les mesures portent sur la liste des sessions.
+        prefs.replyPromptDismissed = true
         // Jamais le vrai ~/.claude : un dossier de configuration vide.
         let config = FileManager.default.temporaryDirectory.appendingPathComponent("claude-notch-no-config")
         let hooks = HookSetup(installer: HookInstaller(configDirectory: config, bundledHook: nil))

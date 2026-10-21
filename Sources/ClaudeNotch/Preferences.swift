@@ -181,6 +181,7 @@ final class Preferences: ObservableObject {
         static let alternateEars = "appearance.alternateEars"
         static let hideFromCapture = "privacy.hideFromCapture"
         static let replyFromNotch = "claude.replyFromNotch"
+        static let replyPromptDismissed = "claude.replyPromptDismissed"
 
         /// Réglages de la notch remis à zéro par « Rétablir les réglages par défaut » : ni les onglets, ni les
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
@@ -359,6 +360,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(replyFromNotch, forKey: Key.replyFromNotch) }
     }
 
+    /// « Plus tard » sur la carte qui propose d'activer les réponses : elle ne revient pas (le réglage reste dans
+    /// Réglages › Claude).
+    @Published var replyPromptDismissed: Bool {
+        didSet { defaults.set(replyPromptDismissed, forKey: Key.replyPromptDismissed) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         func double(_ key: String, _ fallback: Double, _ range: ClosedRange<Double>) -> Double {
@@ -418,6 +425,7 @@ final class Preferences: ObservableObject {
         showEars = defaults.object(forKey: Key.showEars) as? Bool ?? true
         alternateEars = defaults.object(forKey: Key.alternateEars) as? Bool ?? true
         replyFromNotch = defaults.bool(forKey: Key.replyFromNotch)
+        replyPromptDismissed = defaults.bool(forKey: Key.replyPromptDismissed)
     }
 
     /// Ancien « Toujours visible » : vrai → toujours, faux → quand Claude est ouvert, jamais réglé → toujours (les

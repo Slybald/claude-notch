@@ -56,6 +56,17 @@ final class HookSetup: ObservableObject {
         return .welcome(claude: claudeEnabled)
     }
 
+    /// Ce qu'il faut faire des hooks pour que les réponses marchent.
+    enum Repair { case none, update, install }
+
+    static func repairNeeded(for status: HookInstaller.Status) -> Repair {
+        switch status {
+        case .installed: return .none
+        case .outdated, .scriptOutdated: return .update
+        case .notInstalled, .unreadable: return .install
+        }
+    }
+
     /// `.scriptOutdated` : seul le script est réécrit. `.outdated` : entrées et script.
     func silentUpdate() {
         do {
