@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Edit the tabs in the notch, like apps on an iPhone: press and hold the tab bar, then drag the icons to reorder
+  them, hide a tab with **−** (never the last one) or bring one back with **+**. **Done**, Esc or a click outside the
+  bar ends it. Same settings as **Settings › Tabs**, which stays in sync.
+
 ## [1.2.3] - 2026-10-21
 
 ### Fixed
