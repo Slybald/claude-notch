@@ -203,7 +203,7 @@
 "Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de chaque onglet). Les oreilles restent les mêmes." = "Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de chaque onglet). Les oreilles restent les mêmes.";
 "Compact : demi-largeur, seulement le résumé de chaque onglet. Les oreilles restent les mêmes." = "Compact : demi-largeur, seulement le résumé de chaque onglet. Les oreilles restent les mêmes.";
 "Activé" = "Activé";
-"Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan." = "Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan.";
+"Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan. Dans la notch, un appui long sur les onglets permet aussi de les déplacer et de les masquer." = "Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan. Dans la notch, un appui long sur les onglets permet aussi de les déplacer et de les masquer.";
 "Onglet à l'ouverture" = "Onglet à l'ouverture";
 "Dernier utilisé" = "Dernier utilisé";
 "Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude." = "Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude.";
@@ -358,3 +358,12 @@
 "Rechoisis tes onglets, l'ouverture de la notch et le raccourci clavier." = "Rechoisis tes onglets, l'ouverture de la notch et le raccourci clavier.";
 "Hooks ajoutés, sauvegarde horodatée ; les tiens restent." = "Hooks ajoutés, sauvegarde horodatée ; les tiens restent.";
 "Relaie les événements à l'app, en local (127.0.0.1)." = "Relaie les événements à l'app, en local (127.0.0.1).";
+
+/* Tab editing in the notch (long press) */
+"OK" = "OK";
+"Modifier les onglets" = "Modifier les onglets";
+"Déplacer à gauche" = "Déplacer à gauche";
+"Déplacer à droite" = "Déplacer à droite";
+"Masquer « %@ »" = "Masquer « %@ »";
+"Aucun onglet masqué" = "Aucun onglet masqué";
+"Remettre un onglet" = "Remettre un onglet";

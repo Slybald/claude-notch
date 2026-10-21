@@ -60,13 +60,13 @@ final class FootprintTests: XCTestCase {
         print(String(format: "FOOTPRINT CPU replié 5 s : %.1f %%", (idle.cpu - cycled.cpu) / 5 * 100))
     }
 
-    private struct Sample {
+    struct Sample {
         var footprint: UInt64
         var resident: UInt64
         var cpu: Double
     }
 
-    private static func sample() -> Sample {
+    static func sample() -> Sample {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
         _ = withUnsafeMutablePointer(to: &info) {

@@ -203,7 +203,7 @@
 "Compact : demi-largeur, seulement l'essentiel (sessions Claude en cours, résumé de chaque onglet). Les oreilles restent les mêmes." = "Compact: half width, only the essentials (running Claude sessions, a summary of each tab). The ears stay the same.";
 "Compact : demi-largeur, seulement le résumé de chaque onglet. Les oreilles restent les mêmes." = "Compact: half width, only a summary of each tab. The ears stay the same.";
 "Activé" = "Enabled";
-"Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan." = "Drag the tabs to change their order. A disabled tab does nothing, not even in the background.";
+"Glisse les onglets pour changer leur ordre. Un onglet désactivé ne fait rien, même en arrière-plan. Dans la notch, un appui long sur les onglets permet aussi de les déplacer et de les masquer." = "Drag the tabs to change their order. A disabled tab does nothing, not even in the background. In the notch, a long press on the tabs also lets you move and hide them.";
 "Onglet à l'ouverture" = "Tab on Open";
 "Dernier utilisé" = "Last Used";
 "Quand Claude attend ta réponse, la notch s'ouvre toujours sur Claude." = "When Claude is waiting for you, the notch always opens on Claude.";
@@ -358,3 +358,12 @@
 "Rechoisis tes onglets, l'ouverture de la notch et le raccourci clavier." = "Pick your tabs, how the notch opens and the keyboard shortcut again.";
 "Hooks ajoutés, sauvegarde horodatée ; les tiens restent." = "Hooks added, timestamped backup; yours stay.";
 "Relaie les événements à l'app, en local (127.0.0.1)." = "Relays events to the app, locally (127.0.0.1).";
+
+/* Tab editing in the notch (long press) */
+"OK" = "Done";
+"Modifier les onglets" = "Edit Tabs";
+"Déplacer à gauche" = "Move Left";
+"Déplacer à droite" = "Move Right";
+"Masquer « %@ »" = "Hide “%@”";
+"Aucun onglet masqué" = "No Hidden Tabs";
+"Remettre un onglet" = "Add a Tab";

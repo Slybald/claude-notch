@@ -23,7 +23,7 @@ organised and why some choices were made, so they are not undone by accident.
 - Live diagnostics of the running app: `GET http://127.0.0.1:47823/state` with the hook token
   (`curl -H @"$HOME/Library/Application Support/ClaudeNotch/hook-token" …`): sessions, notch, tools, jobs,
   version, updater, replies (counts only); `notch` gives the window level seen by the window server, the Space,
-  occlusion, screen, front app, full-screen state, tab and running modules.
+  occlusion, screen, front app, full-screen state, tab, tab edit mode (`editingTabs`) and running modules.
 
 ## Code map (`Sources/ClaudeNotch/`)
 
@@ -101,6 +101,25 @@ Apple Events and Bluetooth are already there) nor another module's files.
   pointer. Click, or hover for 0.2 s (passing over a tab does not switch). The panel opens on the last tab or the
   default one (settings), except when Claude needs the user and the Claude tab is on: then on Claude. A tab that
   is no longer enabled falls back to the first enabled one.
+  - **Edit mode** (`NotchViewModel.isEditingTabs`, rules in `TabEditing`, pure): a 0.5 s long press on the bar (or
+    the "Edit Tabs" accessibility action). Icons wiggle, can be dragged (the others move aside with the spring),
+    "−" hides a tab (never the last one shown), "+" after the last tab lists the hidden ones and puts the chosen one
+    back at the end. Same storage as Settings › Tabs (`ModuleRegistry.moveTab`, `hideTab`, `showTab` write
+    `tabs.order` and `tabs.enabled`, read from `Preferences` so two gestures in one run loop never use a stale
+    order): both stay in sync live and a hidden tab stops its module. A move keeps hidden tabs in their slots.
+  - While it lasts: hover does not switch tabs, the panel does not collapse when the mouse leaves, the tab content
+    is dimmed and takes no clicks, "Done" replaces the title, accessory and "…" menu. The panel takes the keyboard
+    so Esc works, and gives it back on exit unless it was opened with the shortcut. Exits: Done, a click outside
+    the bar (in the panel: a background tap; outside the panel: `NotchController.mouseDown`, which then only leaves
+    the mode), Esc (`handleKey`), the panel collapsing (`isExpanded` didSet), compact full screen.
+  - No tab moves under the pointer outside a drag: every tab keeps its width (`LayoutTests`), "−" sits on the icon
+    and "+" comes after the last tab. One view per tab in both modes.
+  - **Wiggle** (`WiggleIcon`): a Core Animation rotation of the icon placed in its own `NSHostingView`, which lets
+    clicks through to the SwiftUI gestures (`hitTest` returns nil). A repeating SwiftUI animation took a full core
+    while editing (measured, `TabEditingGestureTests.testEditModeCPU`); now ~3 % in debug while editing and 0 %
+    after the exit transition. Off with "Reduce motion" (fade only). The views exist only in edit mode, panel open.
+  - Tests play the gestures with mouse events sent to the expanded notch in an offscreen window (long press,
+    click, drag, "−", Done, click outside the bar) and render `tabs-*.png` with `CLAUDE_NOTCH_SNAPSHOT_DIR`.
 - **Ears** (collapsed notch; Claude only while its tab is on): Claude waiting for you > Claude working > Claude
   just finished (5 s) > the module ears with the highest priority (timer 5, player 1, caffeine -10; tab order
   breaks ties) > nothing. Only running modules count. "Show the ears" off: the collapsed notch is exactly the
