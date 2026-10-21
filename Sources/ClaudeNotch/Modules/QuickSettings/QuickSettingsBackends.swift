@@ -66,11 +66,13 @@ struct QuickSettingsBackends {
     var battery: BatteryBackend
     var caffeine: CaffeineBackend
     var shortcuts: ShortcutBackend
+    var fans: FanBackend
 
     /// Les vrais accès. Créer ces objets ne touche à rien : le système n'est appelé qu'à l'usage.
     static func system() -> QuickSettingsBackends {
         QuickSettingsBackends(wifi: SystemWiFi(), bluetooth: SystemBluetooth(), power: SystemPowerMode(),
-                              battery: SystemBattery(), caffeine: SystemCaffeine(), shortcuts: SystemShortcuts())
+                              battery: SystemBattery(), caffeine: SystemCaffeine(), shortcuts: SystemShortcuts(),
+                              fans: SystemFans())
     }
 }
 
