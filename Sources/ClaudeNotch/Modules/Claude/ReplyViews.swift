@@ -156,9 +156,12 @@ struct SessionReplyArea: View {
             }
             if let count = replies.queued[session.id]?.count, count > 0 {
                 HStack(spacing: 6) {
-                    ReplyStatusLine(icon: "tray.full", color: Palette.amber, text: String(format: L(
+                    // Tour en cours : il part à sa fin. Session au repos sans attente : au prochain tour de Claude.
+                    ReplyStatusLine(icon: "tray.full", color: Palette.amber, text: String(format: session.phase.isWorking ? L(
                         count, one: "%d message en file : il partira à la fin du tour",
-                        other: "%d messages en file : ils partiront à la fin du tour", table: "Claude"), count))
+                        other: "%d messages en file : ils partiront à la fin du tour", table: "Claude") : L(
+                        count, one: "%d message en file : il partira au prochain tour de Claude",
+                        other: "%d messages en file : ils partiront au prochain tour de Claude", table: "Claude"), count))
                     Spacer(minLength: 4)
                     Button(L("Annuler", table: "Claude")) { replies.dropQueue(session.id) }
                         .buttonStyle(.plain)
@@ -527,6 +530,8 @@ struct MessageComposer: View {
     let session: Session
     /// Seul : sa propre carte. Dans la conversation : la carte de la conversation l'entoure déjà.
     var framed = true
+    /// Ouvre la session dans son app : proposé quand le message ne peut pas partir tout de suite.
+    var open: (() -> Void)?
 
     @FocusState private var focused: Bool
 
@@ -566,11 +571,20 @@ struct MessageComposer: View {
                      ? (session.phase.isWorking
                         ? L("Claude le lira après l'action en cours", table: "Claude")
                         : L("Claude le lira tout de suite", table: "Claude"))
-                     : L("En file : il partira à la fin du tour", table: "Claude"))
+                     : session.phase.isWorking
+                        ? L("En file : il partira à la fin du tour", table: "Claude")
+                        : L("En file : Claude le lira à son prochain tour", table: "Claude"))
                 if text.utf8.count > ReplyCenter.maxMessageBytes {
                     Text(verbatim: "·")
                     Text("trop long, il sera coupé", tableName: "Claude")
                         .foregroundColor(Palette.amber)
+                }
+                if !connected, !session.phase.isWorking, let open {
+                    Spacer(minLength: 4)
+                    Button(L("Ouvrir", table: "Claude"), action: open)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundColor(Palette.accent)
                 }
             }
             .font(.system(size: 10.5))

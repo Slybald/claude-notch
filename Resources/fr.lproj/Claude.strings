@@ -24,6 +24,9 @@
 "trop long, il sera coupé" = "trop long, il sera coupé";
 "%d message en file : il partira à la fin du tour" = "%d message en file : il partira à la fin du tour";
 "%d messages en file : ils partiront à la fin du tour" = "%d messages en file : ils partiront à la fin du tour";
+"En file : Claude le lira à son prochain tour" = "En file : Claude le lira à son prochain tour";
+"%d message en file : il partira au prochain tour de Claude" = "%d message en file : il partira au prochain tour de Claude";
+"%d messages en file : ils partiront au prochain tour de Claude" = "%d messages en file : ils partiront au prochain tour de Claude";
 "Annuler" = "Annuler";
 "message envoyé depuis la notch" = "message envoyé depuis la notch";
 
