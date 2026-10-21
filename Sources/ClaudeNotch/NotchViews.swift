@@ -636,16 +636,14 @@ struct NotchTabBar: View {
     var body: some View {
         HStack(spacing: Self.spacing) {
             ForEach(Array(ids.enumerated()), id: \.element) { index, id in
-                if let module = registry.module(id) {
-                    if editing { editableTab(module, index: index) } else { tab(module) }
-                }
+                if let module = registry.module(id) { tab(module, index: index) }
             }
             if editing { addMenu }
         }
         .coordinateSpace(name: Self.space)
         .contentShape(Rectangle())
         .animation(animation, value: selection)
-        // Simultané : le bouton de l'onglet garde son clic.
+        // Simultané : le clic de l'onglet reste possible.
         .simultaneousGesture(LongPressGesture(minimumDuration: TabEditing.pressDuration).onEnded { _ in startEditing() },
                              including: editing ? .subviews : .all)
         // Mode édition : un clic sur la barre (hors « − » et « + ») n'en sort pas.
@@ -660,46 +658,46 @@ struct NotchTabBar: View {
         editing = true
     }
 
-    private func tab(_ module: any NotchModule) -> some View {
-        let active = module.id == selection
-        return Button {
-            selection = module.id
-        } label: {
-            icon(module, active: active)
-        }
-        .buttonStyle(.plain)
-        .onHover { inside in hover(module.id, inside) }
-        .help(module.title)
-        .accessibilityLabel(module.title)
-        .accessibilityAddTraits(active ? .isSelected : [])
-        .transition(.opacity)
-    }
-
-    /// Même icône, même taille qu'en mode normal : rotation, échelle et décalage ne changent pas la mise en page.
-    private func editableTab(_ module: any NotchModule, index: Int) -> some View {
+    /// Une seule vue par onglet dans les deux modes (la capsule de l'onglet actif n'existe jamais deux fois).
+    /// Rotation, échelle et décalage du mode édition ne changent pas la mise en page.
+    private func tab(_ module: any NotchModule, index: Int) -> some View {
         let id = module.id
+        let active = id == selection
         let isDragged = dragged == id
         let shift = dropTarget.flatMap { target in
             ids.firstIndex { $0 == dragged }.map { TabEditing.shift(index, from: $0, to: target) }
         } ?? 0
-        return icon(module, active: id == selection)
-            .overlay(alignment: .topLeading) {
-                if TabEditing.canHide(id, enabled: ids) { hideButton(module) }
+        return tabShape(active: active) {
+            if editing {
+                WiggleIcon(content: glyph(module, active: active), clockwise: index.isMultiple(of: 2),
+                           isOn: !reduceMotion)
+                    .frame(width: 17, height: 17)
+                    .accessibilityHidden(true)
+            } else {
+                glyph(module, active: active)
             }
-            .modifier(Wiggle(index: index, isOn: !reduceMotion))
-            .scaleEffect(isDragged ? 1.15 : 1)
-            .offset(x: isDragged ? dragOffset : CGFloat(shift) * (Self.tabWidth + Self.spacing))
-            .zIndex(isDragged ? 1 : 0)
-            .gesture(drag(id, from: index))
-            .transition(.opacity)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(module.title)
-            .accessibilityAction(named: Text("Déplacer à gauche")) { registry.moveTab(id, to: index - 1) }
-            .accessibilityAction(named: Text("Déplacer à droite")) { registry.moveTab(id, to: index + 1) }
+        }
+        .overlay(alignment: .topLeading) {
+            if editing, TabEditing.canHide(id, enabled: ids) { hideButton(module) }
+        }
+        .scaleEffect(isDragged ? 1.15 : 1)
+        .offset(x: isDragged ? dragOffset : CGFloat(shift) * (Self.tabWidth + Self.spacing))
+        .zIndex(isDragged ? 1 : 0)
+        // En mode édition, le clic sur l'onglet ne change rien (et ne sort pas du mode).
+        .onTapGesture { if !editing { selection = id } }
+        .gesture(drag(id, from: index), including: editing ? .all : .subviews)
+        .onHover { inside in hover(id, inside) }
+        .help(module.title)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(module.title)
+        .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { selection = id }
+        .accessibilityAction(named: Text("Déplacer à gauche")) { registry.moveTab(id, to: index - 1) }
+        .accessibilityAction(named: Text("Déplacer à droite")) { registry.moveTab(id, to: index + 1) }
     }
 
-    private func icon(_ module: any NotchModule, active: Bool) -> some View {
-        Group {
+    private func glyph(_ module: any NotchModule, active: Bool) -> AnyView {
+        AnyView(Group {
             if let icon = module.makeTabIcon() {
                 icon
             } else {
@@ -710,16 +708,22 @@ struct NotchTabBar: View {
         .frame(width: 17, height: 17)
         .foregroundColor(active ? Palette.primary
                          : .white.opacity(editing ? 0.75 : hovered == module.id ? 0.85 : 0.5))
-        .padding(.horizontal, 5)
-        .frame(height: 22)
-        .background {
-            if active {
-                Capsule()
-                    .fill(Color.white.opacity(0.12))
-                    .matchedGeometryEffect(id: "active-tab", in: namespace)
+        .environment(\.colorScheme, .dark))
+    }
+
+    /// Même forme, même taille dans les deux modes : capsule de l'onglet actif, zone de clic.
+    private func tabShape<Glyph: View>(active: Bool, @ViewBuilder glyph: () -> Glyph) -> some View {
+        glyph()
+            .padding(.horizontal, 5)
+            .frame(height: 22)
+            .background {
+                if active {
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                        .matchedGeometryEffect(id: "active-tab", in: namespace)
+                }
             }
-        }
-        .contentShape(Capsule())
+            .contentShape(Capsule())
     }
 
     /// L'onglet suit la souris, les autres s'écartent ; au lâcher, l'ordre est enregistré comme dans les réglages.
@@ -806,25 +810,90 @@ struct NotchTabBar: View {
     }
 }
 
-/// Tremblement du mode édition : petite rotation aller-retour, de sens opposé d'un onglet à l'autre. L'animation
-/// n'existe que tant que l'onglet est affiché en mode édition, panneau ouvert : sortir du mode retire la vue.
-private struct Wiggle: ViewModifier {
+/// Tremblement du mode édition, confié à Core Animation comme `AnimatedGlyphView` : l'icône est posée dans sa
+/// propre vue, que le serveur de rendu fait pivoter. Une animation SwiftUI répétée prenait un cœur entier (mesuré,
+/// `TabEditingGestureTests.testEditModeCPU`). La vue n'existe qu'en mode édition, panneau ouvert.
+struct WiggleIcon: NSViewRepresentable {
+    let content: AnyView
+    /// Sens de départ, alterné d'un onglet à l'autre.
+    let clockwise: Bool
+    /// Éteint avec « Réduire les animations ».
     let isOn: Bool
-    /// Sens de départ fixé à l'apparition : un onglet déplacé ne change pas de sens en cours de route.
-    @State private var tilt: Double
 
-    init(index: Int, isOn: Bool) {
-        self.isOn = isOn
-        _tilt = State(initialValue: index.isMultiple(of: 2) ? -2.5 : 2.5)
+    func makeNSView(context: Context) -> WiggleView { WiggleView(content) }
+
+    func updateNSView(_ view: WiggleView, context: Context) {
+        view.hosting.rootView = content
+        view.set(isOn: isOn, clockwise: clockwise)
+    }
+}
+
+final class WiggleView: NSView {
+    static let angle: CGFloat = 2.5
+    static let period: CFTimeInterval = 0.13
+
+    let hosting: NSHostingView<AnyView>
+    private var isOn = false
+    private var clockwise = true
+    private var animatedSize = CGSize.zero
+
+    init(_ content: AnyView) {
+        hosting = NSHostingView(rootView: content)
+        super.init(frame: .zero)
+        wantsLayer = true
+        hosting.wantsLayer = true
+        addSubview(hosting)
     }
 
-    func body(content: Content) -> some View {
-        content
-            .rotationEffect(.degrees(isOn ? tilt : 0))
-            .onAppear {
-                guard isOn else { return }
-                withAnimation(.easeInOut(duration: 0.13).repeatForever(autoreverses: true)) { tilt = -tilt }
-            }
+    required init?(coder: NSCoder) { nil }
+
+    /// Les clics vont aux gestes SwiftUI de l'onglet (glisser, « − »), pas à l'icône.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    var isWiggling: Bool { hosting.layer?.animation(forKey: "wiggle") != nil }
+
+    func set(isOn: Bool, clockwise: Bool) {
+        guard isOn != self.isOn || clockwise != self.clockwise else { return }
+        self.isOn = isOn
+        self.clockwise = clockwise
+        restart()
+    }
+
+    override func layout() {
+        super.layout()
+        hosting.frame = bounds
+        // Seulement si la taille change : un glisser déplace la vue sans la redimensionner.
+        if bounds.size != animatedSize { restart() }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        restart()
+    }
+
+    private func restart() {
+        guard let layer = hosting.layer else { return }
+        layer.removeAnimation(forKey: "wiggle")
+        animatedSize = bounds.size
+        guard isOn, window != nil, bounds.width > 0 else { return }
+        // Pivot au centre, quel que soit le point d'ancrage choisi par AppKit pour le calque de la vue.
+        let size = layer.bounds.size
+        let dx = size.width * (0.5 - layer.anchorPoint.x)
+        let dy = size.height * (0.5 - layer.anchorPoint.y)
+        func tilt(_ degrees: CGFloat) -> CATransform3D {
+            let rotated = CATransform3DRotate(CATransform3DMakeTranslation(dx, dy, 0), degrees * .pi / 180, 0, 0, 1)
+            return CATransform3DTranslate(rotated, -dx, -dy, 0)
+        }
+        let angle = clockwise ? Self.angle : -Self.angle
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = tilt(-angle)
+        animation.toValue = tilt(angle)
+        animation.duration = Self.period
+        animation.autoreverses = true
+        animation.repeatCount = .infinity
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        animation.isRemovedOnCompletion = false
+        layer.add(animation, forKey: "wiggle")
     }
 }
 

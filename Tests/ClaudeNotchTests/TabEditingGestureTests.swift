@@ -90,6 +90,32 @@ final class TabEditingGestureTests: XCTestCase {
 
     private var shown: [String] { notch.registry.enabled.map { $0.id } }
 
+    private var outputDir: URL? {
+        ProcessInfo.processInfo.environment["CLAUDE_NOTCH_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
+    }
+
+    /// PNG de la notch telle qu'elle est à l'écran de test, rognée sur le panneau, sur fond gris clair.
+    private func snapshot(_ name: String) throws {
+        guard let outputDir else { return }
+        let layer = try XCTUnwrap(window.contentView?.layer)
+        let size = CGSize(width: NotchController.panelSize.width,
+                          height: min(NotchController.panelSize.height, ceil(notch.model.contentSize.height) + 24))
+        let scale: CGFloat = 2
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0))
+        let cg = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap)).cgContext
+        cg.setFillColor(NSColor(white: 0.85, alpha: 1).cgColor)
+        cg.fill(CGRect(x: 0, y: 0, width: size.width * scale, height: size.height * scale))
+        cg.translateBy(x: 0, y: size.height * scale)
+        cg.scaleBy(x: scale, y: -scale)
+        layer.render(in: cg)
+        let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        try png.write(to: outputDir.appendingPathComponent("tabs-\(name).png"))
+    }
+
     // MARK: - Gestes
 
     func testShortClickSelectsTabAndLongPressStartsEditing() {
@@ -130,6 +156,93 @@ final class TabEditingGestureTests: XCTestCase {
         XCTAssertGreaterThan(notch.model.contentSize.height, 32 + 24 + 40, "panneau assez haut")
         click(CGPoint(x: NotchController.panelSize.width / 2, y: headerY - 40))
         XCTAssertFalse(notch.model.isEditingTabs, "clic sous la barre : sortie du mode")
+    }
+
+    /// Rendus PNG (`CLAUDE_NOTCH_SNAPSHOT_DIR`) : `tabs-normal`, `tabs-editing`, `tabs-editing-dragging` (glisser en
+    /// cours, les autres écartés), `tabs-editing-hidden` (« + » actif), `tabs-editing-one-tab` (pas de « − »),
+    /// `tabs-editing-reduce-motion` (sans tremblement).
+    func testRenderEditMode() throws {
+        guard outputDir != nil else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
+        try snapshot("normal")
+        longPress(tabCenter(0))
+        try snapshot("editing")
+
+        let start = tabCenter(0)
+        send(.leftMouseDown, start)
+        for step in 1...8 {
+            send(.leftMouseDragged, CGPoint(x: start.x + CGFloat(step) * 6, y: start.y))
+            wait(0.03)
+        }
+        wait(0.6)
+        try snapshot("editing-dragging")
+        send(.leftMouseUp, CGPoint(x: start.x + 48, y: start.y))
+        wait(0.5)
+
+        click(hideBadge(2))
+        wait(0.3)
+        try snapshot("editing-hidden")
+
+        for id in shown.dropFirst() { notch.registry.hideTab(id) }
+        wait(0.6)
+        XCTAssertEqual(shown.count, 1)
+        try snapshot("editing-one-tab")
+
+        for id in notch.registry.hidden.map({ $0.id }) { notch.registry.showTab(id) }
+        notch.model.isEditingTabs = false
+        notch.model.reduceMotion = true
+        wait(0.4)
+        longPress(tabCenter(0))
+        wait(0.3)
+        try snapshot("editing-reduce-motion")
+    }
+
+    private func wiggleViews(_ view: NSView? = nil) -> [WiggleView] {
+        guard let view = view ?? window.contentView else { return [] }
+        return ((view as? WiggleView).map { [$0] } ?? []) + view.subviews.flatMap { wiggleViews($0) }
+    }
+
+    /// Le tremblement est une animation Core Animation par icône, qui n'existe qu'en mode édition (rien à chaque
+    /// image côté app) ; aucune avec « Réduire les animations ».
+    func testWiggleExistsOnlyInEditMode() {
+        XCTAssertTrue(wiggleViews().isEmpty, "mode normal : aucune vue de tremblement")
+        longPress(tabCenter(0))
+        let views = wiggleViews()
+        XCTAssertEqual(views.count, shown.count, "une par onglet")
+        XCTAssertTrue(views.allSatisfy { $0.isWiggling }, "toutes tremblent")
+        notch.model.isEditingTabs = false
+        // La transition de sortie (ressort) dure moins d'une seconde.
+        let deadline = Date().addingTimeInterval(2)
+        while !wiggleViews().isEmpty, Date() < deadline { wait(0.05) }
+        XCTAssertTrue(wiggleViews().isEmpty, "sortie du mode : plus rien ne tremble")
+
+        notch.model.reduceMotion = true
+        wait(0.3)
+        longPress(tabCenter(0))
+        XCTAssertTrue(notch.model.isEditingTabs)
+        XCTAssertFalse(wiggleViews().contains { $0.isWiggling }, "« Réduire les animations » : pas de tremblement")
+    }
+
+    /// Diagnostic (`CLAUDE_NOTCH_FOOTPRINT`, mesures de temps non fiables en CI) : CPU de l'app avant, pendant et après
+    /// le mode édition. Mesuré en debug : 0 %, 3 à 4 % (une animation SwiftUI répétée prenait 100 %), 0 % une fois
+    /// passée la transition de sortie (moins d'une seconde, comme un changement d'onglet).
+    func testEditModeCPU() throws {
+        guard ProcessInfo.processInfo.environment["CLAUDE_NOTCH_FOOTPRINT"] != nil else {
+            throw XCTSkip("CLAUDE_NOTCH_FOOTPRINT non défini")
+        }
+        func cpu(during seconds: TimeInterval) -> Double {
+            let start = FootprintTests.sample().cpu
+            wait(seconds)
+            return (FootprintTests.sample().cpu - start) / seconds * 100
+        }
+        let before = cpu(during: 2)
+        longPress(tabCenter(0))
+        let editing = cpu(during: 2)
+        notch.model.isEditingTabs = false
+        wait(1.5)
+        let after = cpu(during: 2)
+        print(String(format: "EDIT CPU avant %.1f %%, en mode édition %.1f %%, après %.1f %%", before, editing, after))
+        XCTAssertLessThan(editing, 10, "tremblement hors du processus")
+        XCTAssertLessThan(after, before + 1, "rien ne reste après le mode")
     }
 
     func testDoneButtonLeaves() {
