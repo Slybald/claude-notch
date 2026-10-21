@@ -49,7 +49,8 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         PowerSourceInfo(name: "Magic Trackpad", kind: .accessory, percent: 95, isCharging: false),
     ]
 
-    /// Tout actif : caféine, économie d'énergie, Concentration, en charge, AirPods (et d'autres accessoires).
+    /// Tout actif : caféine, économie d'énergie, Concentration, en charge, AirPods (et d'autres accessoires),
+    /// ventilateurs en vitesse fixe (la carte la plus haute : son curseur en plus).
     private func busyFixture(extraAccessories: Int = 0) -> QuickSettingsFixture {
         let f = QuickSettingsFixture(self)
         f.power.lowPower = true
@@ -63,6 +64,9 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         f.module.startCaffeine(until: f.now.addingTimeInterval(72 * 60))
         f.module.applyScene(.autonomy)
         f.module.startCaffeine(until: f.now.addingTimeInterval(72 * 60))
+        f.fans.status = QSFakeFans.macBookPro(actual: 4183, cpu: 88.6, gpu: 61.2)
+        f.module.fans.read()
+        f.module.fans.setFixed(rpm: 4200)
         return f
     }
 
@@ -79,6 +83,7 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         f.bluetooth.power = nil
         f.power.supported = false
         f.battery.iops = []
+        f.fans.status = nil
         f.startAndShow()
         return f
     }
@@ -218,6 +223,25 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         narrowScene.harness.prefs.panelSize = .compact
         try render(narrowScene.root, name: "qs-narrow", to: outputDir)
 
+        // Ventilateurs : rendus à macOS par l'outil (température), et lecture seule (Mac Intel).
+        let notice = idleFixture()
+        notice.module.fans.setFixed(rpm: 3000)
+        notice.fans.say("auto temperature")
+        try render(scene(notice).root, name: "qs-fans-notice", to: outputDir)
+        let readOnly = QuickSettingsFixture(self)
+        readOnly.fans.status?.supportsManual = false
+        readOnly.startAndShow()
+        try render(scene(readOnly).root, name: "qs-fans-readonly", to: outputDir)
+        let narrowFans = scene(busyFixture())
+        narrowFans.harness.prefs.panelSize = .compact
+        try render(narrowFans.root, name: "qs-fans-fixed-narrow", to: outputDir)
+        let fanEars = QuickSettingsFixture(self)
+        fanEars.startAndShow()
+        fanEars.module.fans.setFixed(rpm: 4200)
+        let fanCollapsed = scene(fanEars, expanded: false)
+        fanCollapsed.registry.reconcile()
+        try render(fanCollapsed.root, name: "qs-collapsed-ears-fans", to: outputDir)
+
         // Oreilles de la notch repliée : caféine seule.
         let ears = QuickSettingsFixture(self)
         ears.startAndShow()
@@ -247,6 +271,16 @@ final class QuickSettingsSnapshotTests: XCTestCase {
         let view = SettingsView(prefs: harness.prefs, registry: registry, updater: Updater(),
                                 selection: .module("quicksettings"))
         try render(view, name: "qs-settings", to: outputDir, size: SettingsWindow.size, background: nil)
+
+        // Section « Ventilateurs » : outil absent, installé, d'une autre version.
+        for state in [FanAuthorizationState.notInstalled, .installed, .outdated] {
+            let fixture = idleFixture()
+            fixture.fans.authorization = state
+            fixture.module.fans.refreshAuthorization()
+            try render(QuickSettingsSettingsView(module: fixture.module, prefs: fixture.module.prefs),
+                       name: "qs-settings-fans-\(state)", to: outputDir,
+                       size: CGSize(width: SettingsWindow.size.width - 190, height: 1350), background: nil)
+        }
 
         // Section « Économie d'énergie » : mot de passe à chaque fois, autorisé, règle refusée.
         for (name, state) in [("none", LowPowerAuthorizationState.none), ("granted", .granted), ("refused", .refused)] {

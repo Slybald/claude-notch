@@ -40,13 +40,16 @@ final class SystemFans: FanBackend {
     private var thermals: Thermals?
     private let run: SystemProcess.Runner
     private let userName: () -> String
+    private let bundledHelper: URL?
     private var process: Process?
     private var input: FileHandle?
 
+    /// Les paramètres servent aux tests : aucun processus réel, un outil d'essai.
     init(run: @escaping SystemProcess.Runner = { SystemProcess.run($0, $1, timeout: $2) },
-         userName: @escaping () -> String = NSUserName) {
+         userName: @escaping () -> String = NSUserName, bundledHelper: URL? = FanAuthorization.bundledHelper()) {
         self.run = run
         self.userName = userName
+        self.bundledHelper = bundledHelper
     }
 
     func read(completion: @escaping (FanStatus?) -> Void) {
@@ -67,7 +70,6 @@ final class SystemFans: FanBackend {
         }
     }
 
-    private lazy var bundledHelper = FanAuthorization.bundledHelper()
     private lazy var bundledHash = bundledHelper.flatMap(FanAuthorization.sha256)
 
     var canInstall: Bool { bundledHash != nil }

@@ -24,7 +24,16 @@ if [ -e "$LOWPOWER_RULE" ]; then
     sudo /bin/rm -f "$LOWPOWER_RULE" || echo "Règle non retirée. Pour la retirer : sudo rm $LOWPOWER_RULE"
 fi
 
+# Outil des ventilateurs et sa règle sudo (Réglages rapides) : l'app quitte d'abord (sa tenue rend la main à
+# macOS), puis l'outil remet l'automatique une dernière fois avant d'être retiré.
+FAN_HELPER=/Library/PrivilegedHelperTools/io.github.slybald.claudenotch.fanctl
+FAN_RULE=/etc/sudoers.d/claude-notch-fans
 pkill -x ClaudeNotch 2>/dev/null || true
+if [ -e "$FAN_HELPER" ] || [ -e "$FAN_RULE" ]; then
+    echo "Outil des ventilateurs de Claude Notch trouvé : retrait avec sudo, ton mot de passe est demandé."
+    sudo /bin/sh -c "[ -x $FAN_HELPER ] && $FAN_HELPER auto; /bin/rm -f $FAN_RULE $FAN_HELPER" \
+        || echo "Outil non retiré. Pour le retirer : sudo rm $FAN_RULE $FAN_HELPER"
+fi
 for dir in /Applications "$HOME/Applications"; do
     if [ -d "$dir/ClaudeNotch.app" ]; then
         rm -rf "$dir/ClaudeNotch.app"

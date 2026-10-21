@@ -8,14 +8,17 @@ struct FanCard: View {
     /// Vitesse pendant un glissement du curseur (envoyée au relâchement seulement).
     @State private var dragRPM: Int?
 
+    /// Une seule ligne dans les deux modes (44 pt) : le panneau doit rester sous 460 pt. En vitesse fixe, le curseur
+    /// prend la place du détail, et un repère y montre la vitesse réelle.
     var body: some View {
         if let status = fans.status {
-            VStack(spacing: 7) {
-                HStack(spacing: 8) {
-                    icon
+            HStack(spacing: 8) {
+                icon
+                if case .fixed(let rpm) = fans.mode, let range = fans.range {
+                    speedControl(rpm: rpm, range: range, actual: status.fans.map(\.actual))
+                } else {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(verbatim: fans.isFixed ? L("Vitesse fixe", table: "QuickSettings")
-                            : L("Ventilateurs", table: "QuickSettings"))
+                        Text(verbatim: L("Ventilateurs", table: "QuickSettings"))
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundColor(Palette.primary)
                         Text(verbatim: fans.notice ?? QuickSettingsFormat.rpm(status.fans.map(\.actual)))
@@ -25,12 +28,9 @@ struct FanCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     Spacer(minLength: 6)
-                    temperatures(status.temperatures)
-                    action
                 }
-                if case .fixed(let rpm) = fans.mode, let range = fans.range {
-                    speedBar(rpm: rpm, range: range)
-                }
+                temperatures(status.temperatures)
+                action
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 7)
@@ -99,44 +99,53 @@ struct FanCard: View {
         .buttonStyle(PressStyle())
     }
 
-    /// Curseur de vitesse, par pas de 100 tr/min, borné au minimum et au maximum du Mac.
-    private func speedBar(rpm: Int, range: ClosedRange<Int>) -> some View {
+    /// « Vitesse fixe   4200 tr/min » et le curseur dessous, par pas de 100 tr/min, borné au minimum et au maximum
+    /// du Mac. Le petit trait blanc : la vitesse réelle (moyenne des ventilateurs).
+    private func speedControl(rpm: Int, range: ClosedRange<Int>, actual: [Double]) -> some View {
         let shown = dragRPM ?? rpm
         let span = Double(max(1, range.upperBound - range.lowerBound))
-        let fraction = Double(shown - range.lowerBound) / span
+        func position(_ value: Double) -> Double { min(1, max(0, (value - Double(range.lowerBound)) / span)) }
         func snap(_ value: Int) -> Int { min(max((value + 50) / 100 * 100, range.lowerBound), range.upperBound) }
-        return HStack(spacing: 8) {
-            Text(verbatim: String(range.lowerBound))
-                .frame(minWidth: 30, alignment: .trailing)
+        let average = actual.isEmpty ? Double(rpm) : actual.reduce(0, +) / Double(actual.count)
+        let value = String(format: L("%d tr/min", table: "QuickSettings"), shown)
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(verbatim: L("Vitesse fixe", table: "QuickSettings"))
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundColor(Palette.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(verbatim: value)
+                    .font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                    .foregroundColor(Palette.secondary)
+                    .fixedSize()
+            }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.15))
-                    Capsule().fill(Palette.accent).frame(width: max(6, proxy.size.width * fraction))
+                    Capsule().fill(Palette.accent).frame(width: max(6, proxy.size.width * position(Double(shown))))
+                    Capsule().fill(Color.white.opacity(0.9))
+                        .frame(width: 2, height: 8)
+                        .offset(x: max(0, proxy.size.width * position(average) - 1))
                 }
                 .frame(height: dragRPM == nil ? 4 : 6)
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let position = min(1, max(0, value.location.x / proxy.size.width))
-                        dragRPM = snap(range.lowerBound + Int(position * span))
+                    .onChanged { drag in
+                        let fraction = min(1, max(0, drag.location.x / proxy.size.width))
+                        dragRPM = snap(range.lowerBound + Int(fraction * span))
                     }
                     .onEnded { _ in
                         if let dragRPM { fans.setFixed(rpm: dragRPM) }
                         dragRPM = nil
                     })
             }
-            .frame(height: 12)
-            Text(verbatim: String(format: L("%d tr/min", table: "QuickSettings"), shown))
-                .foregroundColor(Palette.primary)
-                .frame(minWidth: 62, alignment: .trailing)
+            .frame(height: 10)
         }
-        .font(.system(size: 10, weight: .medium).monospacedDigit())
-        .foregroundColor(Palette.secondary)
-        .padding(.horizontal, 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Vitesse des ventilateurs", tableName: "QuickSettings"))
-        .accessibilityValue(Text(verbatim: String(format: L("%d tr/min", table: "QuickSettings"), shown)))
+        .accessibilityValue(Text(verbatim: value))
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: fans.setFixed(rpm: snap(rpm + 100))

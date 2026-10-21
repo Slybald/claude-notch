@@ -1,3 +1,4 @@
+import FanControl
 import Foundation
 import XCTest
 @testable import ClaudeNotch
@@ -176,6 +177,71 @@ final class QSFakeShortcuts: ShortcutBackend {
     }
 }
 
+/// Ventilateurs : lecture, outil et tenue simulés. `say` et `exit` jouent le rôle de l'outil.
+final class QSFakeFans: FanBackend {
+    var status: FanStatus? = QSFakeFans.macBookPro()
+    var authorization = FanAuthorizationState.installed
+    var canInstall = true
+    var installFailure: QuickSettingsFailure?
+    var uninstallFailure: QuickSettingsFailure?
+    var startSucceeds = true
+    var resetSucceeds = true
+    private(set) var reads = 0
+    private(set) var installs = 0
+    private(set) var uninstalls = 0
+    private(set) var resets = 0
+    private(set) var holds = 0
+    private(set) var endHolds = 0
+    private(set) var sent: [String] = []
+    /// Rappels de chaque tenue lancée, dans l'ordre.
+    private(set) var handlers: [(message: (String) -> Void, end: (Int32, String?) -> Void)] = []
+
+    /// Deux ventilateurs (2317…6800 tr/min, les bornes mesurées sur un MacBook Pro M3 Pro).
+    static func macBookPro(actual: Double = 2317, cpu: Double? = 62.4, gpu: Double? = 48.1) -> FanStatus {
+        FanStatus(fans: [FanReading(index: 0, actual: actual, minimum: 2317, maximum: 6800, target: actual, mode: 0),
+                         FanReading(index: 1, actual: actual + 3, minimum: 2317, maximum: 6800, target: actual, mode: 0)],
+                  temperatures: Thermals.Reading(cpu: cpu, gpu: gpu), supportsManual: true)
+    }
+
+    func read(completion: @escaping (FanStatus?) -> Void) { reads += 1; completion(status) }
+
+    func install(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+        installs += 1
+        if let installFailure { return completion(.failure(installFailure)) }
+        authorization = .installed
+        completion(.success(()))
+    }
+
+    func uninstall(completion: @escaping (Result<Void, QuickSettingsFailure>) -> Void) {
+        uninstalls += 1
+        if let uninstallFailure { return completion(.failure(uninstallFailure)) }
+        authorization = .notInstalled
+        completion(.success(()))
+    }
+
+    func startHold(onMessage: @escaping (String) -> Void, onEnd: @escaping (Int32, String?) -> Void) -> Bool {
+        holds += 1
+        guard startSucceeds else { return false }
+        handlers.append((onMessage, onEnd))
+        return true
+    }
+
+    func send(_ line: String) { sent.append(line) }
+    func endHold() { endHolds += 1 }
+
+    func resetToAutomatic(completion: @escaping (Bool) -> Void) {
+        resets += 1
+        completion(resetSucceeds)
+    }
+
+    /// L'outil de la dernière tenue (ou de la tenue `hold`) écrit une ligne.
+    func say(_ line: String, hold: Int? = nil) { handlers[hold ?? handlers.count - 1].message(line) }
+    /// L'outil de la dernière tenue s'arrête.
+    func exit(status: Int32 = 0, error: String? = nil, hold: Int? = nil) {
+        handlers[hold ?? handlers.count - 1].end(status, error)
+    }
+}
+
 /// Un module branché sur des doubles, des réglages jetables et une horloge réglable.
 final class QuickSettingsFixture {
     let wifi = QSFakeWiFi()
@@ -184,6 +250,7 @@ final class QuickSettingsFixture {
     let battery = QSFakeBattery()
     let caffeine = QSFakeCaffeine()
     let shortcuts = QSFakeShortcuts()
+    let fans = QSFakeFans()
     let defaults: UserDefaults
     /// Horloge et URL ouvertes : dans un objet à part, que le module garde en vie même si la fixture disparaît.
     private final class State {
@@ -212,7 +279,7 @@ final class QuickSettingsFixture {
 
     var backends: QuickSettingsBackends {
         QuickSettingsBackends(wifi: wifi, bluetooth: bluetooth, power: power, battery: battery,
-                              caffeine: caffeine, shortcuts: shortcuts)
+                              caffeine: caffeine, shortcuts: shortcuts, fans: fans)
     }
 
     /// Un deuxième module sur les mêmes réglages (relance de l'app).
