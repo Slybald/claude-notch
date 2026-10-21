@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [1.9.0] - 2026-10-21
+## [Unreleased]
 
 ### Added
 
@@ -21,6 +21,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   also in the **…** menu and the right-click menu of the notch, and VoiceOver can use it and turn the cylinder.
 - **Settings › General › Bubble**: *Allow detaching the notch* (on by default) and *Return to the notch at relaunch*.
   With "Reduce motion", the drop becomes a simple fade.
+
+## [1.9.0] - 2026-10-21
+
+### Added
+
 - **Approve with the keyboard.** A permission request from Claude Code or Codex can be settled without the mouse:
   **⌃⌥Y** allows, **⌃⌥N** denies the oldest waiting request, both agents in one queue ("1 of 3" on its card, the two keys
   shown on its buttons). Off by default (Settings › Claude and › Codex › *Approve with the keyboard*; it needs *Reply
