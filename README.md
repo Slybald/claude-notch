@@ -124,6 +124,10 @@ Open **…** › **Settings…** (⌘,).
 - **Screen**: the built-in display (the default), the main display, the display under the mouse, or a display
   picked by name. A screen without a notch gets a virtual one at the top center.
 - **Privacy**: hide the notch from screenshots and screen sharing. This depends on the app that captures the screen.
+- **Profile**: **Change Profile…** starts you from a profile (Developer, Student, Creative or Minimal): it shows
+  the tabs it will show and hide, the opening mode and the ears, and changes nothing until you confirm. Your tab
+  data and the hooks are never touched; hidden tabs come back from **Settings › Tabs**. The pane names the profile
+  that matches your tabs, or "Custom". See [docs/EDITIONS.md](docs/EDITIONS.md).
 - **Setup assistant**: **Run the Setup Assistant Again** goes through the first-launch steps again, starting from
   your current settings.
 - **Reset to defaults**, after a confirmation. Tabs, their data and the hooks are not changed.
@@ -156,7 +160,11 @@ these accesses one last time, then no longer.
 On first launch, a setup assistant lets you pick what you need, in four short steps. **Skip** is always there and
 changes nothing; nothing is written before you click **Apply**.
 
-1. **Welcome**: what the notch is.
+1. **Welcome and profile**: what the notch is, and an optional profile: Developer (Claude and Codex if found,
+   clipboard, timer, notes), Student (player and calendar, timer, notes, quick settings), Creative (player and
+   calendar, shelf, clipboard) or Minimal (player and calendar, quick settings). It ticks the tabs, sets how the
+   panel opens and the ears; the next steps start from it, and everything stays editable. Without a choice,
+   nothing changes.
 2. **Tabs**: one card per tab, tick the ones you want (at least one stays on). The Claude card is offered only when
    Claude Code is found on the Mac, and with it an unticked option to install the Claude Code hooks: they add
    Claude Notch's entries to `~/.claude/settings.json` (a timestamped backup is written next to it first, and your
@@ -542,6 +550,11 @@ Ouvre **…** › **Réglages…** (⌘,).
   nom. Un écran sans encoche reçoit une encoche virtuelle en haut au centre.
 - **Confidentialité** : masquer la notch des captures d'écran et du partage d'écran. Cela dépend de l'app qui capture
   l'écran.
+- **Profil** : **Changer de profil…** te fait partir d'un profil (Développeur, Étudiant, Créatif ou Minimal) : la
+  fenêtre montre les onglets affichés et masqués, l'ouverture et les oreilles, et ne change rien avant ta
+  confirmation. Les données des onglets et les hooks ne sont jamais touchés ; les onglets masqués reviennent depuis
+  **Réglages › Onglets**. Le volet nomme le profil qui correspond à tes onglets, ou « Personnalisé ». Voir
+  [docs/EDITIONS.md](docs/EDITIONS.md).
 - **Assistant de configuration** : **Relancer l'assistant de configuration** refait les étapes du premier lancement,
   en partant de tes réglages actuels.
 - **Rétablir les réglages par défaut**, après confirmation. Les onglets, leurs données et les hooks ne changent pas.
@@ -574,7 +587,11 @@ certificat, macOS redemande ces accès une dernière fois, puis plus jamais.
 Au premier lancement, un assistant de configuration te laisse choisir ce qui t'intéresse, en quatre courtes
 étapes. **Passer** est toujours possible et ne change rien ; rien n'est écrit avant **Appliquer**.
 
-1. **Bienvenue** : ce qu'est la notch.
+1. **Bienvenue et profil** : ce qu'est la notch, et un profil facultatif : Développeur (Claude et Codex s'ils sont
+   trouvés, presse-papiers, minuteur, notes), Étudiant (lecteur et calendrier, minuteur, notes, réglages rapides),
+   Créatif (lecteur et calendrier, étagère, presse-papiers) ou Minimal (lecteur et calendrier, réglages rapides). Il
+   coche les onglets, règle l'ouverture du panneau et les oreilles ; les étapes suivantes partent de lui et tout reste
+   modifiable. Sans choix, rien ne change.
 2. **Onglets** : une carte par onglet, coche ceux que tu veux (au moins un reste activé). La carte Claude n'est
    proposée que si Claude Code est sur le Mac, avec une option décochée pour installer les hooks de Claude Code :
    ils ajoutent les entrées de Claude Notch dans `~/.claude/settings.json` (une sauvegarde horodatée est faite à
