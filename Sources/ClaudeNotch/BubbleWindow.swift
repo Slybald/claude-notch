@@ -274,9 +274,7 @@ final class BubbleController {
             showBubble()
             return
         }
-        let reach = BubbleGeometry.detachDistance + BubbleGeometry.radius + 40
-        showGoo(covering: panel.union(notch).union(CGRect(x: handle.x - reach, y: handle.y - reach,
-                                                         width: 2 * reach, height: 2 * reach))) { local in
+        showGoo(covering: Self.pullCover(panel: panel, notch: notch, handle: handle)) { local in
             GooState(panel: local.body(panel), notch: local.body(notch), handle: local.point(handle),
                      drop: local.point(handle))
         }
@@ -334,9 +332,7 @@ final class BubbleController {
         let direction = length > 1 ? CGPoint(x: dx / length, y: dy / length) : CGPoint(x: 0, y: -1)
         let end = CGPoint(x: handle.x + direction.x * BubbleGeometry.detachDistance,
                           y: handle.y + direction.y * BubbleGeometry.detachDistance)
-        let reach = BubbleGeometry.detachDistance + BubbleGeometry.radius + 40
-        showGoo(covering: body.union(notch).union(CGRect(x: handle.x - reach, y: handle.y - reach,
-                                                        width: 2 * reach, height: 2 * reach))) { local in
+        showGoo(covering: Self.pullCover(panel: body, notch: notch, handle: handle)) { local in
             GooState(panel: local.body(body), notch: local.body(notch), handle: local.point(handle),
                      drop: local.point(handle), mode: .autoPull(start: Date(), to: local.point(end)))
         }
@@ -392,9 +388,8 @@ final class BubbleController {
     /// Montre la goutte sous la notch, sur `rect` (coordonnées écran) prolongé jusqu'au-dessus de l'écran.
     private func showGoo(covering rect: CGRect, state: (GooCoordinates) -> GooState) {
         gooGeneration += 1
-        let top = (NSScreen.screens.first { $0.frame.intersects(rect) }?.frame.maxY ?? rect.maxY) + Self.gooOverflow
-        let frame = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: max(top, rect.maxY) - rect.minY)
-            .integral
+        let frame = Self.gooFrame(covering: rect,
+                                  screenTop: NSScreen.screens.first { $0.frame.intersects(rect) }?.frame.maxY)
         let panel = gooWindow ?? makeGooWindow()
         // Couleur relue à chaque goutte : le fond des réglages a pu changer.
         (panel.contentView as? NSHostingView<GooView>)?.rootView = GooView(goo: goo, color: prefs.panelColor)
@@ -406,6 +401,19 @@ final class BubbleController {
         } else {
             panel.orderFrontRegardless()
         }
+    }
+
+    /// Ce que la goutte d'un décollage couvre : le panneau, la notch et la portée du glisser autour de la poignée.
+    static func pullCover(panel: CGRect, notch: CGRect, handle: CGPoint) -> CGRect {
+        let reach = BubbleGeometry.detachDistance + BubbleGeometry.radius + 40
+        return panel.union(notch).union(CGRect(x: handle.x - reach, y: handle.y - reach, width: 2 * reach,
+                                               height: 2 * reach))
+    }
+
+    /// Fenêtre de la goutte : `rect` prolongé jusqu'au-dessus du haut de l'écran.
+    static func gooFrame(covering rect: CGRect, screenTop: CGFloat?) -> CGRect {
+        let top = (screenTop ?? rect.maxY) + gooOverflow
+        return CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: max(top, rect.maxY) - rect.minY).integral
     }
 
     private func makeGooWindow() -> GooPanel {
