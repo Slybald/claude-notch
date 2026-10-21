@@ -73,6 +73,8 @@ struct SetupChoices: Equatable {
     var toggleHotKey: HotKeyChoice
     var launchAtLogin: Bool
     var installHooks: Bool
+    /// Profil pris à la première étape ; nil = pas de profil, les onglets restent comme ils sont.
+    private(set) var profile: NotchProfile?
 
     /// `isEnabled` : l'état actuel des onglets (au premier lancement, leur activation par défaut, avec Claude décidé
     /// par la détection). Au moins un onglet reste coché, comme dans Réglages › Onglets et dans la notch.
@@ -91,8 +93,11 @@ struct SetupChoices: Equatable {
 
     var claudeOffered: Bool { offered.contains(ModuleRegistry.claudeId) }
     var includesClaude: Bool { tabs.contains(ModuleRegistry.claudeId) }
-    /// Onglets cochés, dans l'ordre des réglages.
-    var selected: [String] { offered.filter(tabs.contains) }
+    /// Onglets cochés, dans l'ordre des réglages (celui du profil, s'il y en a un).
+    var selected: [String] {
+        let on = offered.filter(tabs.contains)
+        return profile?.arrange(on) ?? on
+    }
 
     func isOn(_ id: String) -> Bool { tabs.contains(id) }
 
@@ -109,12 +114,24 @@ struct SetupChoices: Equatable {
         return true
     }
 
-    /// Écrit les onglets (par le registre, comme Réglages › Onglets), l'ouverture et le raccourci. Un onglet non
-    /// proposé (Claude sans Claude Code) n'est pas touché.
+    /// Prend un profil : ses onglets proposés cochés, les autres décochés, et son ouverture. Rien n'est écrit avant
+    /// « Appliquer » ; les onglets et l'ouverture se règlent ensuite à la main.
+    mutating func choose(_ profile: NotchProfile) {
+        self.profile = profile
+        tabs = Set(profile.shown(offered: offered))
+        openTrigger = profile.openTrigger
+    }
+
+    /// Écrit les onglets (par le registre, comme Réglages › Onglets), l'ouverture et le raccourci, puis l'ordre et
+    /// les oreilles du profil choisi. Un onglet non proposé (Claude sans Claude Code) n'est pas touché.
     func apply(to registry: ModuleRegistry, prefs: Preferences) {
         for id in offered { registry.setEnabled(id, tabs.contains(id)) }
         prefs.openTrigger = openTrigger
         prefs.toggleHotKey = toggleHotKey
+        if let profile {
+            prefs.tabOrder = ProfilePlan.order(shown: selected, current: registry.ordered.map { $0.id })
+            prefs.showEars = profile.showEars
+        }
     }
 }
 
@@ -168,7 +185,15 @@ final class SetupAssistantModel: ObservableObject {
     }
 
     /// Les cartes cochées, dans l'ordre (aperçu de la notch).
-    var selectedTabs: [SetupTab] { tabs.filter { choices.isOn($0.id) } }
+    var selectedTabs: [SetupTab] { choices.selected.compactMap { id in tabs.first { $0.id == id } } }
+
+    func choose(_ profile: NotchProfile) { choices.choose(profile) }
+
+    /// Les onglets que `profile` affichera ici (Claude seulement s'il est proposé), séparés par des virgules.
+    func summary(of profile: NotchProfile) -> String {
+        profile.shown(offered: choices.offered).compactMap { id in tabs.first { $0.id == id }?.title }
+            .joined(separator: ", ")
+    }
 
     var claudeOffered: Bool { choices.claudeOffered }
     var canGoBack: Bool { step == .tabs || step == .behavior }
@@ -261,23 +286,34 @@ struct SetupAssistantView: View {
     // MARK: Étapes
 
     private var welcome: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Spacer(minLength: 0)
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Palette.accent.opacity(0.16))
-                Image(systemName: "rectangle.topthird.inset.filled")
-                    .font(.system(size: 26, weight: .medium))
-                    .foregroundColor(Palette.accent)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Palette.accent.opacity(0.16))
+                    Image(systemName: "rectangle.topthird.inset.filled")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(Palette.accent)
+                }
+                .frame(width: 44, height: 44)
+                header(L("Bienvenue dans Claude Notch"),
+                       L("Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, "
+                         + "presse-papiers et plus encore."))
             }
-            .frame(width: 56, height: 56)
-            header(L("Bienvenue dans Claude Notch"),
-                   L("Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, "
-                     + "presse-papiers et plus encore."))
             Text("En trois étapes, choisis ce qui t'intéresse. Tu pourras tout changer ensuite.")
                 .font(.system(size: 12.5))
                 .foregroundColor(Palette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: L("Pour commencer, un profil (facultatif)", table: "Profiles"))
+                    .font(.system(size: 12, weight: .semibold))
+                ForEach(NotchProfile.allCases) { profile in
+                    SetupProfileCard(profile: profile, summary: model.summary(of: profile),
+                                     isOn: model.choices.profile == profile) {
+                        model.choose(profile)
+                    }
+                }
+            }
             SetupNotchPreview(tabs: model.selectedTabs)
             if !model.inApplications { ApplicationsWarning() }
             Spacer(minLength: 0)
