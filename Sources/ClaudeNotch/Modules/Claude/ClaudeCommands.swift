@@ -10,7 +10,7 @@ extension ClaudeModule {
     }
 
     func commands(for query: CommandQuery) -> [NotchCommand] {
-        guard query.verb == ">" else { return [] }
+        guard prefs.replyFromNotch, query.verb == ">" else { return [] }
         let sessions = store.sortedSessions.filter { $0.phase != .ended && !replies.headless.contains($0.id) }
         guard !sessions.isEmpty else {
             return [NotchCommand(id: "claude.none", symbol: "moon.zzz", title: L("Aucune session à qui écrire", table: "Command"),

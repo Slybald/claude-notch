@@ -17,7 +17,9 @@ enum CommandDuration {
         guard let number = group(1).flatMap({ Int($0) }) else { return nil }
         let total: Int
         if group(2) != nil {
-            total = number * 60 + (group(3).flatMap { Int($0) } ?? 0)
+            let extra = group(3).flatMap { Int($0) } ?? 0
+            guard extra < 60 else { return nil }
+            total = number * 60 + extra
         } else if group(4) != nil || allowBare {
             total = number
         } else {

@@ -39,7 +39,6 @@ struct CommandBarView: View {
         .frame(width: prefs.expandedWidth(compact: false), alignment: .top)
         .onAppear {
             model.onFinish = close
-            model.reset()
         }
         .onChange(of: model.results.map(\.id)) { _ in announce(resultsSummary) }
         .onChange(of: model.selection) { _ in announce(selectedSummary) }

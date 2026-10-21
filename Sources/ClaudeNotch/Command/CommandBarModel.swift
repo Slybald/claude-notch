@@ -152,6 +152,7 @@ final class CommandBarModel: ObservableObject {
     var onFinish: () -> Void = {}
     private var rewriting = false
 
+    /// Une barre neuve à chaque ouverture : champ vide, sans verbe.
     init(modules: @escaping () -> [any NotchModule]) {
         self.modules = modules
         refreshVerbs()
@@ -159,16 +160,6 @@ final class CommandBarModel: ObservableObject {
 
     var query: CommandQuery {
         CommandQuery(verb: verb?.key, argument: text.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    /// Champ vide, sans verbe : la barre vient de s'ouvrir.
-    func reset() {
-        rewriting = true
-        text = ""
-        rewriting = false
-        verb = nil
-        refreshVerbs()
-        refresh()
     }
 
     /// Pastille touchée : le verbe s'ajoute à ce qui est tapé ; touchée à nouveau, il s'en va.
