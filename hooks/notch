@@ -75,13 +75,13 @@ send() {
         CODE=$(curl -q -s --noproxy '*' --path-as-is --connect-timeout 1 --max-time 5 \
             -o "$OUT" -w '%{http_code}' -X "$1" -H @"$TOKEN" "$URL$2")
     fi
-    STATUS=$?
+    CURL_STATUS=$?
     REPLY_BODY=$(cat "$OUT")
     rm -f "$OUT"
     case "$CODE" in
     2??) return 0 ;;
     esac
-    if [ "$STATUS" -ne 0 ]; then
+    if [ "$CURL_STATUS" -ne 0 ]; then
         MESSAGE="Claude Notch is not running."
     else
         MESSAGE=$(printf '%s' "$REPLY_BODY" | sed -n 's/.*"message":"\(.*\)".*/\1/p')
@@ -172,7 +172,7 @@ run)
     # Ctrl-C arrête la commande (même groupe de processus) ; le shell attend sa fin puis affiche la croix.
     trap ':' INT TERM
     "$@"
-    STATUS=$?
+    RESULT=$?
     trap - INT TERM
     ELAPSED=$(($(date +%s) - START))
     if [ "$ELAPSED" -lt 60 ]; then
@@ -182,15 +182,15 @@ run)
     else
         TEXT=$(printf '%dh%02d' $((ELAPSED / 3600)) $((ELAPSED % 3600 / 60)))
     fi
-    if [ "$STATUS" -eq 0 ]; then
+    if [ "$RESULT" -eq 0 ]; then
         ICON=checkmark.circle.fill COLOR=green DETAIL=
     else
-        ICON=xmark.circle.fill COLOR=red DETAIL="exit code $STATUS"
+        ICON=xmark.circle.fill COLOR=red DETAIL="exit code $RESULT"
     fi
     TTL=60
     body
     [ -z "$NOTIFY" ] || send POST "" "$BODY" || :
-    exit "$STATUS"
+    exit "$RESULT"
     ;;
 help | -h | --help)
     usage
