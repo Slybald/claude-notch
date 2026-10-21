@@ -47,7 +47,7 @@ master, `-crf 17` pour le 1080p, `-movflags +faststart`.
 | `notch-promo-9x16.mp4` | 1080 × 1920 : mise en page verticale refaite, pas un zoom |
 | `notch-promo-9x16-4k.mp4` | 2160 × 3840 (master) |
 | `*-fr.mp4` | mêmes fichiers, textes en français |
-| `../docs/media/claude-notch.gif` | boucle de 28,95 s pour le README, 16 i/s, 960 × 540 (versionnée, moins de 5 Mo) |
+| `../docs/media/claude-notch.gif` | boucle de 22,6 s pour le README, 12 i/s, 672 × 378, 48 couleurs sans tramage, 4,4 Mo (versionnée, moins de 5 Mo : la caméra change chaque image) |
 
 `out/` et `tmp/` ne sont pas versionnés. La vidéo MP4 s'arrête sur la carte finale (image 1321) ; le GIF va jusqu'à
 l'image 1357, où la notch redevient fermée, pour que la boucle soit sans saut. **Rendre la v4 avec `--gl=angle`**

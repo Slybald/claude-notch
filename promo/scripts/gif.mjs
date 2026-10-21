@@ -1,4 +1,4 @@
-// GIF du README : node scripts/gif.mjs [--lang=en] [--fps=20] [--scale=0.5] [--gl=angle] → ../docs/media/claude-notch[-fr].gif (moins de 5 Mo)
+// GIF du README : node scripts/gif.mjs [--lang=en] [--fps=12] [--scale=0.35] [--colors=48] [--dither=none] [--gl=angle] → ../docs/media/claude-notch[-fr].gif (moins de 5 Mo)
 // C'est la boucle complète de la v4 en 16:9 (retour à la notch fermée), pas la vidéo coupée sur la carte finale.
 import fs from "node:fs";
 import path from "node:path";
@@ -9,9 +9,11 @@ import { root } from "./lib.mjs";
 
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `=${d}`).split("=")[1];
 const lang = arg("lang", "en");
-const fps = Number(arg("fps", 16));
-const scale = Number(arg("scale", 0.5));
-const colors = Number(arg("colors", 96));
+const fps = Number(arg("fps", 12));
+const scale = Number(arg("scale", 0.35));
+const colors = Number(arg("colors", 48));
+// v4 : la caméra change chaque image ; sans tramage le GIF tient sous 5 Mo sans bandes visibles (aplats, ombres douces).
+const dither = arg("dither", "none");
 const inputProps = { format: "wide", lang };
 
 await ensureBrowser();
@@ -32,7 +34,7 @@ const run = (a) => {
 };
 // Palette adaptée au contenu : fond gris clair, aplats noirs, un peu d'orange.
 run(["-i", mp4, "-vf", `fps=${fps},palettegen=max_colors=${colors}:stats_mode=diff`, palette]);
-run(["-i", mp4, "-i", palette, "-lavfi", `fps=${fps}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`, "-loop", "0", gif]);
+run(["-i", mp4, "-i", palette, "-lavfi", `fps=${fps}[x];[x][1:v]paletteuse=dither=${dither}:diff_mode=rectangle`, "-loop", "0", gif]);
 const kb = Math.round(fs.statSync(gif).size / 1024);
 console.log("→", path.relative(path.join(root, ".."), gif), `${kb} Ko`);
 if (kb > 5000) console.error("Trop lourd (> 5 Mo) : baisser --fps, --scale ou --colors.");

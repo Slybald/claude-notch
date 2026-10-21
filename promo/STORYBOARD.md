@@ -32,8 +32,9 @@ l'amplitude, la continuité et la caméra.
    pour révéler (ouverture du panneau, fichier pris hors du panneau, notch repliée). Ressort ζ 0,9, ω 11 rad/s, mesuré
    sur les caméras des références. Tant que le panneau est ouvert, ses bords bornent le cadrage (jamais de vide à côté
    d'un gros plan) ; la notch reste accrochée au haut du cadre quand la caméra vise haut. La roue et les mentions ne
-   bougent pas avec elle (calque au-dessus). En 9:16 le panneau remplit déjà la largeur : poussées réduites à 30 %,
-   sauf l'accroche.
+   bougent pas avec elle (calque au-dessus). En 9:16 le panneau n'est qu'une bande en haut du cadre et son texte n'y fait
+   que 1 % de la hauteur : les gros plans y servent autant la lecture que le mouvement (poussées à 85 % de celles
+   du 16:9, rognage latéral assumé, toujours borné aux bords du panneau).
 3. **Fouetté et flou de vitesse** : au changement d'onglet, l'ancien contenu part du côté opposé et le nouveau arrive
    du côté de l'onglet choisi (avec flou) ; sur les mouvements rapides (pointe des grands mouvements de caméra, au-delà de 20 px par image, fouettés,
    chute de la notch, carte, lien), chaque image est la moyenne de 8 instants sur une demi-image.
@@ -67,5 +68,25 @@ Temps v4 (s). Le contenu de chaque plan est celui de la v3, au même ordre.
 
 ## Vérification
 
-`analyze.py` (même outil que pour les références) sur le rendu 1080p : voir la PR pour le tableau avant / après.
-Images regardées : planches contact 16:9 et 9:16, images isolées en pleine résolution (flou de vitesse, cadrage).
+Mesures refaites avec le même outil que pour les références, sur les rendus 1080p anglais (cibles : immobile ≤ 8 %,
+aucune tenue au-delà de 0,6 s hors carte finale, intensité ≥ 0,35 diag/s, accroche avant 0,5 s) :
+
+| Mesure | Références | v3 16:9 | **v4 16:9** | v3 9:16 | **v4 9:16** |
+|---|---|---|---|---|---|
+| Temps immobile | 0,2 – 10,5 % | 32,9 % | **6,7 %** | 31,6 % | **9,9 %** |
+| Tenue la plus longue | 0 – 0,58 s | 1,03 s | **0,6 s** | 1,8 s | **1,0 s** (carte finale) |
+| Intensité d'un temps fort | 0,37 – 0,82 diag/s | 0,20 | **0,69** | 0,07 | **0,22** |
+| Flux optique moyen | 0,08 – 0,17 diag/s | 0,056 | **0,20** | 0,029 | **0,092** |
+| Plan médian | 0,92 – 2,18 s | 2,98 s | **0,5 s** | 2,17 s | **1,31 s** |
+| Accents par seconde | 0,54 – 1,45 | 0,78 | **1,32** | 0,89 | **1,73** |
+| Premier accent | 0,25 – 1,68 s | 1,28 s | **0,23 s** | 1,28 s | **0,33 s** |
+| Caméra | 0 – 2,2 s | 0 | **1,9 s** (6 zooms) | 0 | **0,4 s** |
+
+Le 16:9 atteint toutes les cibles et dépasse même la plus dynamique des références sur le flux et le nombre de
+changements de scène. Le 9:16 gagne autant en continuité (immobile divisé par trois) mais reste moins intense : le
+panneau n'y occupe qu'une bande en haut du cadre (mise en page de la v3), les gros plans ne peuvent pas le remplir
+sans trop rogner. Seul écart commun : la « vitesse de pointe des éléments » (0,35 – 0,46 diag/s, références 0,7 – 1,85),
+parce que le grand mouvement de la v4 est celui de la caméra et non des éléments eux-mêmes.
+
+Images regardées : planches contact 16:9 et 9:16, images isolées en pleine résolution (flou de vitesse, cadrage, texte
+français), première et dernière image du GIF (boucle sans saut).

@@ -114,8 +114,9 @@ type Target = { at4: number; s: number; x: number; y: number };
 
 function targetsFor(format: Format3, L: Layout3, keys: Key[]): Target[] {
   const left = L.cx - (644 * L.S) / 2;
-  // En 9:16 le panneau remplit déjà la largeur : poussées réduites (sauf l'accroche sur la notch repliée).
-  const k = (i: number) => (format === "wide" || i < 2 ? 1 : 0.3);
+  // En 9:16 le panneau n'est qu'une bande en haut du cadre et son texte y fait 1 % de la hauteur : les gros plans
+  // servent autant la lecture que le mouvement (presque les mêmes poussées qu'en 16:9).
+  const k = (i: number) => (format === "wide" || i < 2 ? 1 : 0.85);
   const out = SHOTS.map((c, i) => {
     const next = keys.find((q) => q.arrive >= c.at) ?? keys[keys.length - 1];
     return { at4: v4Of(c.at), s: 1 + (c.s - 1) * k(i), x: c.x === "cursor" ? next.x : left + c.x * L.S, y: c.y * L.S };
@@ -124,6 +125,8 @@ function targetsFor(format: Format3, L: Layout3, keys: Key[]): Target[] {
   const wl = L.cx - (WINDOW_W * L.win.S) / 2;
   out.push({ at4: v4Of(24.0), s: 1 + 0.25 * k(99), x: wl + 328 * L.win.S, y: L.win.top + 270 * L.win.S });
   out.push({ at4: v4Of(24.85), s: 1, x: L.cx, y: L.h / 2 });
+  // Boucle du GIF (après la fin de la vidéo) : retour au gros plan de l'accroche, pour une boucle sans saut.
+  out.push({ ...out[0], at4: v4Of(T.ret) });
   return out;
 }
 
