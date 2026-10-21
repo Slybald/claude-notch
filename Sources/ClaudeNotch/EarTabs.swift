@@ -156,13 +156,6 @@ enum EarTabs {
         if mode == .retracted && !tab.isAlert { return sliverWidth }
         return rank == 0 || tab.isAlert ? tab.restWidth : min(tab.restWidth, sliceWidth)
     }
-
-    /// Hauteur d'un intercalaire au repos : celui qui touche la notch a exactement sa hauteur (aucune marche entre elles),
-    /// puis un cran de moins que le précédent en s'éloignant (escalier).
-    static func height(rank: Int, notchHeight: CGFloat) -> CGFloat {
-        let step: CGFloat = notchHeight >= 30 ? 3 : 2
-        return notchHeight - step * CGFloat(rank)
-    }
 }
 
 /// Géométrie des intercalaires de la notch repliée, sans vue ni fenêtre : la vue la dessine, le contrôleur en tire
@@ -185,10 +178,8 @@ struct EarTabsLayout: Equatable {
         let inner: CGFloat
         /// Largeur de la tranche visible : le reste de l'intercalaire glisse sous celui qui le précède.
         let width: CGFloat
+        /// Toujours la hauteur de la notch : tous alignés avec elle, même haut, même bas, base continue.
         let height: CGFloat
-        /// Hauteur de ce qui le précède (la notch pour le rang 0) : un intercalaire déployé ne peut pas arrondir son
-        /// coin intérieur au-dessus.
-        let previousHeight: CGFloat
 
         var id: String { tab.id }
         /// Sens du bord extérieur : −1 à gauche, +1 à droite.
@@ -227,13 +218,10 @@ struct EarTabsLayout: Equatable {
         let placed = EarTabs.distribute(tabs)
         func build(_ tabs: [EarTab], _ side: Side) -> [Item] {
             var inner = notch.width / 2
-            var previousHeight = notch.height
             return tabs.enumerated().map { rank, tab in
                 let width = EarTabs.slice(of: tab, rank: rank, mode: mode)
-                let height = EarTabs.height(rank: rank, notchHeight: notch.height)
-                defer { inner += width; previousHeight = height }
-                return Item(tab: tab, side: side, rank: rank, inner: inner, width: width, height: height,
-                            previousHeight: previousHeight)
+                defer { inner += width }
+                return Item(tab: tab, side: side, rank: rank, inner: inner, width: width, height: notch.height)
             }
         }
         left = build(placed.left, .left)
@@ -281,7 +269,7 @@ struct EarTabsLayout: Equatable {
         for item in items {
             if item.id == hovered,
                Self.contains(cardFrame(item, height: cardHeight), point, side: item.side, outerRadius: EarTabs.cardRadius,
-                             innerRadius: cardInnerRadius(item, height: cardHeight)) {
+                             innerRadius: cardInnerRadius(height: cardHeight)) {
                 return .tab(item.id)
             }
             if Self.contains(item.bodyFrame, point, side: item.side, outerRadius: EarTabs.restRadius, innerRadius: 0) {
@@ -291,10 +279,10 @@ struct EarTabsLayout: Equatable {
         return .none
     }
 
-    /// Rayon du coin intérieur bas d'un intercalaire déployé : pas plus haut que ce qui dépasse sous celui qui le précède
-    /// (la notch pour le rang 0), sinon il laisse un jour contre lui.
-    func cardInnerRadius(_ item: Item, height: CGFloat) -> CGFloat {
-        min(EarTabs.cardRadius, max(0, max(height, notch.height) - item.previousHeight))
+    /// Rayon du coin intérieur bas d'un intercalaire déployé : pas plus haut que ce qui dépasse sous la notch et les
+    /// intercalaires, qui ont sa hauteur, sinon il laisse un jour contre eux.
+    func cardInnerRadius(height: CGFloat) -> CGFloat {
+        min(EarTabs.cardRadius, max(0, height - notch.height))
     }
 
     /// Dans `rect` (bords inclusifs), sans les coins bas arrondis (rayon 0 : coin droit).

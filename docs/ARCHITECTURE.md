@@ -161,14 +161,15 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   - **Geometry** (`EarTabsGeometryTests`, measured on the rendered silhouette against the physical notch): the collapsed
     shape on a real notch has no top flares (`topRadius` 0), so it is exactly `notchRect` (185 × 32 pt on the 14" built-in
     display: screen width − the two auxiliary areas) and `contentSize` equals the notch; the 6 pt flares are kept only on
-    the virtual notch and once expanded. The tab against the notch has exactly its height (no step), its rank-0 `overlap`
-    runs down to the notch's bottom so no gap is left in the notch's rounded bottom corners, and the deployed card's inner
-    corner radius never starts above the bottom of what precedes it (`EarTabsLayout.cardInnerRadius`: the notch for rank 0,
-    the tab above for the others).
+    the virtual notch and once expanded. Every tab, at every rank, has exactly the notch's height (same top, same bottom, a
+    continuous base: no staircase, no vertical offset, at rest or deployed; the stack overlaps horizontally only), the
+    `overlap` of rank 0 runs down to the notch's bottom so no gap is left in the notch's rounded bottom corners, and the
+    deployed card's inner corner radius never starts above that bottom (`EarTabsLayout.cardInnerRadius`). The rendered base
+    is measured across the whole fan (`testFanBaseIsContinuousAndFlushWithTheNotch`): covered at the notch's bottom,
+    nothing under it (so no drop shadow at rest: the shadow of the covering tab is a gradient inside the slice).
   - **Look** (`EarTabViews.swift`): a fan, like cards spread on a table. Each tab is its own shape (rounded outer
-    bottom corner) drawn in the notch's black, the first as tall as the notch, then one step shorter than the previous one
-    going outwards (a staircase, `EarTabs.height`), with a discreet accent per activity (`EarTabs.accentHex`: Claude takes
-    the accent of the settings). Rank 0 (against the notch) is on top; the body of every other tab slides under the
+    bottom corner) drawn in the notch's black and as tall as the notch, with a discreet accent per activity
+    (`EarTabs.accentHex`: Claude takes the accent of the settings). Rank 0 (against the notch) is on top; the body of every other tab slides under the
     previous one (`EarTabs.overlap`) and only its **slice** shows (`EarTabsLayout.Item.width`, see `EarTabs.slice(of:rank:mode:)`;
     `frame` is the slice, `bodyFrame` the whole tab). Stacking is `zIndex(-rank)`; a thin light edge (`EarTabEdge`), a soft
     shadow and a slight lightening per rank make the overlap readable (rank 0 keeps the notch's pure black). Setting

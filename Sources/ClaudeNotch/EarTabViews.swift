@@ -55,11 +55,13 @@ struct EarTabEdge: Shape {
     func path(in rect: CGRect) -> Path {
         let r = max(0, min(radius, rect.width / 2, rect.height))
         let s: CGFloat = side == .left ? 1 : -1
-        let o = side == .left ? rect.minX : rect.maxX
+        // Rentré d'un demi-point : le trait (1 pt) reste entièrement dans la forme, rien ne dépasse sous la base.
+        let o = (side == .left ? rect.minX : rect.maxX) + s * 0.5
+        let bottom = rect.maxY - 0.5
         var path = Path()
         path.move(to: CGPoint(x: o, y: rect.minY))
-        path.addLine(to: CGPoint(x: o, y: rect.maxY - r))
-        path.addQuadCurve(to: CGPoint(x: o + s * r, y: rect.maxY), control: CGPoint(x: o, y: rect.maxY))
+        path.addLine(to: CGPoint(x: o, y: bottom - r))
+        path.addQuadCurve(to: CGPoint(x: o + s * r, y: bottom), control: CGPoint(x: o, y: bottom))
         return path
     }
 }
@@ -162,9 +164,9 @@ private struct EarTabItemView: View {
         // Filet clair sur le bord extérieur : sépare la tranche de celle qu'elle recouvre. Déployé, la carte n'en a pas.
         .overlay(EarTabEdge(side: item.side, radius: EarTabs.restRadius)
             .stroke(Color.white.opacity(isHovered ? 0 : 0.16), lineWidth: 1))
-        // Ombre portée sur la tranche d'en dessous (au repos) ou sur la pile (déployé).
-        .shadow(color: .black.opacity(isHovered ? 0.5 : 0.55), radius: isHovered ? 7 : 2.5,
-                x: item.outward * (isHovered ? 2 : 1.5), y: isHovered ? 3 : 1)
+        // Déployé, la carte se détache de la pile par une ombre. Au repos, aucune ombre ne dépasse sous la base : celle de la
+        // tranche qui recouvre est dans `rest`, à l'intérieur de la tranche.
+        .shadow(color: .black.opacity(isHovered ? 0.5 : 0), radius: 7, x: item.outward * 2, y: 3)
         .contentShape(shape)
         .accessibilityElement(children: isHovered ? .contain : .ignore)
         .accessibilityLabel(accessibilityLabel)
@@ -175,8 +177,8 @@ private struct EarTabItemView: View {
 
     private var shape: EarTabShape {
         EarTabShape(side: item.side, outerRadius: isHovered ? EarTabs.cardRadius : EarTabs.restRadius,
-                    innerRadius: isHovered ? layout.cardInnerRadius(item, height: cardHeight) : 0, overlap: overlap,
-                    overlapHeight: isHovered ? item.previousHeight : item.height)
+                    innerRadius: isHovered ? layout.cardInnerRadius(height: cardHeight) : 0, overlap: overlap,
+                    overlapHeight: item.height)
     }
 
     // MARK: Au repos
@@ -205,6 +207,15 @@ private struct EarTabItemView: View {
             }
         }
         .frame(width: item.width, height: item.height)
+        // L'ombre de l'intercalaire qui recouvre : dans la tranche, sans rien qui dépasse sous la base.
+        .overlay(alignment: item.side == .left ? .trailing : .leading) {
+            if item.rank > 0 {
+                LinearGradient(colors: [.black.opacity(0.55), .clear],
+                               startPoint: item.side == .left ? .trailing : .leading,
+                               endPoint: item.side == .left ? .leading : .trailing)
+                    .frame(width: min(8, item.width))
+            }
+        }
         .transition(.opacity)
     }
 

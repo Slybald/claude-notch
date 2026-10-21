@@ -76,14 +76,6 @@ final class EarTabsFanTests: XCTestCase {
         }
     }
 
-    func testPreviousHeightFollowsTheStack() {
-        let fan = layout(6)
-        for side in [fan.left, fan.right] {
-            XCTAssertEqual(side[0].previousHeight, notch.height)
-            for (near, far) in zip(side, side.dropFirst()) { XCTAssertEqual(far.previousHeight, near.height) }
-        }
-    }
-
     // MARK: - Pile et zones de survol
 
     /// Du dessus vers le dessous : un point qui tombe sur deux corps est au premier de la pile (le plus près de la notch) ;
@@ -96,9 +88,9 @@ final class EarTabsFanTests: XCTestCase {
         XCTAssertTrue(below.bodyFrame.contains(underTop) || top.bodyFrame.contains(underTop))
         XCTAssertEqual(fan.hit(CGPoint(x: top.frame.minX + 3, y: 5), hovered: nil, cardHeight: 0), .tab(top.id))
         // Le coin bas extérieur arrondi du premier : vide s'il est seul, le corps du deuxième s'y voit.
-        let corner = CGPoint(x: top.frame.minX + 0.4, y: below.height - 0.4)
-        XCTAssertEqual(fan.hit(corner, hovered: nil, cardHeight: 0), .tab(below.id))
-        XCTAssertEqual(layout(2).hit(CGPoint(x: layout(2).left[0].frame.minX + 0.4, y: below.height - 0.4),
+        let corner = CGPoint(x: top.frame.minX + 0.4, y: top.height - 0.4)
+        XCTAssertEqual(fan.hit(corner, hovered: nil, cardHeight: 0), .tab(below.id), "même hauteur : il comble le coin")
+        XCTAssertEqual(layout(2).hit(CGPoint(x: layout(2).left[0].frame.minX + 0.4, y: top.height - 0.4),
                                      hovered: nil, cardHeight: 0), .none)
         // Sa tranche, elle, est à lui.
         XCTAssertEqual(fan.hit(CGPoint(x: below.frame.midX, y: 5), hovered: nil, cardHeight: 0), .tab(below.id))
@@ -168,23 +160,37 @@ final class EarTabsFanTests: XCTestCase {
         }
     }
 
-    /// Le coin intérieur d'une carte ouverte ne commence pas au-dessus de ce qui la précède : jamais de jour contre lui.
-    func testCardInnerRadiusStaysBelowThePreviousTab() {
+    /// Le coin intérieur d'une carte ouverte ne commence pas au-dessus du bas de la notch (et des intercalaires, qui ont sa
+    /// hauteur) : jamais de jour contre eux.
+    func testCardInnerRadiusStaysBelowTheBase() {
         let fan = layout(6)
-        for item in fan.items {
-            // Carte basse (la hauteur de la notch) : le coin n'arrondit que ce qui dépasse sous le précédent.
-            XCTAssertEqual(fan.cardInnerRadius(item, height: 0), notch.height - item.previousHeight, accuracy: 0.001)
-            XCTAssertEqual(fan.cardInnerRadius(fan.left[0], height: 0), 0, "contre la notch : coin droit")
-            XCTAssertEqual(fan.cardInnerRadius(item, height: 1000), EarTabs.cardRadius)
-            let height = item.previousHeight + 5
-            XCTAssertEqual(fan.cardInnerRadius(item, height: height), 5, accuracy: 0.001)
+        XCTAssertEqual(fan.cardInnerRadius(height: 0), 0, "carte basse : coin droit")
+        XCTAssertEqual(fan.cardInnerRadius(height: notch.height), 0)
+        XCTAssertEqual(fan.cardInnerRadius(height: notch.height + 5), 5, accuracy: 0.001)
+        XCTAssertEqual(fan.cardInnerRadius(height: 1000), EarTabs.cardRadius)
+    }
+
+    /// Alignés sur la notch : même haut, même bas, base continue, à tout rang, rétractés ou non, ouverts ou non. Seule la
+    /// superposition (horizontale) distingue les rangs.
+    func testTabsStayAlignedWithTheNotch() {
+        for mode in [EarTabsMode.visible, .retracted] {
+            let fan = layout(6, mode: mode)
+            for item in fan.items {
+                XCTAssertEqual(item.frame.minY, 0)
+                XCTAssertEqual(item.frame.maxY, notch.height, "\(item.id) : même bas que la notch")
+                XCTAssertEqual(item.bodyFrame.minY, 0)
+                XCTAssertEqual(item.bodyFrame.maxY, notch.height)
+                XCTAssertEqual(fan.cardFrame(item, height: 0).minY, 0, "ouvert : même haut")
+                XCTAssertEqual(fan.cardFrame(item, height: 0).maxY, notch.height, "carte basse : même bas")
+                XCTAssertEqual(fan.cardFrame(item, height: 90).minY, 0)
+            }
         }
     }
 
     func testRoundedInnerCornerOfAnOpenedCardIsOutsideItsZone() {
         let fan = layout(3)
         let item = fan.left[1]
-        let height = item.previousHeight + EarTabs.cardRadius + 10
+        let height = notch.height + EarTabs.cardRadius + 10
         let card = fan.cardFrame(item, height: height)
         let corner = CGPoint(x: card.maxX - 0.4, y: card.maxY - 0.4)
         XCTAssertEqual(fan.hit(corner, hovered: item.id, cardHeight: height), .none, "le coin arrondi n'est pas la carte")
