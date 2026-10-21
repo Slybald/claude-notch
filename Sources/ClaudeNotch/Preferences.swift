@@ -190,8 +190,8 @@ final class Preferences: ObservableObject {
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
         static let notchSettings = [
             alwaysVisible, visibility, hiddenUntil, openTrigger, closeOnClickOutside, openDelay, closeDelay, haptics,
-            toggleHotKey, hideHotKey, commandHotKey, fullScreen, screen, accent, panelSize, customWidth, background, customBackground,
-            tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
+            toggleHotKey, hideHotKey, commandHotKey, fullScreen, screen, accent, panelSize, customWidth, background,
+            customBackground, tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
         ]
     }
 
