@@ -55,16 +55,18 @@ final class LocalAPI: ObservableObject {
     private let defaults: UserDefaults
     /// Nom affiché de l'app installée qui a cet identifiant ; nil si aucune.
     private let appName: (String) -> String?
-    private var limiter = RateLimiter(capacity: 10, perSecond: 2)
+    private var limiter: RateLimiter
     private var expiryWork: DispatchWorkItem?
     /// Le serveur tient le port : le jeton peut être écrit (une seconde instance n'écrase pas celui de la première).
     private var serverReady = false
 
     init(defaults: UserDefaults = .standard, tokenFile: URL? = LocalAPI.standardFile,
-         appName: @escaping (String) -> String? = LocalAPI.installedAppName) {
+         appName: @escaping (String) -> String? = LocalAPI.installedAppName,
+         limiter: RateLimiter = RateLimiter(capacity: 10, perSecond: 2)) {
         self.defaults = defaults
         self.tokenFile = tokenFile
         self.appName = appName
+        self.limiter = limiter
         isEnabled = defaults.bool(forKey: Self.enabledKey)
     }
 
@@ -331,12 +333,14 @@ struct ExternalEar: Equatable, Identifiable {
         "cup.and.saucer.fill", "gamecontroller.fill", "book.fill", "paintbrush.fill", "tag.fill",
     ]
 
-    /// Couleurs permises, par nom.
+    /// Couleurs permises, par nom. Aucune n'est celle de Codex (2DD4BF).
     static let colors: [String: String] = [
         "gray": "A1A1AA", "red": "F87171", "orange": "FB923C", "yellow": "FACC15", "green": "4ADE80",
-        "mint": "34D399", "teal": "2DD4BF", "cyan": "22D3EE", "blue": "60A5FA", "indigo": "818CF8",
-        "purple": "C084FC", "pink": "F472B6",
+        "mint": "34D399", "cyan": "22D3EE", "blue": "60A5FA", "indigo": "818CF8", "purple": "C084FC",
+        "pink": "F472B6",
     ]
+    /// Un programme ne se présente pas comme l'un d'eux (« via Codex ») : casse ignorée.
+    static let reservedClients = ["claude", "codex", "anthropic", "openai"]
 
     init(id: String, title: String, text: String = "", detail: String = "", icon: String = ExternalEar.defaultIcon,
          color: String = ExternalEar.defaultColor, app: String? = nil, appName: String? = nil,
@@ -369,6 +373,9 @@ struct ExternalEar: Equatable, Identifiable {
                                     rule: "1 to 24 letters, digits, space, dot, dash or underscore")
         let app = try Self.token(json, "app", pattern: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$",
                                  rule: "a bundle identifier such as com.apple.Terminal", max: 155)
+        if let client, Self.reservedClients.contains(where: { client.lowercased().contains($0) }) {
+            throw Invalid("client: this name is reserved.")
+        }
         if let icon, !Self.icons.contains(icon) { throw Invalid("icon: not in the list (see docs/API.md).") }
         if let color, Self.colors[color] == nil {
             throw Invalid("color: one of \(Self.colors.keys.sorted().joined(separator: ", ")).")

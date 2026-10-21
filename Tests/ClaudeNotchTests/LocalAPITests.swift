@@ -14,11 +14,12 @@ final class LocalAPIServerFixture {
     private(set) var port: UInt16 = 0
 
     init(_ testCase: XCTestCase, enabled: Bool = true,
-         apps: [String: String] = ["com.apple.Terminal": "Terminal"]) throws {
+         apps: [String: String] = ["com.apple.Terminal": "Terminal"],
+         limiter: RateLimiter = RateLimiter(capacity: 10, perSecond: 2)) throws {
         home = try makeTemporaryDirectory(testCase)
         let directory = home.appendingPathComponent("Library/Application Support/ClaudeNotch")
         api = LocalAPI(defaults: makeEphemeralDefaults(testCase), tokenFile: directory.appendingPathComponent("api-token"),
-                       appName: { apps[$0] })
+                       appName: { apps[$0] }, limiter: limiter)
         api.isEnabled = enabled
         access = HookAccess(file: directory.appendingPathComponent("hook-token"))
         let replies = ReplyCenter(prefs: Preferences(defaults: makeEphemeralDefaults(testCase)))
@@ -196,6 +197,10 @@ final class LocalAPITests: XCTestCase {
             (["title": "x", "id": ""], "id: 1 to 32 letters"),
             (["title": "x", "id": String(repeating: "a", count: 33)], "id: 1 to 32 letters"),
             (["title": "x", "client": "Claude\u{202E}"], "client: 1 to 24 letters"),
+            (["title": "x", "client": "Claude Code"], "client: this name is reserved."),
+            (["title": "x", "client": "my-CODEX-bot"], "client: this name is reserved."),
+            (["title": "x", "client": "OpenAI"], "client: this name is reserved."),
+            (["title": "x", "color": "teal"], "color: one of"),
             (["title": "x", "app": "Terminal"], "app: a bundle identifier"),
             (["title": "x", "app": "com.example.absent"], "app: no installed app has this bundle identifier."),
             (["title": "x", "app": "file:///Applications/Calculator.app"], "app: a bundle identifier"),
@@ -366,6 +371,8 @@ final class LocalAPITests: XCTestCase {
         }
         XCTAssertEqual(Set(ExternalEar.icons).count, ExternalEar.icons.count)
         for (name, hex) in ExternalEar.colors { XCTAssertNotNil(Color(hex: hex), name) }
+        XCTAssertFalse(ExternalEar.colors.values.contains(EarTabs.accentHex(forId: ModuleRegistry.codexId) ?? ""),
+                       "jamais la couleur de Codex")
         XCTAssertNotNil(ExternalEar.colors[ExternalEar.defaultColor])
         XCTAssertTrue(ExternalEar.icons.contains(ExternalEar.defaultIcon))
     }

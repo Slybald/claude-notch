@@ -15,11 +15,11 @@ final class NotchCommandTests: XCTestCase {
         private(set) var stdout = ""
         private(set) var stderr = ""
 
-        init(_ arguments: [String], home: URL, port: UInt16) throws {
+        init(_ arguments: [String], home: URL, port: UInt16, environment: [String: String] = [:]) throws {
             process.executableURL = URL(fileURLWithPath: "/bin/sh")
             process.arguments = [NotchCommandTests.script.path] + arguments
             process.environment = ["HOME": home.path, "CLAUDE_NOTCH_PORT": String(port), "PATH": "/usr/bin:/bin",
-                                   "TMPDIR": home.path, "LANG": "en_US.UTF-8"]
+                                   "TMPDIR": home.path, "LANG": "en_US.UTF-8"].merging(environment) { $1 }
             process.currentDirectoryURL = home
             process.standardOutput = out
             process.standardError = err
@@ -98,6 +98,24 @@ final class NotchCommandTests: XCTestCase {
             XCTAssertTrue(refused.stderr.hasPrefix("notch: --"), refused.stderr)
         }
         XCTAssertEqual(fixture.api.items.count, 1, "aucune requête envoyée")
+
+        // Le port ne peut pas changer l'hôte : le jeton ne part jamais ailleurs que vers 127.0.0.1.
+        let elsewhere = try Command(["show", "--title", "x"], home: fixture.home, port: fixture.port,
+                                    environment: ["CLAUDE_NOTCH_PORT": "80@example.com"])
+        XCTAssertTrue(elsewhere.finish())
+        XCTAssertEqual(elsewhere.status, 1)
+        XCTAssertEqual(elsewhere.stderr, "notch: CLAUDE_NOTCH_PORT: digits only\n")
+    }
+
+    /// Lancements rapprochés : le résultat refusé par la cadence est renvoyé une seconde plus tard, le sablier ne
+    /// reste pas une heure.
+    func testRunResultSurvivesRateLimit() throws {
+        // Une requête d'affilée : le sablier passe, le résultat qui le suit aussitôt est d'abord refusé.
+        let fixture = try LocalAPIServerFixture(self, limiter: RateLimiter(capacity: 1, perSecond: 1))
+        let run = try notch(["run", "--id", "job", "--", "/usr/bin/true"], fixture)
+        XCTAssertEqual(run.status, 0)
+        XCTAssertTrue(run.stderr.contains("Too many requests"), run.stderr)
+        XCTAssertEqual(fixture.api.items.first { $0.id == "job" }?.icon, "checkmark.circle.fill")
     }
 
     /// L'app refuse : le message de l'API, code 1.

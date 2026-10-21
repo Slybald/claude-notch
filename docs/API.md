@@ -30,7 +30,8 @@ notch help
 - `show` prints the id of the ear tab. The same `--id` replaces it in place (a progress that updates).
 - `run` shows an hourglass titled with the command name while it runs, then a check mark (green) or a cross (red, with
   the exit code) and the duration for 60 s. It exits with the status of the command. With the API off or the app
-  closed, the command still runs, without an ear tab.
+  closed, the command still runs, without an ear tab. Ctrl-C or closing the terminal stops the command and shows the
+  cross; if `notch` itself is killed outright, the hourglass goes away at the end of its hour.
 - `clear` removes one ear tab (`--id`) or all of them.
 - `--client` is the name shown on the card ("via make.sh") and in Settings › Scripts. Default: `notch`.
 - `CLAUDE_NOTCH_PORT` changes the port (tests).
@@ -67,7 +68,7 @@ field of the wrong type, is refused):
 | `ttl` | integer | seconds before it goes away, 1 to 3600 | 60 |
 | `id` | string | 1 to 32 of `A-Z a-z 0-9 . _ -`; the same id replaces the ear tab | random, returned |
 | `app` | string | bundle identifier of an installed app (`com.apple.Terminal`): the card gets a button that opens it | no button |
-| `client` | string | 1 to 24 of `A-Z a-z 0-9 space . _ -`: your program's name, shown as "via …" | `script` |
+| `client` | string | 1 to 24 of `A-Z a-z 0-9 space . _ -`: your program's name, shown as "via …"; names containing claude, codex, anthropic or openai are refused | `script` |
 
 Texts are shown on one line: line breaks and tabs become spaces; control characters, writing-direction overrides,
 zero-width and private-use characters are removed. Lengths count characters (an emoji is one), after that cleaning.
@@ -121,7 +122,7 @@ name, value = header.split(": ", 1)
 request = urllib.request.Request(
     "http://127.0.0.1:47823/api/v1/ears",
     data=json.dumps({"title": "Training done", "text": "98%", "icon": "chart.line.uptrend.xyaxis",
-                     "color": "teal", "client": "train.py"}).encode(),
+                     "color": "mint", "client": "train.py"}).encode(),
     headers={name: value, "Content-Type": "application/json"},
 )
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # never through a proxy
@@ -143,7 +144,7 @@ None of them looks like a permission request (no raised hand, lock, key, shield 
 
 ### Colors
 
-`gray`, `red`, `orange`, `yellow`, `green`, `mint`, `teal`, `cyan`, `blue`, `indigo`, `purple`, `pink`.
+`gray`, `red`, `orange`, `yellow`, `green`, `mint`, `cyan`, `blue`, `indigo`, `purple`, `pink` (none is Codex's teal).
 
 ## Security model
 
@@ -156,8 +157,9 @@ None of them looks like a permission request (no raised hand, lock, key, shield 
 - **Bounded.** 3 ear tabs at most, 1 hour at most, 10 requests in a burst then 2 per second. Expiry uses one scheduled
   wake-up, no periodic timer: the collapsed notch stays at ~0 % CPU.
 - **Cannot pass for Claude or Codex.** Script ear tabs rank below theirs, never stay unfolded on their own, have no
-  Allow or Deny button, and their card always says which program sent them ("via backup.sh"). Their ids are kept apart
-  from the modules' (`api.<id>`), so a script calling itself `claude` gets its own tab, not Claude's.
+  Allow or Deny button, and their card always says which program sent them ("via backup.sh"; a name with claude, codex,
+  anthropic or openai is refused). No color is Codex's. Their ids are kept apart from the modules' (`api.<id>`), so a
+  script whose id is `claude` gets its own tab, not Claude's.
 
 Settings › Scripts lists the last five programs that showed something (the name each one gives itself, kept in memory
 only), so you can see who uses the API.

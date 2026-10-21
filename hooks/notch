@@ -5,7 +5,8 @@
 # par -H @fichier, jamais en argument (invisible dans ps). Chaque texte est échappé pour JSON ici ; l'app le valide
 # ensuite (schéma strict, tailles bornées). Rien de ce que reçoit l'app n'est exécuté.
 
-URL="http://127.0.0.1:${CLAUDE_NOTCH_PORT:-47823}/api/v1/ears"
+PORT=${CLAUDE_NOTCH_PORT:-47823}
+URL="http://127.0.0.1:$PORT/api/v1/ears"
 TOKEN="$HOME/Library/Application Support/ClaudeNotch/api-token"
 
 usage() {
@@ -140,7 +141,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Des chiffres seulement (rien ne s'ajoute au JSON), et un identifiant sûr dans une URL.
+# Des chiffres seulement (rien ne s'ajoute au JSON ni à l'URL, dont l'hôte reste 127.0.0.1), et un identifiant sûr
+# dans une URL.
+case "$PORT" in
+'' | *[!0-9]*) die "CLAUDE_NOTCH_PORT: digits only" ;;
+esac
 case "$TTL" in
 '' | [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) ;;
 *) die "--ttl: whole number of seconds, 1 to 3600" ;;
@@ -169,11 +174,12 @@ run)
     # API coupée ou app fermée : la commande tourne quand même, sans intercalaire.
     if send POST "" "$BODY"; then NOTIFY=1; else NOTIFY=; fi
     START=$(date +%s)
-    # Ctrl-C arrête la commande (même groupe de processus) ; le shell attend sa fin puis affiche la croix.
-    trap ':' INT TERM
+    # Ctrl-C, ou le terminal fermé, arrête la commande (même groupe de processus) ; le shell attend sa fin puis
+    # affiche la croix. Tué net (KILL), le sablier part seul à sa durée de vie (une heure).
+    trap ':' INT TERM HUP
     "$@"
     RESULT=$?
-    trap - INT TERM
+    trap - INT TERM HUP
     ELAPSED=$(($(date +%s) - START))
     if [ "$ELAPSED" -lt 60 ]; then
         TEXT="${ELAPSED}s"
@@ -189,7 +195,11 @@ run)
     fi
     TTL=60
     body
-    [ -z "$NOTIFY" ] || send POST "" "$BODY" || :
+    # Refusé (cadence de lancements rapprochés) : un nouvel essai une seconde plus tard, sinon le sablier est retiré.
+    if [ -n "$NOTIFY" ] && ! send POST "" "$BODY"; then
+        sleep 1
+        send POST "" "$BODY" || send DELETE "/$ID" || :
+    fi
     exit "$RESULT"
     ;;
 help | -h | --help)

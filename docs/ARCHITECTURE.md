@@ -468,7 +468,8 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   token opens nothing else. Strict schema (unknown field, wrong type or too long = 400, never cut), icons and colors from
   lists, 3 tabs (the oldest leaves), 1 h at most, token bucket (10, then 2/s). No URL, command or file: the only action
   opens an installed app by bundle id, on a click. Tabs rank 2 (under timer, Codex, Claude), never `alert`, no
-  Allow/Deny, "via <client>" on the card. Expiry is one wall-clock `asyncAfter` re-armed for the next deadline (no
+  Allow/Deny, "via <client>" on the card (names with claude, codex, anthropic or openai refused, no color is Codex's).
+  `notch run` resends a result refused by the rate limit once, a second later, else removes its hourglass. Expiry is one wall-clock `asyncAfter` re-armed for the next deadline (no
   periodic timer). Requests are handled on the main thread (`DispatchQueue.main.sync` from the server queue, like
   `/state`). Not done: a `claude-notch://` scheme (any web page can open one) and App Intents.
 - **Reply flow** (`/permission`, `/inbox`): the hook script posts with the token (curl reads it from the 0600 file
