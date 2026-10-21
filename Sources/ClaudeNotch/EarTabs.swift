@@ -77,16 +77,19 @@ enum EarTabs {
     static let sliverWidth: CGFloat = 8
     /// Ce que montre de lui un intercalaire glissé sous le précédent : son icône, entre deux marges.
     static let sliceWidth: CGFloat = 2 * padding + iconWidth
-    /// Rayon du coin extérieur bas d'un intercalaire au repos, et déployé.
-    static let restRadius: CGFloat = 6
+    /// Rayon du coin extérieur bas d'un intercalaire au repos (celui de la notch repliée), et déployé.
+    static let restRadius: CGFloat = NotchShape.collapsedBottomRadius
     static let cardRadius: CGFloat = 14
+    /// Évasement concave du bord extérieur, en haut : le raccord de la notch avec le haut de l'écran. Il dépasse de la
+    /// tranche (vers l'extérieur) de ce rayon, d'où la marge de la fenêtre.
+    static let flareRadius: CGFloat = NotchShape.collapsedTopRadius
     /// Largeur d'un intercalaire déployé (réduite pour rester dans la fenêtre).
     static let cardWidth: CGFloat = 236
     /// Dépassement sous la notch (derrière elle) ou sous l'intercalaire précédent de la pile, pour qu'aucun jour ne
     /// reste dans leur coin arrondi.
     static let overlap: CGFloat = 12
-    /// Marge gardée entre un intercalaire déployé et le bord de la fenêtre.
-    static let windowMargin: CGFloat = 6
+    /// Marge gardée entre un intercalaire déployé et le bord de la fenêtre (au moins l'évasement, qui dépasse).
+    static let windowMargin: CGFloat = max(6, flareRadius)
 
     // MARK: Choix des activités
 

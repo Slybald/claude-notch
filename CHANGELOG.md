@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Index tabs have the notch's own edge.** Their outer edge was squarer than the notch's (a 6 pt bottom corner against
+  the notch's 9 pt, and a sharp angle where the top met the screen edge), which made the join look odd. Every tab, at
+  rest and unfolded, now takes the notch's outline on its outer side: the same concave flare at the top and the same
+  bottom corner curve and radius, with no step or gap where tabs overlap. The light line between two tabs follows that
+  outline and no longer runs along the top of the screen.
+
 ## [2.0.0] - 2026-10-21
 
 **Claude Notch is now Oriel.** Same app, same settings, same data: the automatic update installs it in place and it

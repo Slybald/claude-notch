@@ -63,17 +63,17 @@ final class EarTabsGeometryTests: XCTestCase {
         }
 
         /// Bord de ce qui touche le centre sur la ligne `y`, vers la gauche (−1) ou la droite (+1), au pas d'un pixel.
-        func extent(row y: CGFloat, toward sign: CGFloat) -> CGFloat? {
+        func extent(row y: CGFloat, toward sign: CGFloat, from start: CGFloat = 0) -> CGFloat? {
             let step = 1 / EarTabsGeometryTests.scale
-            guard covered(0, y) else { return nil }
-            var x: CGFloat = 0
+            guard covered(start, y) else { return nil }
+            var x: CGFloat = start
             while abs(x) < 399, covered(x + sign * step, y) { x += sign * step }
             return x + sign * step
         }
     }
 
-    private func render(_ root: some View, background: Color = Color(red: 1, green: 0, blue: 1)) throws -> NSBitmapImageRep {
-        let size = Self.band
+    private func render(_ root: some View, background: Color = Color(red: 1, green: 0, blue: 1), size: CGSize = band,
+                        scale: CGFloat = scale) throws -> NSBitmapImageRep {
         let hosting = NSHostingView(rootView: root.background(background))
         hosting.frame = CGRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
@@ -82,7 +82,6 @@ final class EarTabsGeometryTests: XCTestCase {
         hosting.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.6))
         hosting.layoutSubtreeIfNeeded()
-        let scale = Self.scale
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -206,6 +205,150 @@ final class EarTabsGeometryTests: XCTestCase {
         let scene = scene(.claudeAndTimer, notch: Self.measured, hasNotch: true)
         _ = try silhouette(scene)
         XCTAssertEqual(scene.harness.model.contentSize, Self.measured)
+    }
+
+    // MARK: - Le bord extérieur est celui de la notch
+
+    private enum Element {
+        case move(CGPoint), line(CGPoint), quad(CGPoint, CGPoint), close
+    }
+
+    private func elements(_ path: Path, origin: CGPoint) -> [Element] {
+        func at(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x - origin.x, y: p.y - origin.y) }
+        var out: [Element] = []
+        path.forEach { element in
+            switch element {
+            case .move(let p): out.append(.move(at(p)))
+            case .line(let p): out.append(.line(at(p)))
+            case .quadCurve(let p, let c): out.append(.quad(at(p), at(c)))
+            case .curve: XCTFail("courbe cubique : la notch n'utilise que des quadratiques")
+            case .closeSubpath: out.append(.close)
+            }
+        }
+        return out
+    }
+
+    private func assertSame(_ a: Element, _ b: Element, _ label: String, file: StaticString = #filePath, line: UInt = #line) {
+        func same(_ p: CGPoint, _ q: CGPoint) -> Bool { abs(p.x - q.x) < 0.001 && abs(p.y - q.y) < 0.001 }
+        switch (a, b) {
+        case let (.move(p), .move(q)), let (.line(p), .line(q)):
+            XCTAssertTrue(same(p, q), "\(label) : \(p) et non \(q)", file: file, line: line)
+        case let (.quad(p, c), .quad(q, d)):
+            XCTAssertTrue(same(p, q) && same(c, d), "\(label) : courbe \(p) / \(c) et non \(q) / \(d)", file: file, line: line)
+        default:
+            XCTFail("\(label) : \(a) et non \(b)", file: file, line: line)
+        }
+    }
+
+    /// Le bord extérieur d'un intercalaire (évasement du haut, arête, coin du bas) est le bord gauche de `NotchShape` :
+    /// mêmes points, mêmes points de contrôle, à toute largeur de tranche (même une languette de 8 pt) et toute hauteur
+    /// d'encoche. Déployé : même évasement, coin du bas au rayon de la carte. L'autre côté en est le miroir.
+    func testOuterEdgePathIsTheNotchsPath() {
+        let top = NotchShape.collapsedTopRadius
+        for (size, _) in Self.notches {
+            for (bottom, height) in [(EarTabs.restRadius, size.height), (EarTabs.cardRadius, size.height + 80)] {
+                let notchRect = CGRect(x: 40, y: 0, width: size.width + 2 * top, height: height)
+                let reference = elements(NotchShape(topRadius: top, bottomRadius: bottom).path(in: notchRect),
+                                         origin: CGPoint(x: notchRect.minX + top, y: 0))
+                XCTAssertEqual(NotchShape(topRadius: top, bottomRadius: bottom).path(in: notchRect).boundingRect.minX,
+                               notchRect.minX, accuracy: 0.001)
+                // Une carte déployée n'est jamais plus étroite que sa tranche de repos ni que ses deux rayons.
+                let widths = bottom == EarTabs.restRadius ? [EarTabs.sliverWidth, EarTabs.sliceWidth, 36.5, EarTabs.cardWidth]
+                                                          : [EarTabs.sliceWidth, 36.5, EarTabs.cardWidth]
+                for width in widths {
+                    let rect = CGRect(x: -150 - width, y: 0, width: width, height: height)
+                    let shape = EarTabShape(side: .left, outerRadius: bottom, overlap: EarTabs.overlap, overlapHeight: size.height)
+                    let left = elements(shape.path(in: rect), origin: CGPoint(x: rect.minX, y: 0))
+                    let label = "\(size) rayon \(bottom) largeur \(width)"
+                    // move (pointe de l'évasement), évasement, arête, coin bas : les quatre premiers éléments.
+                    for index in 0..<4 { assertSame(left[index], reference[index], "\(label) élément \(index)") }
+
+                    let rightShape = EarTabShape(side: .right, outerRadius: bottom, overlap: EarTabs.overlap, overlapHeight: size.height)
+                    let right = elements(rightShape.path(in: rect), origin: CGPoint(x: rect.maxX, y: 0))
+                    func mirrored(_ e: Element) -> Element {
+                        func m(_ p: CGPoint) -> CGPoint { CGPoint(x: -p.x, y: p.y) }
+                        switch e {
+                        case .move(let p): return .move(m(p))
+                        case .line(let p): return .line(m(p))
+                        case .quad(let p, let c): return .quad(m(p), m(c))
+                        case .close: return .close
+                        }
+                    }
+                    for index in 0..<4 { assertSame(right[index], mirrored(left[index]), "\(label) côté droit, élément \(index)") }
+                }
+            }
+        }
+    }
+
+    /// Ligne par ligne, de combien le bord extérieur dépasse son arête (évasement du haut) puis rentre (coin du bas).
+    private func outline(_ sil: Silhouette, side sign: CGFloat, height: CGFloat, from start: CGFloat = 0) -> [CGFloat] {
+        let rows = Array(stride(from: CGFloat(0.25), through: height - 0.25, by: 0.25))
+        let edge = rows.map { abs(sil.extent(row: $0, toward: sign, from: start) ?? .nan) }
+        let body = edge[edge.count / 2]
+        return edge.map { $0 - body }
+    }
+
+    /// Le bord extérieur DESSINÉ (pixels) a le profil de la notch : on rend `NotchShape` seule, aux rayons de la notch
+    /// repliée, et on compare ligne par ligne avec le bord extérieur de l'intercalaire, à toute taille d'encoche : évasement
+    /// du haut, arête, coin du bas. Sur une vraie encoche, le bas seulement (la forme repliée n'a pas d'évasement).
+    func testRenderedOuterEdgeHasTheNotchsProfile() throws {
+        let top = NotchShape.collapsedTopRadius, bottom = NotchShape.collapsedBottomRadius
+        for (size, hasNotch) in Self.notches {
+            let reference = Silhouette(
+                bitmap: try render(NotchShape(topRadius: top, bottomRadius: bottom).fill(Color.black)
+                    .frame(width: 60, height: size.height)
+                    .frame(width: Self.band.width, height: Self.band.height, alignment: .top)),
+                background: NSColor(red: 1, green: 0, blue: 1, alpha: 1))
+            let wanted = outline(reference, side: -1, height: size.height)
+            for (name, tabs, sign) in [("gauche", Tabs.claudeOnly, CGFloat(-1)), ("droite", .claudeAndTimer, 1)] {
+                let sil = try silhouette(scene(tabs, notch: size, hasNotch: hasNotch))
+                let drawn = outline(sil, side: sign, height: size.height)
+                XCTAssertEqual(drawn.count, wanted.count)
+                var bad: [String] = []
+                for (index, (a, b)) in zip(drawn, wanted).enumerated() where !(abs(a - b) <= 0.4) {
+                    bad.append("y=\(0.25 * CGFloat(index + 1)) : \(a) au lieu de \(b)")
+                }
+                XCTAssertTrue(bad.isEmpty, "\(size) bord \(name) : " + bad.prefix(6).joined(separator: " ; "))
+                // Il y a bien un évasement (le bord dépasse son arête en haut) et un coin arrondi (il rentre en bas).
+                XCTAssertGreaterThan(drawn.first ?? 0, top * 0.5, "\(size) bord \(name) : pas d'évasement")
+                XCTAssertLessThan(drawn.last ?? 0, -bottom * 0.5, "\(size) bord \(name) : coin du bas non arrondi")
+            }
+        }
+    }
+
+    /// Aucun jour dans l'éventail : de l'arête extérieure du dernier intercalaire à celle de la notch, chaque ligne est
+    /// dessinée en entier (hors coin du bas extérieur), au repos de 1 à 3 par côté, rétractés et avec un intercalaire déployé.
+    func testFanHasNoGapBetweenSlices() throws {
+        for (size, hasNotch) in Self.notches {
+            for (tabs, mode, hovered) in [(Tabs.claudeOnly, EarTabsMode.visible, String?.none),
+                                          (.claudeAndTimer, .visible, nil), (.six, .visible, nil), (.six, .retracted, nil),
+                                          (.six, .visible, "media"), (.six, .visible, "claude")] {
+                let fan = scene(tabs, notch: size, hasNotch: hasNotch, mode: mode, hovered: hovered)
+                let layout = fan.registry.earLayout(claude: fan.harness.store.indicator, claudeEars: fan.harness.store.ears,
+                                                    notch: size)
+                let sil = try silhouette(fan)
+                let label = "\(size) \(tabs) \(mode) survol : \(hovered ?? "aucun")"
+                for items in [layout.left, layout.right] {
+                    guard let last = items.last else { continue }
+                    // Déployé, un intercalaire ne s'étend plus loin que son rang au repos.
+                    let outer = items.map { $0.id == hovered ? layout.cardFrame($0, height: size.height) : $0.frame }
+                        .map { last.side == .left ? $0.minX : $0.maxX }
+                        .reduce(last.side == .left ? CGFloat.greatestFiniteMagnitude : -.greatestFiniteMagnitude) {
+                            last.side == .left ? min($0, $1) : max($0, $1)
+                        }
+                    let sign: CGFloat = last.side == .left ? 1 : -1
+                    var gaps: [String] = []
+                    for y in stride(from: CGFloat(0.3), through: size.height - 0.3, by: 0.5) {
+                        let corner = y > size.height - EarTabs.restRadius ? EarTabs.restRadius + 0.5 : 0.5
+                        for step in stride(from: corner, through: abs(outer) - size.width / 2 - 0.5, by: 0.5) {
+                            let x = outer + sign * step
+                            if !sil.covered(x, y) { gaps.append("(\(x), \(y))") }
+                        }
+                    }
+                    XCTAssertTrue(gaps.isEmpty, "\(label) côté \(last.side) : jour en " + gaps.prefix(6).joined(separator: " "))
+                }
+            }
+        }
     }
 
     // MARK: - Rendus PNG (CLAUDE_NOTCH_SNAPSHOT_DIR)

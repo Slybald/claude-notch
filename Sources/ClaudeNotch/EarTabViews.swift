@@ -1,15 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// Forme d'un intercalaire : coin extérieur bas arrondi (et coin intérieur bas une fois déployé), bord haut collé au
-/// haut de l'écran. Le prolongement derrière la notch ou derrière l'intercalaire précédent (`overlap`, sur
-/// `overlapHeight`) bouche le jour que laissent leurs coins arrondis.
+/// Forme d'un intercalaire : le bord extérieur reprend celui de la notch (`NotchShape`) : évasement concave en haut, qui
+/// dépasse de la tranche et rejoint le haut de l'écran, et coin bas arrondi de même rayon et de même courbe ; coin
+/// intérieur bas arrondi une fois déployé. Le prolongement derrière la notch ou derrière l'intercalaire précédent
+/// (`overlap`, sur `overlapHeight`) bouche le jour que laissent leurs coins arrondis.
 struct EarTabShape: Shape {
     var side: EarTabsLayout.Side
     var outerRadius: CGFloat
     var innerRadius: CGFloat = 0
     var overlap: CGFloat = 0
     var overlapHeight: CGFloat = 0
+    var flareRadius: CGFloat = EarTabs.flareRadius
 
     var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
         get { AnimatablePair(AnimatablePair(outerRadius, innerRadius), overlapHeight) }
@@ -21,16 +23,28 @@ struct EarTabShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
-        let outer = max(0, min(outerRadius, rect.width / 2, rect.height))
+        // Le coin bas extérieur garde le rayon de la notch même sur une languette plus étroite que lui : il finit sous le voisin.
+        let outer = max(0, min(outerRadius, (rect.width + overlap) / 2, rect.height))
         let inner = max(0, min(innerRadius, rect.width / 2, rect.height))
+        let flare = max(0, min(flareRadius, rect.height / 2))
         // `s` : du bord extérieur vers le bord intérieur.
         let s: CGFloat = side == .left ? 1 : -1
         let o = side == .left ? rect.minX : rect.maxX
         let i = side == .left ? rect.maxX : rect.minX
         var path = Path()
-        path.move(to: CGPoint(x: o, y: rect.minY))
+        // Mêmes courbes que `NotchShape` (quadratiques, point de contrôle dans l'angle) : l'évasement part de la pointe
+        // `flare` en dehors du bord, hors de la tranche.
+        path.move(to: CGPoint(x: o - s * flare, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: o, y: rect.minY + flare), control: CGPoint(x: o, y: rect.minY))
         path.addLine(to: CGPoint(x: o, y: rect.maxY - outer))
         path.addQuadCurve(to: CGPoint(x: o + s * outer, y: rect.maxY), control: CGPoint(x: o, y: rect.maxY))
+        if inner == 0, overlap > 0 {
+            // Au repos : le dessous continue jusque sous le voisin, sans revenir en arrière si le coin dépasse la tranche.
+            path.addLine(to: CGPoint(x: i + s * overlap, y: rect.maxY))
+            path.addLine(to: CGPoint(x: i + s * overlap, y: rect.minY))
+            path.closeSubpath()
+            return path
+        }
         path.addLine(to: CGPoint(x: i - s * inner, y: rect.maxY))
         path.addQuadCurve(to: CGPoint(x: i, y: rect.maxY - inner), control: CGPoint(x: i, y: rect.maxY))
         if overlap > 0, overlapHeight > 0 {
@@ -47,21 +61,24 @@ struct EarTabShape: Shape {
     }
 }
 
-/// Le bord extérieur d'un intercalaire (arête et coin bas arrondi) : le filet clair qui sépare deux tranches de la pile.
+/// Le bord extérieur d'un intercalaire (évasement du haut, arête et coin bas arrondi), exactement le contour de
+/// `EarTabShape` : le filet clair qui sépare deux tranches de la pile. Tracé en double épaisseur puis rogné par la forme
+/// (`clipShape`), il reste entièrement à l'intérieur : rien ne déborde au-dessus ni sous la base.
 struct EarTabEdge: Shape {
     var side: EarTabsLayout.Side
     var radius: CGFloat
+    var flareRadius: CGFloat = EarTabs.flareRadius
 
     func path(in rect: CGRect) -> Path {
-        let r = max(0, min(radius, rect.width / 2, rect.height))
+        let r = max(0, min(radius, (rect.width + EarTabs.overlap) / 2, rect.height))
+        let flare = max(0, min(flareRadius, rect.height / 2))
         let s: CGFloat = side == .left ? 1 : -1
-        // Rentré d'un demi-point : le trait (1 pt) reste entièrement dans la forme, rien ne dépasse sous la base.
-        let o = (side == .left ? rect.minX : rect.maxX) + s * 0.5
-        let bottom = rect.maxY - 0.5
+        let o = side == .left ? rect.minX : rect.maxX
         var path = Path()
-        path.move(to: CGPoint(x: o, y: rect.minY))
-        path.addLine(to: CGPoint(x: o, y: bottom - r))
-        path.addQuadCurve(to: CGPoint(x: o + s * r, y: bottom), control: CGPoint(x: o, y: bottom))
+        path.move(to: CGPoint(x: o - s * flare, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: o, y: rect.minY + flare), control: CGPoint(x: o, y: rect.minY))
+        path.addLine(to: CGPoint(x: o, y: rect.maxY - r))
+        path.addQuadCurve(to: CGPoint(x: o + s * r, y: rect.maxY), control: CGPoint(x: o, y: rect.maxY))
         return path
     }
 }
@@ -163,11 +180,13 @@ private struct EarTabItemView: View {
         })
         // Filet clair sur le bord extérieur : sépare la tranche de celle qu'elle recouvre. Déployé, la carte n'en a pas.
         .overlay(EarTabEdge(side: item.side, radius: EarTabs.restRadius)
-            .stroke(Color.white.opacity(isHovered ? 0 : 0.16), lineWidth: 1))
+            .stroke(Color.white.opacity(isHovered ? 0 : 0.16), lineWidth: 2)
+            .clipShape(shape))
         // Déployé, la carte se détache de la pile par une ombre. Au repos, aucune ombre ne dépasse sous la base : celle de la
         // tranche qui recouvre est dans `rest`, à l'intérieur de la tranche.
         .shadow(color: .black.opacity(isHovered ? 0.5 : 0), radius: 7, x: item.outward * 2, y: 3)
-        .contentShape(shape)
+        // La zone cliquable est celle du corps : l'évasement est un raccord dessiné, pas une surface.
+        .contentShape(shape(flare: 0))
         .accessibilityElement(children: isHovered ? .contain : .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(L("Ouvre l'onglet correspondant"))
@@ -175,10 +194,12 @@ private struct EarTabItemView: View {
         .accessibilityAction { openTab(item.id) }
     }
 
-    private var shape: EarTabShape {
+    private var shape: EarTabShape { shape(flare: EarTabs.flareRadius) }
+
+    private func shape(flare: CGFloat) -> EarTabShape {
         EarTabShape(side: item.side, outerRadius: isHovered ? EarTabs.cardRadius : EarTabs.restRadius,
                     innerRadius: isHovered ? layout.cardInnerRadius(height: cardHeight) : 0, overlap: overlap,
-                    overlapHeight: item.height)
+                    overlapHeight: item.height, flareRadius: flare)
     }
 
     // MARK: Au repos
