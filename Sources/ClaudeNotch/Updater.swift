@@ -25,6 +25,8 @@ final class Updater: ObservableObject, @unchecked Sendable {
     static let firstCheckDelay: TimeInterval = 60
     static let checkInterval: TimeInterval = 6 * 3600
     static let idleRetryInterval: TimeInterval = 10 * 60
+    /// Au réveil, le temps que le réseau revienne.
+    static let wakeCheckDelay: TimeInterval = 30
 
     enum Status: Equatable {
         case idle
@@ -46,6 +48,7 @@ final class Updater: ObservableObject, @unchecked Sendable {
     private var lastCheck: Date?
     private var launchCheckDone = false
     private var checkTimer: Timer?
+    private var wakeObserver: NSObjectProtocol?
     private var retryTimer: Timer?
 
     init(bundle: Bundle = .main, defaults: UserDefaults = .standard) {
@@ -72,6 +75,22 @@ final class Updater: ObservableObject, @unchecked Sendable {
         timer.tolerance = 60
         RunLoop.main.add(timer, forMode: .common)
         checkTimer = timer
+        // Le minuteur ne compte pas le temps de veille (mesuré : 16 h sans vérification après une nuit) : au réveil,
+        // on rattrape une vérification due.
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeCheckDelay) {
+                guard let self, Self.isOverdue(lastCheck: self.lastCheck, now: Date()) else { return }
+                self.check(atLaunch: false)
+            }
+        }
+    }
+
+    /// Dernière vérification plus vieille que l'intervalle, en temps réel (veille comprise). Jamais faite : la
+    /// vérification du lancement s'en charge.
+    static func isOverdue(lastCheck: Date?, now: Date) -> Bool {
+        guard let lastCheck else { return false }
+        return now.timeIntervalSince(lastCheck) >= checkInterval
     }
 
     /// « Rechercher les mises à jour ».

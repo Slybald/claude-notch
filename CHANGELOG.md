@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.3] - 2026-10-21
+
+### Fixed
+
+- Updates were checked every 6 hours of awake time only: after a night of sleep the app could go a whole morning
+  without noticing a new version. It now also checks when the Mac wakes up, if the last check is older than
+  6 hours.
+
 ## [1.2.2] - 2026-10-20
 
 ### Added

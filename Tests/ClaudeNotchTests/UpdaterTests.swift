@@ -77,6 +77,15 @@ final class UpdaterTests: XCTestCase {
 
     // MARK: - Versions
 
+    /// Au réveil : vérification seulement si la dernière date de plus de 6 h (veille comprise).
+    func testWakeCheckOnlyWhenOverdue() {
+        let now = Date()
+        XCTAssertFalse(Updater.isOverdue(lastCheck: nil, now: now), "pas encore de vérification : celle du lancement")
+        XCTAssertFalse(Updater.isOverdue(lastCheck: now.addingTimeInterval(-3600), now: now))
+        XCTAssertTrue(Updater.isOverdue(lastCheck: now.addingTimeInterval(-Updater.checkInterval), now: now))
+        XCTAssertTrue(Updater.isOverdue(lastCheck: now.addingTimeInterval(-16 * 3600), now: now), "une nuit de veille")
+    }
+
     func testVersionComparison() {
         XCTAssertEqual(Updater.compareVersions("1.0", "1.0.0"), .orderedSame)
         XCTAssertEqual(Updater.compareVersions("v1.2.0", "1.2"), .orderedSame)
