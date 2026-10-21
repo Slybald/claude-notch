@@ -16,6 +16,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   passed with `curl -H @file`), exact `Host` and no `Origin` (no web page can call it), strict schema, rate limit; no
   code, command or URL from a tab, only a button that opens a named app. A script's tab always says which program sent
   it and can never pass for a Claude or Codex request. Settings › Scripts lists the last clients.
+
+## [1.9.0] - 2026-10-21
+
+### Added
+
 - **Approve with the keyboard.** A permission request from Claude Code or Codex can be settled without the mouse:
   **⌃⌥Y** allows, **⌃⌥N** denies the oldest waiting request, both agents in one queue ("1 of 3" on its card, the two keys
   shown on its buttons). Off by default (Settings › Claude and › Codex › *Approve with the keyboard*; it needs *Reply
