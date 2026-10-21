@@ -382,6 +382,7 @@ struct ClaudeSettingsView: View {
                     }
                 }
             }
+            if prefs.replyFromNotch { ApprovalKeysSettings(prefs: prefs) }
             Section {
                 LabeledContent("État") {
                     Text(statusText)
