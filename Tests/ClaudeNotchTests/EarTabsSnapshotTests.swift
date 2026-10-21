@@ -86,6 +86,46 @@ final class EarTabsSnapshotTests: XCTestCase {
 
         // Rien : la notch seule.
         try render(scene([], store: SessionStore()), "ear-tabs-none")
+
+        // Réglages › Apparence, défilé jusqu'à « Notch repliée » : le choix Rétractés / Toujours visibles.
+        let settings = scene(Array(activities.prefix(2)))
+        try renderScrolledToBottom(SettingsView(prefs: settings.harness.prefs, registry: settings.registry,
+                                                updater: Updater(), selection: .appearance),
+                                   "ear-tabs-settings-appearance", dir)
+    }
+
+    /// Rendu d'une fenêtre dont la liste défilante est descendue tout en bas.
+    private func renderScrolledToBottom<V: View>(_ view: V, _ name: String, _ dir: URL) throws {
+        let size = SettingsWindow.size
+        let hosting = NSHostingView(rootView: view)
+        hosting.frame = CGRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        hosting.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        func scrollViews(_ view: NSView) -> [NSScrollView] {
+            (view as? NSScrollView).map { [$0] } ?? [] + view.subviews.flatMap(scrollViews)
+        }
+        for scroll in scrollViews(hosting) {
+            if let document = scroll.documentView {
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, document.frame.height - scroll.contentSize.height)))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        let scale: CGFloat = 2
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0))
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap)).cgContext
+        context.translateBy(x: 0, y: size.height * scale)
+        context.scaleBy(x: scale, y: -scale)
+        try XCTUnwrap(hosting.layer).render(in: context)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: dir.appendingPathComponent("\(name).png"))
+        window.close()
     }
 
     func testRenderDeployedTabs() throws {

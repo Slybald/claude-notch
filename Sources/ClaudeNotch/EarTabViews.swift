@@ -109,7 +109,12 @@ private struct EarTabItemView: View {
     private var cardWidth: CGFloat { layout.cardWidth(item) }
     private var isSliver: Bool { item.width <= EarTabs.sliverWidth }
     private var title: String {
-        item.tab.id == EarTab.moreId ? item.tab.text : registry.module(item.tab.id)?.title ?? item.tab.id
+        if case .more(let hidden) = item.tab.kind { return Self.moreTitle(hidden.count) }
+        return registry.module(item.tab.id)?.title ?? item.tab.id
+    }
+
+    static func moreTitle(_ count: Int) -> String {
+        String(format: L(count, one: "%d autre activité", other: "%d autres activités"), count)
     }
     /// L'intercalaire contre la notch prolonge sa forme derrière elle.
     private var overlap: CGFloat { item.rank == 0 ? EarTabs.overlap : 0 }
@@ -181,7 +186,9 @@ private struct EarTabItemView: View {
                     .foregroundColor(Palette.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                EarTabInfo(tab: item.tab, claudeEars: claudeEars, accent: accent)
+                if item.tab.id != EarTab.moreId {
+                    EarTabInfo(tab: item.tab, claudeEars: claudeEars, accent: accent)
+                }
             }
             .padding(.horizontal, 12)
             .frame(height: layout.notch.height)
@@ -227,7 +234,7 @@ private struct EarTabItemView: View {
         case .module:
             return item.tab.text.isEmpty ? title : String(format: L("%@ : %@"), title, item.tab.text)
         case .more(let hidden):
-            return String(format: L(hidden.count, one: "%d autre activité", other: "%d autres activités"), hidden.count)
+            return Self.moreTitle(hidden.count)
         }
     }
 }
