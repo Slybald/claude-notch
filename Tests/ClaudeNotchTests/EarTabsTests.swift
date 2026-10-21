@@ -136,7 +136,10 @@ final class EarTabsTests: XCTestCase {
     func testWidthsFollowTheModeAndAlertsStayWide() {
         let tabs = tabs(.attention, [entry("timer", "4:59", priority: 5), entry("media", "", priority: 1, bars: true)])
         let visible = layout(tabs, mode: .visible)
-        for tab in tabs { XCTAssertEqual(visible.item(tab.id)?.width, tab.restWidth, tab.id) }
+        // Contre la notch (ou en alerte) : icône et information. Plus loin dans la pile : la tranche de l'icône.
+        XCTAssertEqual(visible.item("claude")?.width, tabs[0].restWidth)
+        XCTAssertEqual(visible.item("timer")?.width, tabs[1].restWidth)
+        XCTAssertEqual(visible.item("media")?.width, EarTabs.sliceWidth, "rang 1 : glissé sous le premier")
         XCTAssertGreaterThan(visible.left[0].width, EarTabs.sliverWidth)
 
         let retracted = layout(tabs, mode: .retracted)
@@ -176,6 +179,7 @@ final class EarTabsTests: XCTestCase {
             let shared = a.intersection(b)
             return !shared.isNull && shared.width > 0.001 && shared.height > 0.001
         }
+        // Les tranches visibles se touchent sans se recouvrir ; le corps de chacun glisse sous le précédent.
         for item in layout.items {
             XCTAssertFalse(overlap(item.frame, notch), "\(item.id) ne recouvre pas la notch")
             for other in layout.items where other.id != item.id {
@@ -187,11 +191,12 @@ final class EarTabsTests: XCTestCase {
         while x <= 330 {
             for y in stride(from: CGFloat(0), through: 34, by: 1) {
                 let point = CGPoint(x: x, y: y)
-                // Deux intercalaires voisins partagent leur bord : à ce point, l'un ou l'autre.
-                let inTabs = layout.items.filter { $0.frame.insetBy(dx: -0.001, dy: -0.001).contains(point) }.map { $0.id }
+                // Deux intercalaires voisins partagent leur bord, et le coin arrondi de l'un laisse voir le corps de l'autre.
+                let inBodies = layout.items.filter { $0.bodyFrame.insetBy(dx: -0.001, dy: -0.001).contains(point) }.map { $0.id }
+                let inSlices = layout.items.filter { $0.frame.insetBy(dx: -0.001, dy: -0.001).contains(point) }.map { $0.id }
                 switch layout.hit(point, hovered: nil, cardHeight: 0) {
-                case .tab(let id): XCTAssertTrue(inTabs.contains(id), "(\(x), \(y))")
-                case .notch: XCTAssertTrue(abs(x) <= 92.5 && (inTabs.isEmpty || abs(x) == 92.5), "(\(x), \(y))")
+                case .tab(let id): XCTAssertTrue(inBodies.contains(id), "(\(x), \(y))")
+                case .notch: XCTAssertTrue(abs(x) <= 92.5 && (inSlices.isEmpty || abs(x) == 92.5), "(\(x), \(y))")
                 case .none: XCTAssertGreaterThan(abs(x), 92.5, "(\(x), \(y)) : jamais de trou dans la notch")
                 }
             }
