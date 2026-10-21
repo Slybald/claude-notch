@@ -40,6 +40,8 @@ final class FanController: ObservableObject {
     private var heartbeat: Timer?
     private var reading = false
     private var observers: [NSObjectProtocol] = []
+    /// Empêche App Nap de retarder les nouvelles à l'outil (bail de 30 s) ; la veille reste permise.
+    private var activity: NSObjectProtocol?
 
     init(backend: FanBackend, defaults: UserDefaults, readInterval: TimeInterval = 2, heartbeatInterval: TimeInterval = 10,
          workspace: NotificationCenter = NSWorkspace.shared.notificationCenter) {
@@ -184,6 +186,8 @@ final class FanController: ObservableObject {
             return report(QuickSettingsIssue(message: L("Ventilateurs : impossible de lancer l'outil.", table: "QuickSettings")))
         }
         hold = current
+        activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
+                                                         reason: "Ventilateurs en vitesse fixe")
         defaults.set(true, forKey: Self.manualFlagKey)
         send(rpm)
         startHeartbeat()
@@ -239,6 +243,8 @@ final class FanController: ObservableObject {
     private func finishHold() {
         hold = nil
         backend.endHold()
+        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        activity = nil
         heartbeat?.invalidate()
         heartbeat = nil
         observers.forEach(workspace.removeObserver)
