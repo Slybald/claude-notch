@@ -304,7 +304,7 @@ struct NotesEditorCard: View {
 
     /// Échap : le clavier retourne à l'app de devant.
     private static func leaveEditor() {
-        NSApp.windows.first { $0 is NotchPanel && $0.isVisible }?.makeFirstResponder(nil)
+        NotchKeyboard.panel?.makeFirstResponder(nil)
         NotchKeyboard.release(force: true)
     }
 }

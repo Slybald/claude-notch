@@ -28,6 +28,10 @@ final class NotchViewModel: ObservableObject {
     @Published var hoveredTab: String?
     /// Hauteur mesurée de l'intercalaire déployé : avec sa largeur, la zone de survol qui le garde ouvert.
     var tabCardHeight: CGFloat = 0
+    /// Notch détachée en bulle (voir `BubbleController`).
+    @Published var bubble = BubblePhase.attached
+    /// La goutte remplace la notch dépliée pendant le décollage : la notch est cachée dessous.
+    @Published var gooActive = false
 }
 
 struct NotchActions {
@@ -40,6 +44,12 @@ struct NotchActions {
     var openSettings: () -> Void = {}
     /// Ouvre le panneau sur l'onglet de cette activité (clic sur un intercalaire).
     var openTab: (String) -> Void = { _ in }
+    /// Appui maintenu sur la poignée de l'angle : le glisser qui suit décolle la notch.
+    var beginDetach: () -> Void = {}
+    /// « Détacher la notch » (menu « … », VoiceOver) ; nil = pas d'entrée.
+    var detach: (() -> Void)?
+    /// « Rattacher à la notch » (panneau de la bulle) ; nil = pas d'entrée.
+    var reattach: (() -> Void)?
 }
 
 final class NotchPanel: NSPanel {
@@ -69,6 +79,8 @@ final class NotchController {
     let model = NotchViewModel()
     let registry: ModuleRegistry
     let panel: NotchPanel
+    /// Notch détachée en bulle.
+    let bubble: BubbleController
 
     private let store: SessionStore
     private let monitor: ClaudeMonitor
@@ -107,6 +119,8 @@ final class NotchController {
     var mouseLocation: () -> CGPoint = { NSEvent.mouseLocation }
     /// Onglet d'avant qu'un glisser de fichiers montre l'Étagère ; nil dès qu'un dépôt a lieu.
     private var tabBeforeDrag: String?
+    /// Glisser de décollage en cours (poignée de l'angle) : suit la souris jusqu'au relâchement.
+    private var detachMonitor: Any?
 
     init(store: SessionStore, monitor: ClaudeMonitor, prefs: Preferences, tools: ToolsFeed) {
         self.store = store
@@ -116,6 +130,7 @@ final class NotchController {
         codex = CodexModule()
         registry = ModuleRegistry(modules: ModuleRegistry.standardModules(claude: claude, codex: codex), prefs: prefs)
         settings = SettingsWindow(prefs: prefs, registry: registry)
+        bubble = BubbleController(model: model, prefs: prefs, registry: registry, store: store)
 
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize),
                            styleMask: [.borderless, .nonactivatingPanel],
@@ -158,7 +173,9 @@ final class NotchController {
             quit: { NSApp.terminate(nil) },
             revealFile: { [weak self] path in self?.reveal(path) },
             openSettings: { [weak self] in self?.openSettings() },
-            openTab: { [weak self] id in self?.openTab(id) }
+            openTab: { [weak self] id in self?.openTab(id) },
+            beginDetach: { [weak self] in self?.beginDetach() },
+            detach: { [weak self] in self?.detachFromMenu() }
         )
         claude.actions = actions
         codex.openHost = { [weak self] bundleId, link in
@@ -192,17 +209,20 @@ final class NotchController {
         model.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         model.isShown = isShown
         updateGeometry()
+        startBubble(actions: actions)
         installMouseMonitors()
         observeChanges()
         observeShellSettings()
         updateFullScreen()
         updateVisibility()
+        bubble.restore()
     }
 
     /// Réglages… (menu « … », ⌘,).
     func openSettings() {
         suppressUntilExit = true
         collapse()
+        bubble.close()
         settings.show()
     }
 
@@ -237,6 +257,7 @@ final class NotchController {
             "background": prefs.panelBackground.rawValue,
             "reduceMotion": model.reduceMotion,
             "sharingType": panel.sharingType == .none ? "none" : "readOnly",
+            "bubble": bubble.debugInfo,
         ]
         // Choix de l'écran sans son nom (le nom de l'écran utilisé est déjà sous `screen`).
         let choices = [ScreenChoice.builtin, ScreenChoice.main, ScreenChoice.mouse]
@@ -330,8 +351,8 @@ final class NotchController {
             guard let self else { return event }
             if event.type != .leftMouseDown {
                 self.mouseMoved()
-            } else if event.window !== self.panel {
-                // Clic dans une autre fenêtre de l'app (réglages) ; ceux du panneau restent aux vues.
+            } else if event.window !== self.panel, event.window !== self.bubble.window {
+                // Clic dans une autre fenêtre de l'app (réglages) ; ceux du panneau et de la bulle restent aux vues.
                 self.mouseDown()
             }
             return event
@@ -379,8 +400,10 @@ final class NotchController {
 
     func mouseMoved() {
         followMouseScreen()
-        guard isShown else { return }
+        // Décollage ou bulle déplacée : la souris est à la bulle, la notch ne réagit pas à son passage.
+        guard isShown, !bubble.isInteracting else { return }
         let point = mouseLocation()
+        bubble.mouseMoved(point)
         let hit = model.isExpanded ? .none : collapsedHit(point)
         let inside = model.isExpanded ? isInsideZone(point) : hit != .none
         if !inside { suppressUntilExit = false }
@@ -403,7 +426,8 @@ final class NotchController {
             return
         }
         updateTabHover(hit)
-        if hit == .notch, !suppressUntilExit, prefs.openTrigger == .hover {
+        // Notch détachée : la bulle est le panneau, le survol de la notch n'en ouvre pas un second.
+        if hit == .notch, !suppressUntilExit, prefs.openTrigger == .hover, !model.bubble.isDetached {
             guard openWork == nil else { return }
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
@@ -501,6 +525,7 @@ final class NotchController {
     /// Mode « au clic » : clic sur la notch repliée. Panneau ouvert qui attend un clic à l'extérieur : il se ferme.
     /// En mode édition des onglets, un clic à l'extérieur sort seulement du mode.
     func mouseDown(at point: CGPoint = NSEvent.mouseLocation) {
+        bubble.mouseDown(at: point)
         guard isShown else { return }
         if model.isExpanded {
             let inside = isInsideZone(point)
@@ -516,7 +541,7 @@ final class NotchController {
             case .tab(let id):
                 // Le clic est arrivé avant le déploiement : même effet que sur l'intercalaire déployé.
                 openTab(id)
-            case .notch where prefs.openTrigger == .click:
+            case .notch where prefs.openTrigger == .click && !model.bubble.isDetached:
                 openWork?.cancel()
                 openWork = nil
                 expand()
@@ -537,7 +562,9 @@ final class NotchController {
     private var isCompact: Bool { model.isFullScreen && prefs.fullScreenBehavior == .compact }
 
     private func expand(tab: String? = nil) {
-        guard !model.isExpanded else { return }
+        // Notch détachée : un intercalaire ouvre la bulle sur son onglet.
+        if model.bubble.isDetached { return bubble.open(tab: tab) }
+        guard !model.isExpanded, model.bubble == .attached else { return }
         cancelPendingTab()
         if model.hoveredTab != nil {
             model.hoveredTab = nil
@@ -554,6 +581,7 @@ final class NotchController {
     }
 
     private func collapse() {
+        bubble.close()
         openWork?.cancel()
         openWork = nil
         closeWork?.cancel()
@@ -604,7 +632,9 @@ final class NotchController {
     /// Glisser de fichiers au-dessus de la notch repliée : déplie tout de suite sur l'Étagère, puis `ShelfDropView`
     /// prend le relais (fenêtre qui accepte la souris). Une fois par glisser ; jamais en plein écran « masquée ».
     private func openForFileDrag() -> Bool {
-        guard let baseline = fileDragBaseline, !model.isExpanded, !hiddenForFullScreen, !prefs.isHidden(at: now()),
+        // shortcut: notch détachée, pas d'Étagère par glisser vers la notch (ni vers la bulle) ; à ajouter si demandé.
+        guard let baseline = fileDragBaseline, !model.isExpanded, !model.bubble.isDetached, !hiddenForFullScreen,
+              !prefs.isHidden(at: now()),
               Self.dropZone(notch: notchRect, screen: screenFrame,
                             contentWidth: max(model.contentSize.width, 2 * earLayout().reach))
                 .contains(NSEvent.mouseLocation) else { return false }
@@ -736,6 +766,7 @@ final class NotchController {
                                                      object: nil, queue: .main) { [weak self] _ in
             self?.updateGeometry()
             self?.updateFullScreen()
+            self?.bubble.screensChanged()
         }))
         observers.append((center, center.addObserver(forName: NSMenu.didBeginTrackingNotification,
                                                      object: nil, queue: .main) { [weak self] _ in
@@ -771,6 +802,7 @@ final class NotchController {
             guard let self else { return }
             self.updateFullScreen()
             if self.isShown { self.panel.orderFrontRegardless() }
+            self.bubble.orderFront()
         }
     }
 
@@ -805,6 +837,7 @@ final class NotchController {
     private func updateVisibility() {
         // Masquage temporaire échu : on l'oublie (le rappel des réglages disparaît).
         if let until = prefs.hiddenUntil, until <= now() { prefs.hiddenUntil = nil }
+        bubble.setSuppressed(hiddenForFullScreen || hiddenByUser)
         if shouldShow {
             hideWork?.cancel()
             hideWork = nil
@@ -910,6 +943,7 @@ final class NotchController {
 
     /// Raccourci global : ouvre le panneau avec le clavier (même notch masquée), ou le ferme.
     func togglePanelFromKeyboard() {
+        if model.bubble.isDetached { return bubble.togglePanel() }
         if model.isExpanded {
             suppressUntilExit = true
             collapse()
@@ -943,6 +977,7 @@ final class NotchController {
     /// Panneau ouvert au raccourci : ← → et ⌘1…⌘9 changent d'onglet, Échap ferme et rend le clavier (plein écran
     /// compact compris). Ouvert au survol ou au clic, rien ne change (les champs des modules gardent leurs touches).
     func handleKey(_ event: NSEvent) -> Bool {
+        if bubble.handleKey(event) { return true }
         guard model.isExpanded, panel.isKeyWindow,
               let command = NotchKeyCommand.parse(keyCode: event.keyCode, modifiers: event.modifierFlags,
                                                   editingText: panel.firstResponder is NSText) else { return false }
@@ -988,9 +1023,77 @@ final class NotchController {
         durations.addItem(hint)
         hide.submenu = durations
         menu.addItem(hide)
+        if model.bubble.isDetached {
+            menu.addItem(ClosureMenuItem(L("Rattacher à la notch", table: "Bubble")) { [weak self] in
+                self?.bubble.reattach()
+            })
+        } else if prefs.allowsDetach {
+            menu.addItem(ClosureMenuItem(L("Détacher la notch", table: "Bubble")) { [weak self] in
+                self?.detachFromMenu()
+            })
+        }
         menu.addItem(.separator())
         menu.addItem(ClosureMenuItem(L("Réglages…")) { [weak self] in self?.openSettings() })
         menu.popUp(positioning: nil, at: mouse, in: nil)
+    }
+
+    // MARK: - Bulle
+
+    private func startBubble(actions: NotchActions) {
+        bubble.notchRect = { [weak self] in self?.notchRect ?? .zero }
+        bubble.notchWindow = { [weak self] in self?.panel }
+        bubble.collapseNotch = { [weak self] in self?.collapseForBubble() }
+        bubble.didAttach = { [weak self] in
+            // La souris est sous la notch : elle ne la rouvre pas avant d'en être sortie.
+            self?.suppressUntilExit = true
+            self?.updateVisibility()
+        }
+        bubble.openSettings = { [weak self] in self?.openSettings() }
+        bubble.isMenuTracking = { [weak self] in self?.menuTracking ?? false }
+        bubble.start(actions: actions)
+    }
+
+    /// Panneau déplié en coordonnées écran : la forme visible (sans les évasements du haut).
+    private var expandedPanelRect: CGRect {
+        let size = model.contentSize
+        return CGRect(x: notchRect.midX - size.width / 2, y: screenFrame.maxY - size.height, width: size.width,
+                      height: size.height).insetBy(dx: 12, dy: 0)
+    }
+
+    /// Appui maintenu sur la poignée : les glisser et le relâchement arrivent à cette fenêtre (celle du clic) jusqu'au
+    /// relâchement, même hors d'elle.
+    private func beginDetach() {
+        guard prefs.allowsDetach, model.isExpanded, model.bubble == .attached, detachMonitor == nil else { return }
+        closeWork?.cancel()
+        closeWork = nil
+        bubble.beginPull(panel: expandedPanelRect)
+        detachMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self] event in
+            guard let self else { return event }
+            if event.type == .leftMouseUp {
+                if let monitor = self.detachMonitor { NSEvent.removeMonitor(monitor) }
+                self.detachMonitor = nil
+                self.bubble.pullEnded()
+            } else {
+                self.bubble.pullMoved()
+            }
+            return event
+        }
+    }
+
+    /// « Détacher la notch » (menu « … », clic droit, VoiceOver) : sans glisser.
+    private func detachFromMenu() {
+        guard prefs.allowsDetach, model.bubble == .attached else { return }
+        closeWork?.cancel()
+        closeWork = nil
+        bubble.detachAutomatically(panel: model.isExpanded ? expandedPanelRect : nil)
+    }
+
+    /// La goutte a pris la place du panneau : la notch se replie dessous, sans animation.
+    private func collapseForBubble() {
+        suppressUntilExit = true
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { collapse() }
     }
 
     static func title(_ duration: HideDuration) -> String {

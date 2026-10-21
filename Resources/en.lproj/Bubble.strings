@@ -1,0 +1,15 @@
+/* English texts of the detached notch (bubble, cylinder of tabs, Settings › General). The key is the French text used in the code. */
+"Bulle" = "Bubble";
+"Permettre de détacher la notch" = "Allow detaching the notch";
+"Revenir à la notch au redémarrage" = "Return to the notch at relaunch";
+"Maintiens l'angle en bas à droite du panneau puis glisse : la notch se décolle en bulle, à poser où tu veux. Ramène-la sous la notch, double-clique sur son bord ou choisis « Rattacher à la notch » pour la remettre." = "Hold the bottom right corner of the panel, then drag: the notch peels off into a bubble you can put anywhere. Bring it back under the notch, double-click its edge or choose “Reattach to Notch” to put it back.";
+"Détacher la notch" = "Detach Notch";
+"Rattacher à la notch" = "Reattach to Notch";
+"Maintiens puis glisse pour détacher la notch" = "Hold, then drag to detach the notch";
+"La notch devient une bulle à poser où tu veux." = "The notch becomes a bubble you can put anywhere.";
+"Bulle de la notch" = "Notch bubble";
+"Centre : ouvrir. Molette ou glisser sur les onglets : tourner. Bord : déplacer ; double-clic pour rattacher à la notch." = "Center: open. Scroll or drag over the tabs: turn. Edge: move; double-click to reattach to the notch.";
+"Balaie vers le haut ou le bas pour tourner le barillet, active pour ouvrir." = "Swipe up or down to turn the cylinder, activate to open.";
+"%@, onglet %d sur %d" = "%@, tab %d of %d";
+"Activité : %@" = "Activity: %@";
+"Ouvrir" = "Open";
