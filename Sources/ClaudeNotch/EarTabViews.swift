@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Forme d'un intercalaire : le bord extérieur reprend celui de la notch (`NotchShape`) : évasement concave en haut, qui
 /// dépasse de la tranche et rejoint le haut de l'écran, et coin bas arrondi de même rayon et de même courbe ; coin
-/// intérieur bas arrondi une fois déployé. Le prolongement derrière la notch ou derrière l'intercalaire précédent
+/// intérieur bas arrondi une fois déployé, raccordé à la notch par un congé concave. Le prolongement derrière la notch ou derrière l'intercalaire précédent
 /// (`overlap`, sur `overlapHeight`) bouche le jour que laissent leurs coins arrondis.
 struct EarTabShape: Shape {
     var side: EarTabsLayout.Side
@@ -50,7 +50,12 @@ struct EarTabShape: Shape {
         if overlap > 0, overlapHeight > 0 {
             // Jusqu'en bas de la notch, même si la carte déployée est basse : le jour du coin arrondi de la notch s'y trouve.
             let y = min(overlapHeight, rect.maxY)
-            path.addLine(to: CGPoint(x: i, y: y))
+            // Là où la carte déployée dépasse sous la notch : raccord concave, du rayon de l'évasement du haut, au lieu d'un angle vif.
+            let fillet = max(0, min(flare, overlap, rect.maxY - inner - y))
+            path.addLine(to: CGPoint(x: i, y: y + fillet))
+            if fillet > 0 {
+                path.addQuadCurve(to: CGPoint(x: i + s * fillet, y: y), control: CGPoint(x: i, y: y))
+            }
             path.addLine(to: CGPoint(x: i + s * overlap, y: y))
             path.addLine(to: CGPoint(x: i + s * overlap, y: rect.minY))
         } else {

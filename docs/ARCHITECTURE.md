@@ -185,8 +185,18 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     deployed card's inner corner radius never starts above that bottom (`EarTabsLayout.cardInnerRadius`). The rendered base
     is measured across the whole fan (`testFanBaseIsContinuousAndFlushWithTheNotch`): covered at the notch's bottom,
     nothing under it (so no drop shadow at rest: the shadow of the covering tab is a gradient inside the slice).
-  - **Look** (`EarTabViews.swift`): a fan, like cards spread on a table. Each tab is its own shape (rounded outer
-    bottom corner) drawn in the notch's black and as tall as the notch, with a discreet accent per activity
+  - **Outer edge = the notch's outline** (`EarTabsGeometryTests`: path elements identical to `NotchShape`, rendered
+    profile compared line by line, no gap between slices). Each tab's outer side is drawn with the very curves of
+    `NotchShape` (quadratic, control point in the corner) and the radii it takes collapsed, shared as constants
+    (`NotchShape.collapsedTopRadius` 6 pt: concave flare that joins the top of the screen and sticks out of the slice;
+    `collapsedBottomRadius` 9 pt: bottom corner), also on an 8 pt sliver (the corner then ends under the neighbour).
+    Measured on the hardware notch of the 14" (photo, curve fit): bottom corner ≈ 8 pt, top flare ≈ 4.4 pt, both
+    quadratic; 2.0.0 had a 6 pt corner and a sharp top corner, hence the odd join. Unfolded: same flare, 14 pt corner
+    (`EarTabs.cardRadius`), and where the card drops under the notch (or under the tab before it) the concave corner
+    is rounded by a fillet of the flare's radius (`EarTabShape`), never a sharp angle. The flare and fillet are drawn
+    only: hit zones are the bodies. The light edge (`EarTabEdge`) is the exact outline, clipped by the shape.
+  - **Look** (`EarTabViews.swift`): a fan, like cards spread on a table. Each tab is its own shape
+    drawn in the notch's black and as tall as the notch, with a discreet accent per activity
     (`EarTabs.accentHex`: Claude takes the accent of the settings). Rank 0 (against the notch) is on top; the body of every other tab slides under the
     previous one (`EarTabs.overlap`) and only its **slice** shows (`EarTabsLayout.Item.width`, see `EarTabs.slice(of:rank:mode:)`;
     `frame` is the slice, `bodyFrame` the whole tab). Stacking is `zIndex(-rank)`; a thin light edge (`EarTabEdge`), a soft

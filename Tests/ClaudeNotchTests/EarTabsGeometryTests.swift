@@ -107,7 +107,7 @@ final class EarTabsGeometryTests: XCTestCase {
         }
     }
 
-    private enum Tabs { case claudeOnly, claudeAndTimer, six }
+    private enum Tabs { case claudeOnly, claudeAndTimer, three, four, six }
 
     private func scene(_ tabs: Tabs, notch: CGSize, hasNotch: Bool, mode: EarTabsMode = .visible,
                        hovered: String? = nil) -> Scene {
@@ -122,7 +122,8 @@ final class EarTabsGeometryTests: XCTestCase {
             FakeModule(id: id, ears: ModuleEars(symbol: symbol, text: text, priority: priority, bars: id == "media"),
                        keepsRunning: true)
         }
-        let modules: [FakeModule] = tabs == .claudeOnly ? [] : tabs == .claudeAndTimer ? [timer] : [timer] + others
+        let count = [Tabs.claudeOnly: 0, .claudeAndTimer: 1, .three: 2, .four: 3, .six: 5][tabs] ?? 0
+        let modules: [FakeModule] = Array(([timer] + others).prefix(count))
         let registry = ModuleRegistry(modules: [harness.claude] + modules, prefs: harness.prefs)
         registry.reconcile()
         return Scene(harness: harness, registry: registry)
@@ -351,6 +352,53 @@ final class EarTabsGeometryTests: XCTestCase {
         }
     }
 
+    /// Carte déployée : là où elle dépasse sous la notch (ou sous l'intercalaire qui la précède), le coin concave est
+    /// raccordé par une quadratique du rayon de l'évasement du haut (point de contrôle dans l'angle), pas un angle vif ;
+    /// sa taille suit ce qui dépasse, de chaque côté et à toute taille d'encoche. (Tracé : l'ombre de la carte colore
+    /// aussi l'angle, une mesure en pixels n'y distingue rien.)
+    func testUnfoldedCardIsFilletedToTheNotch() {
+        let flare = EarTabs.flareRadius
+        for (size, _) in Self.notches {
+            for side in [EarTabsLayout.Side.left, .right] {
+                // Dépassement sous la notch : 0, 3 pt, puis assez pour un congé entier (le coin bas intérieur en prend 14).
+                for extra in [CGFloat(0), 3, EarTabs.cardRadius + 3, EarTabs.cardRadius + flare, 120] {
+                    let height = size.height + extra
+                    let inner = min(EarTabs.cardRadius, extra)
+                    let rect = CGRect(x: side == .left ? -300 : 100, y: 0, width: EarTabs.cardWidth, height: height)
+                    let shape = EarTabShape(side: side, outerRadius: EarTabs.cardRadius, innerRadius: inner,
+                                            overlap: EarTabs.overlap, overlapHeight: size.height)
+                    let s: CGFloat = side == .left ? 1 : -1
+                    let edge = side == .left ? rect.maxX : rect.minX
+                    var fillets: [(to: CGPoint, control: CGPoint)] = []
+                    var previous: CGPoint?
+                    var beforeFillet: CGPoint?
+                    shape.path(in: rect).forEach { element in
+                        switch element {
+                        case .quadCurve(let p, let c) where abs(c.x - edge) < 0.001 && abs(c.y - size.height) < 0.001:
+                            fillets.append((p, c))
+                            beforeFillet = previous
+                        case .move(let p), .line(let p), .quadCurve(let p, _): previous = p
+                        default: break
+                        }
+                    }
+                    let expected = max(0, min(flare, extra - inner))
+                    let label = "\(size) \(side) dépasse de \(extra)"
+                    if expected == 0 {
+                        XCTAssertTrue(fillets.isEmpty, "\(label) : congé sans place")
+                    } else {
+                        XCTAssertEqual(fillets.count, 1, label)
+                        guard let fillet = fillets.first, let before = beforeFillet else { continue }
+                        XCTAssertEqual(fillet.to.x, edge + s * expected, accuracy: 0.001, label)
+                        XCTAssertEqual(fillet.to.y, size.height, accuracy: 0.001, label)
+                        XCTAssertEqual(before.x, edge, accuracy: 0.001, "\(label) : l'arête arrive droite")
+                        XCTAssertEqual(before.y, size.height + expected, accuracy: 0.001, label)
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(flare, NotchShape.collapsedTopRadius, "le congé a le rayon de l'évasement de la notch")
+    }
+
     // MARK: - Rendus PNG (CLAUDE_NOTCH_SNAPSHOT_DIR)
 
     /// Rendus sur fond de bureau, avec l'encoche physique en contour (cyan) : `geometry-<état>.png`, 300 × 40 pt à 4×.
@@ -388,6 +436,93 @@ final class EarTabsGeometryTests: XCTestCase {
                                             width: size.width * s, height: size.height * s - 0.5))
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             try XCTUnwrap(out.representation(using: .png, properties: [:])).write(to: dir.appendingPathComponent("geometry-\(name).png"))
+        }
+    }
+
+    /// Rendus agrandis du bord extérieur, `arrondis-<état>.png` : en haut la bande (4×) avec le contour de l'encoche physique
+    /// (cyan) ; en dessous, le bord extérieur gauche et droit agrandis, avec `NotchShape` aux rayons de la notch repliée
+    /// (jaune) posée sur l'arête : le contour de l'intercalaire doit s'y confondre. Au repos de 1 à 4 intercalaires,
+    /// rétractés, un déployé (rang 0 et 1), encoche virtuelle.
+    func testRenderRoundedEdges() throws {
+        guard let dir = TimerNotesSnapshot.outputDirectory else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
+        let virtual = CGSize(width: 200, height: 24)
+        let cases: [(String, Scene, String?)] = [
+            ("repos-1", scene(.claudeOnly, notch: Self.measured, hasNotch: true), nil),
+            ("repos-2", scene(.claudeAndTimer, notch: Self.measured, hasNotch: true), nil),
+            ("repos-3", scene(.three, notch: Self.measured, hasNotch: true), nil),
+            ("repos-4", scene(.four, notch: Self.measured, hasNotch: true), nil),
+            ("repos-6", scene(.six, notch: Self.measured, hasNotch: true), nil),
+            ("retractes-4", scene(.four, notch: Self.measured, hasNotch: true, mode: .retracted), nil),
+            ("ouvert-rang-0", scene(.four, notch: Self.measured, hasNotch: true, hovered: "claude"), "claude"),
+            ("ouvert-rang-1", scene(.four, notch: Self.measured, hasNotch: true, hovered: "media"), "media"),
+            ("virtuelle-2", scene(.claudeAndTimer, notch: virtual, hasNotch: false), nil),
+            ("virtuelle-4", scene(.four, notch: virtual, hasNotch: false), nil),
+        ]
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for (name, scene, hovered) in cases {
+            let notch = scene.harness.model.notchSize
+            let source: CGFloat = 10
+            let open = hovered != nil
+            let bitmap = try render(scene.root, background: Self.wallpaper,
+                                    size: CGSize(width: Self.band.width, height: open ? 150 : 70), scale: source)
+            let layout = scene.registry.earLayout(claude: scene.harness.store.indicator, claudeEars: scene.harness.store.ears,
+                                                  notch: notch)
+            let card = max(scene.harness.model.tabCardHeight, notch.height)
+            let shown = (open ? card : notch.height) + 8
+            func outer(_ items: [EarTabsLayout.Item], _ side: EarTabsLayout.Side) -> CGFloat {
+                let edges = items.map { item -> CGFloat in
+                    let frame = item.id == hovered ? layout.cardFrame(item, height: card) : item.frame
+                    return side == .left ? frame.minX : frame.maxX
+                }
+                return (side == .left ? edges.min() : edges.max()) ?? (side == .left ? -notch.width / 2 : notch.width / 2)
+            }
+            let edges: [(EarTabsLayout.Side, CGFloat)] = [(.left, outer(layout.left, .left)), (.right, outer(layout.right, .right))]
+            let zoom: CGFloat = open ? 6 : 10, panelWidth: CGFloat = 56
+            let strip = CGRect(x: 0, y: 0, width: 1200, height: shown * 4)
+            let panelHeight = shown * zoom
+            let total = CGSize(width: 1200, height: strip.height + 10 + panelHeight)
+            let out = try XCTUnwrap(NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(total.width), pixelsHigh: Int(total.height), bitsPerSample: 8,
+                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: out)).cgContext
+            context.setFillColor(NSColor(white: 0.12, alpha: 1).cgColor)
+            context.fill(CGRect(origin: .zero, size: total))
+            let image = try XCTUnwrap(bitmap.cgImage)
+            func draw(_ crop: CGRect, into destination: CGRect) throws {
+                context.interpolationQuality = .none
+                context.draw(try XCTUnwrap(image.cropping(to: crop)), in: destination)
+            }
+            // Bande, avec l'encoche physique en cyan (y vers le haut dans ce contexte).
+            try draw(CGRect(x: (Self.band.width / 2 - 150) * source, y: 0, width: 300 * source, height: shown * source),
+                     into: CGRect(x: 0, y: panelHeight + 10, width: strip.width, height: strip.height))
+            context.setStrokeColor(NSColor.cyan.cgColor)
+            context.setLineWidth(1)
+            context.stroke(CGRect(x: (150 - notch.width / 2) * 4, y: panelHeight + 10 + strip.height - notch.height * 4,
+                                  width: notch.width * 4, height: notch.height * 4 - 0.5))
+            // Bords extérieurs agrandis, avec la notch de référence en jaune.
+            for (index, (side, edge)) in edges.enumerated() {
+                let x0 = side == .left ? edge - 14 : edge - panelWidth + 14
+                let destination = CGRect(x: CGFloat(index) * (total.width - panelWidth * zoom), y: 0, width: panelWidth * zoom,
+                                         height: panelHeight)
+                context.saveGState()
+                defer { context.restoreGState() }
+                context.clip(to: destination)
+                try draw(CGRect(x: (Self.band.width / 2 + x0) * source, y: 0, width: panelWidth * source, height: shown * source),
+                         into: destination)
+                let top = NotchShape.collapsedTopRadius
+                let bottom = (open && edge == outer(side == .left ? layout.left : layout.right, side) && hovered != nil)
+                    ? EarTabs.cardRadius : NotchShape.collapsedBottomRadius
+                let reference = CGRect(x: side == .left ? edge - top : edge + top - 80, y: 0, width: 80,
+                                       height: open ? card : notch.height)
+                var transform = CGAffineTransform(a: zoom, b: 0, c: 0, d: -zoom, tx: destination.minX - x0 * zoom,
+                                                  ty: destination.minY + panelHeight)
+                let path = NotchShape(topRadius: top, bottomRadius: bottom).path(in: reference).cgPath.copy(using: &transform)!
+                context.setStrokeColor(NSColor.yellow.cgColor)
+                context.setLineWidth(1.5)
+                context.addPath(path)
+                context.strokePath()
+            }
+            try XCTUnwrap(out.representation(using: .png, properties: [:])).write(to: dir.appendingPathComponent("arrondis-\(name).png"))
         }
     }
 }
