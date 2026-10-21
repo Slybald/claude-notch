@@ -37,8 +37,9 @@ final class ModuleTests: XCTestCase {
     func testStandardModulesHaveStableIdsAndClaudeFirst() {
         let notch = NotchHarness(self)
         XCTAssertEqual(notch.registry.modules.map { $0.id },
-                       ["claude", "media", "quicksettings", "shelf", "clipboard", "timer", "notes"])
-        XCTAssertEqual(notch.registry.enabled.map { $0.id }, notch.registry.modules.map { $0.id })
+                       ["claude", "codex", "media", "quicksettings", "shelf", "clipboard", "timer", "notes"])
+        // Codex n'est activé d'office que s'il est détecté (décidé au premier lancement, jamais sous test).
+        XCTAssertEqual(notch.registry.enabled.map { $0.id }, notch.registry.modules.map { $0.id }.filter { $0 != "codex" })
         for module in notch.registry.modules {
             XCTAssertNotNil(NSImage(systemSymbolName: module.symbol, accessibilityDescription: nil), module.symbol)
             XCTAssertFalse(module.title.isEmpty)

@@ -3,9 +3,10 @@ import Foundation
 
 extension ModuleRegistry {
     /// Tous les onglets, dans l'ordre par défaut. Ajouter un module = une ligne ici.
-    static func standardModules(claude: ClaudeModule) -> [any NotchModule] {
+    static func standardModules(claude: ClaudeModule, codex: CodexModule = CodexModule()) -> [any NotchModule] {
         [
             claude,
+            codex,
             MediaModule(),
             QuickSettingsModule(),
             ShelfModule(),
@@ -19,6 +20,7 @@ extension ModuleRegistry {
 /// Les onglets de la notch : ordre et activation (lus dans les réglages), cycle de vie, oreilles des modules.
 final class ModuleRegistry: ObservableObject {
     static let claudeId = "claude"
+    static let codexId = "codex"
 
     /// Tous les modules connus, dans l'ordre par défaut.
     let modules: [any NotchModule]
@@ -126,6 +128,7 @@ final class ModuleRegistry: ObservableObject {
     func initialTab(claudeNeedsAttention: Bool) -> String {
         let ids = enabled.map { $0.id }
         if claudeNeedsAttention, ids.contains(Self.claudeId) { return Self.claudeId }
+        if ids.contains(Self.codexId), (module(Self.codexId) as? CodexModule)?.needsAttention == true { return Self.codexId }
         let wanted = prefs.defaultTab == Preferences.lastTabChoice ? prefs.lastTab : prefs.defaultTab
         return ids.contains(wanted) ? wanted : (ids.first ?? Self.claudeId)
     }

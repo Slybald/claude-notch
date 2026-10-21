@@ -7,6 +7,9 @@ CONFIG_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 
 /usr/bin/python3 -I "$ROOT/scripts/hooks_config.py" uninstall
 rm -f "$CONFIG_DIR/hooks/claude-notch-hook.sh"
+if grep -qs codex-notch-hook.sh "$HOME/.codex/hooks.json"; then
+    echo "Hooks Codex encore posés dans ~/.codex/hooks.json : retire-les d'abord (Réglages > Codex > Retirer les hooks)."
+fi
 
 # Identifiant actuel, puis celui des premières versions.
 for LABEL in io.github.slybald.claudenotch local.claudenotch; do

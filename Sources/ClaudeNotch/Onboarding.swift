@@ -77,7 +77,8 @@ final class HookSetup: ObservableObject {
     /// Assistant de configuration : au premier lancement (`firstRun`), ou relancé depuis Réglages › Général, auquel
     /// cas il part des réglages actuels. `~/.claude` n'est lu que si l'onglet Claude est proposé.
     func showSetupAssistant(registry: ModuleRegistry, prefs: Preferences,
-                            claudeDetected: Bool = HookInstaller.claudeCodeOnThisMac, firstRun: Bool = false) {
+                            claudeDetected: Bool = HookInstaller.claudeCodeOnThisMac,
+                            codexDetected: Bool = CodexHookInstaller.codexOnThisMac, firstRun: Bool = false) {
         DispatchQueue.main.async { [self] in
             if let assistant {
                 assistant.showWindow(nil)
@@ -87,7 +88,7 @@ final class HookSetup: ObservableObject {
             let claudeOffered = claudeDetected || registry.isClaudeEnabled
             if claudeOffered { refresh() }
             let model = SetupAssistantModel(
-                registry: registry, prefs: prefs, claudeDetected: claudeDetected,
+                registry: registry, prefs: prefs, claudeDetected: claudeDetected, codexDetected: codexDetected,
                 hookStatus: claudeOffered ? status : .notInstalled, firstRun: firstRun, inApplications: isInApplications,
                 installHooks: { [weak self] in self?.installHooks() },
                 applyLaunchAtLogin: { [weak self] in self?.applyLaunchAtLogin($0) },
@@ -181,6 +182,10 @@ final class HookSetup: ObservableObject {
             Self.activateApp()
             refresh()
             let hooks = status != .notInstalled
+            // Les hooks de Claude Notch dans ~/.codex/hooks.json partent aussi (si lisibles : un fichier cassé
+            // n'empêche pas la désinstallation).
+            let codexInstaller = CodexHookInstaller.standard
+            let codexHooks = [.installed, .outdated, .scriptOutdated].contains(codexInstaller.status())
             let alert = NSAlert()
             alert.alertStyle = .warning
             alert.messageText = L("Désinstaller Claude Notch ?")
@@ -189,6 +194,10 @@ final class HookSetup: ObservableObject {
                     + "horodatée à côté, tes autres hooks restent en place), ainsi que ~/.claude/hooks/claude-notch-hook.sh "
                     + "et le lancement à l'ouverture de session. L'app se fermera ensuite.")
                 : L("Le lancement à l'ouverture de session sera retiré. L'app se fermera ensuite.")
+            if codexHooks {
+                alert.informativeText += "\n\n" + L("Les hooks de Codex seront aussi retirés de ~/.codex/hooks.json "
+                                                      + "(sauvegarde horodatée à côté).", table: "Codex")
+            }
             alert.addButton(withTitle: L("Désinstaller"))
             alert.addButton(withTitle: L("Annuler"))
             alert.buttons.first?.hasDestructiveAction = true
@@ -196,6 +205,7 @@ final class HookSetup: ObservableObject {
 
             do {
                 try installer.uninstall()
+                if codexHooks { try codexInstaller.uninstall() }
             } catch {
                 refresh()
                 Self.showError(error, title: L("Désinstallation interrompue"))
