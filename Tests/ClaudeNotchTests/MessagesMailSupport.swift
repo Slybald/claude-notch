@@ -182,18 +182,36 @@ final class MessagesRig {
 
 // MARK: - Mail
 
-/// Exécuteur factice : garde les appels et rend les réponses prévues, dans l'ordre.
+/// Exécuteur factice : garde les appels et rend les réponses prévues, dans l'ordre. Rien n'est jamais exécuté, donc
+/// aucun mail n'est lu, envoyé ni déposé en brouillon.
 final class FakeScriptRunner: AppleScriptRunner {
     var answers: [Result<String, AppleScriptFailure>] = []
     /// Rend toujours la dernière réponse prévue (les rendus PNG : la vue relit à son affichage).
     var repeatLast = false
+    /// Garde la fin des appels au lieu de la jouer : `complete` la joue plus tard (un envoi encore en cours).
+    var hold = false
     private(set) var calls: [(script: String, arguments: [String], timeout: TimeInterval)] = []
+    private var held: [(Result<String, AppleScriptFailure>) -> Void] = []
 
     func run(_ script: String, arguments: [String], timeout: TimeInterval,
              _ done: @escaping (Result<String, AppleScriptFailure>) -> Void) {
         calls.append((script, arguments, timeout))
+        if hold { held.append { done($0) }; return }
         if repeatLast, answers.count == 1, let last = answers.first { return done(last) }
         done(answers.isEmpty ? .failure(.failed(code: nil)) : answers.removeFirst())
+    }
+
+    /// Joue la fin du plus ancien appel gardé.
+    func complete(_ result: Result<String, AppleScriptFailure>) {
+        guard !held.isEmpty else { return }
+        held.removeFirst()(result)
+    }
+
+    var heldCount: Int { held.count }
+
+    /// Les appels de réponse (envoi ou brouillon), à part des lectures.
+    var replyCalls: [(script: String, arguments: [String], timeout: TimeInterval)] {
+        calls.filter { $0.script == MailScript.replySource }
     }
 }
 
@@ -222,13 +240,33 @@ final class MailRig {
     }
 
     /// Réponse du script : compteurs, puis un enregistrement par message (âge en secondes).
-    static func answer(unread: Int, accounts: Int = 1, messages: [(sender: String, subject: String, age: Int, id: String)] = [])
-        -> String {
+    static func answer(unread: Int, accounts: Int = 1, messages: [FakeMail] = []) -> String {
         let us = String(MailScript.unitSeparator)
         let rs = String(MailScript.recordSeparator)
         return (["OK\(us)\(unread)\(us)\(accounts)"]
-            + messages.map { [$0.sender, $0.subject, String($0.age), $0.id].joined(separator: us) }).joined(separator: rs)
+            + messages.map {
+                [$0.sender, $0.subject, String($0.age), $0.id, $0.unread ? "1" : "0", $0.snippet].joined(separator: us)
+            }).joined(separator: rs)
     }
+
+    /// Un module démarré, onglet ouvert, qui a lu `messages` (rien de réel : le script est factice).
+    func readyModule(unread: Int = 3, messages: [FakeMail]) -> MailModule {
+        runner.answers = [.success(MailRig.answer(unread: unread, messages: messages))]
+        let module = makeModule()
+        module.tabAppeared()
+        module.start()
+        return module
+    }
+}
+
+/// Un mail inventé (adresses en example.com) tel que le script le renverrait.
+struct FakeMail {
+    var sender: String
+    var subject: String
+    var age: Int
+    var id: String
+    var unread = true
+    var snippet = ""
 }
 
 // MARK: - chat.db factice

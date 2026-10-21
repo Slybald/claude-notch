@@ -108,6 +108,10 @@ final class MessagesMailSnapshotTests: XCTestCase {
     // MARK: - Mail
 
     private func mail(_ configure: (MailRig) -> Void, openTab: Bool = true) -> MailModule {
+        mailWithRig(configure, openTab: openTab).module
+    }
+
+    private func mailWithRig(_ configure: (MailRig) -> Void, openTab: Bool = true) -> (module: MailModule, rig: MailRig) {
         let rig = MailRig(self)
         rigs.append(rig)
         configure(rig)
@@ -116,32 +120,90 @@ final class MessagesMailSnapshotTests: XCTestCase {
         if openTab { module.tabAppeared() }
         module.start()
         addTeardownBlock { module.stop() }
+        return (module, rig)
+    }
+
+    /// Des mails inventés (example.com), du plus récent au plus ancien : non lus et lus, avec un début de texte.
+    private let mails: [FakeMail] = [
+        FakeMail(sender: "Camille Martin <camille@example.com>", subject: "Facture de septembre", age: 300,
+                 id: "a1@example.com",
+                 snippet: "Bonjour Nicolas, voici la facture du mois, avec le détail des heures et le récapitulatif des déplacements. Dis-moi si tout te va."),
+        FakeMail(sender: "Alex Durand <alex@example.com>", subject: "Réunion jeudi 14 h : ordre du jour et documents à relire avant la séance",
+                 age: 1_500, id: "a2@example.com", unread: false,
+                 snippet: "Salut, je t'envoie l'ordre du jour. Pense à relire les deux documents avant jeudi, on ne les parcourra pas en séance."),
+        FakeMail(sender: "Boutique en ligne", subject: "", age: 7_200, id: "a3@example.com", unread: false),
+        FakeMail(sender: "noreply@example.com", subject: "Votre colis a été expédié", age: 90_000, id: "a4@example.com",
+                 snippet: "Votre commande est en route. Livraison prévue demain entre 9 h et 13 h."),
+        FakeMail(sender: "Équipe Exemple", subject: "Bienvenue", age: 200_000, id: "a5@example.com", unread: false,
+                 snippet: "Merci de nous avoir rejoints. Voici trois choses à essayer pour bien démarrer."),
+    ]
+
+    private func replyContext(_ configure: (MailModule, MailRig) -> Void) -> MailModule {
+        let (module, rig) = mailWithRig { $0.runner.answers = [.success(MailRig.answer(unread: 14, messages: mails))] }
+        configure(module, rig)
         return module
     }
 
     func testRenderMail() throws {
         try XCTSkipIf(dir == nil, "CLAUDE_NOTCH_SNAPSHOT_DIR non défini")
-        let messages: [(sender: String, subject: String, age: Int, id: String)] = [
-            ("Camille Martin <camille@example.com>", "Facture de septembre", 300, "a1@example.com"),
-            ("Alex Durand <alex@example.com>", "Réunion jeudi 14 h : ordre du jour et documents à relire avant la séance", 1_500, "a2@example.com"),
-            ("Boutique en ligne", "", 7_200, "a3@example.com"),
-            ("noreply@example.com", "Votre colis a été expédié", 90_000, "a4@example.com"),
-        ]
-        let ready = mail { $0.runner.answers = [.success(MailRig.answer(unread: 14, messages: messages))] }
-        try render(tab(MailPanel(module: ready)), "mail-list", height: 250)
+        let ready = mail { $0.runner.answers = [.success(MailRig.answer(unread: 14, messages: mails))] }
+        try render(tab(MailPanel(module: ready)), "mail-list", height: 400)
+        try render(tab(MailPanel(module: ready, hoverPreview: "a2@example.com")), "mail-list-hover", height: 400)
         try render(tab(MailCompactView(module: ready)), "mail-compact", height: 60)
-        try render(MailSettingsView(module: ready).environment(\.colorScheme, .light), "mail-settings", height: 340, dark: false)
+        try render(MailSettingsView(module: ready).environment(\.colorScheme, .light), "mail-settings", height: 400, dark: false)
 
-        let zero = mail { $0.runner.answers = [.success(MailRig.answer(unread: 0))] }
-        try render(tab(MailPanel(module: zero)), "mail-all-read", height: 140)
+        let three = mail { $0.runner.answers = [.success(MailRig.answer(unread: 14, messages: Array(mails.prefix(3))))] }
+        try render(tab(MailPanel(module: three)), "mail-list-3", height: 280)
 
-        let counters = mail({ $0.runner.answers = [.success(MailRig.answer(unread: 6))] }, openTab: false)
-        try render(tab(MailPanel(module: counters)), "mail-counters-only", height: 150)
+        // Réponse : champ ouvert, texte tapé, envoi, « Envoyé », erreurs.
+        let writing = replyContext { module, _ in
+            module.beginReply(module.messages[0])
+            module.draft = "Merci Camille, c'est bon pour moi. Je te règle cette semaine."
+        }
+        try render(tab(MailPanel(module: writing)), "mail-reply", height: 470)
+
+        let empty = replyContext { module, _ in module.beginReply(module.messages[1]) }
+        try render(tab(MailPanel(module: empty)), "mail-reply-empty", height: 470)
+
+        let sent = replyContext { module, rig in
+            module.beginReply(module.messages[0])
+            module.draft = "Merci Camille, c'est bon pour moi."
+            rig.runner.answers = [.success("OK")]
+            module.sendReply()
+            rig.runner.answers = [.success(MailRig.answer(unread: 14, messages: mails))]
+        }
+        XCTAssertEqual(sent.replyState, .sent)
+        try render(tab(MailPanel(module: sent)), "mail-reply-sent", height: 470)
+
+        let failures: [(String, Result<String, AppleScriptFailure>)] = [
+            ("denied", .failure(.notAuthorized)), ("closed", .success("NOTRUNNING")), ("timeout", .failure(.timedOut)),
+            ("gone", .success("NOTFOUND")), ("failed", .success("FAILED")),
+        ]
+        for (name, answer) in failures {
+            let module = replyContext { module, rig in
+                module.beginReply(module.messages[0])
+                module.draft = "Merci Camille, c'est bon pour moi."
+                rig.runner.answers = [answer]
+                module.sendReply()
+                rig.runner.answers = [.success(MailRig.answer(unread: 14, messages: mails))]
+            }
+            try render(tab(MailPanel(module: module)), "mail-reply-error-\(name)", height: 470)
+        }
+
+        let zero = mail { $0.runner.answers = [.success(MailRig.answer(unread: 0, messages: Array(mails.suffix(3))))] }
+        try render(tab(MailPanel(module: zero)), "mail-all-read", height: 280)
+
+        let emptyInbox = mail { $0.runner.answers = [.success(MailRig.answer(unread: 0))] }
+        try render(tab(MailPanel(module: emptyInbox)), "mail-empty-inbox", height: 140)
+
+        let hidden = mail { $0.runner.answers = [.success(MailRig.answer(unread: 6))] }
+        hidden.showSubjects = false
+        try render(tab(MailPanel(module: hidden)), "mail-counters-only", height: 150)
 
         let closed = mail { $0.running = false }
         try render(tab(MailPanel(module: closed)), "mail-not-running", height: 170)
         let ask = mail { $0.probeStatus = .notDetermined }
-        try render(tab(MailPanel(module: ask)), "mail-needs-permission", height: 190)
+        try render(tab(MailPanel(module: ask)), "mail-needs-permission", height: 200)
         let denied = mail { $0.probeStatus = .denied }
         try render(tab(MailPanel(module: denied)), "mail-denied", height: 190)
         let none = mail { $0.runner.answers = [.success(MailRig.answer(unread: 0, accounts: 0))] }

@@ -442,7 +442,7 @@ final class GallerySnapshotTests: XCTestCase {
         try shoot("messages", "unsupported", module(.unavailable(.unsupported), rig: &rigs))
     }
 
-    /// Mail : liste, tout lu, puis chaque état où Mail n'est pas lisible (fermé, pas autorisé, refusé, sans compte).
+    /// Mail : les derniers mails, tout lu, puis chaque état où Mail n'est pas lisible (fermé, pas autorisé, refusé, sans compte).
     private func mail() throws {
         MessagesFixtures.now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded())
         var rigs: [MailRig] = []
@@ -458,14 +458,18 @@ final class GallerySnapshotTests: XCTestCase {
             addTeardownBlock { module.stop() }
             return module
         }
-        let sample: [(sender: String, subject: String, age: Int, id: String)] = (0..<8).map {
-            ("Expéditeur \($0 + 1) <exp\($0)@example.com>", "Objet du message numéro \($0 + 1), assez long pour être coupé en fin de ligne",
-             300 + $0 * 1_800, "id\($0)@example.com")
+        let sample: [FakeMail] = (0..<5).map {
+            FakeMail(sender: "Expéditeur \($0 + 1) <exp\($0)@example.com>",
+                     subject: "Objet du message numéro \($0 + 1), assez long pour être coupé en fin de ligne",
+                     age: 300 + $0 * 1_800, id: "id\($0)@example.com", unread: $0 < 2,
+                     snippet: "Début du texte du message numéro \($0 + 1) : une ou deux lignes suffisent pour savoir de quoi il s'agit, sans ouvrir Mail.")
         }
         let list = module { $0.runner.answers = [.success(MailRig.answer(unread: 21, messages: sample))] }
         try shoot("mail", "list", list)
         try settings("mail", list)
-        try shoot("mail", "all-read", module { $0.runner.answers = [.success(MailRig.answer(unread: 0))] })
+        var read = sample
+        for index in read.indices { read[index].unread = false }
+        try shoot("mail", "all-read", module { $0.runner.answers = [.success(MailRig.answer(unread: 0, messages: read))] })
         try shoot("mail", "not-running", module { $0.running = false })
         try shoot("mail", "needs-permission", module { $0.probeStatus = .notDetermined })
         try shoot("mail", "denied", module { $0.probeStatus = .denied })

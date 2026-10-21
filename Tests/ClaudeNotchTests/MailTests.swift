@@ -5,11 +5,18 @@ import XCTest
 /// Onglet Mail : décodage de la réponse du script, états, autorisations, rythme de lecture. Mail n'est jamais
 /// lancé ni interrogé (script factice) ; le seul vrai `osascript` lancé ici est celui de la garde « Mail fermé ».
 final class MailTests: XCTestCase {
-    private let sample: [(sender: String, subject: String, age: Int, id: String)] = [
-        ("Camille Martin <camille@example.com>", "Facture de   septembre", 300, "<abc123@mail.example.com>"),
-        ("\"Durand, Alex\" <alex@example.com>", "Réunion\njeudi", 120, "def456@mail.example.com"),
-        ("newsletter@example.com", "", 7_200, "ghi789@example.com"),
+    private let sample: [FakeMail] = [
+        FakeMail(sender: "Camille Martin <camille@example.com>", subject: "Facture de   septembre", age: 300,
+                 id: "<abc123@mail.example.com>", unread: false, snippet: "Bonjour,\n\nVoici la facture."),
+        FakeMail(sender: "\"Durand, Alex\" <alex@example.com>", subject: "Réunion\njeudi", age: 120,
+                 id: "def456@mail.example.com", snippet: "Jeudi 14 h, salle 2."),
+        FakeMail(sender: "newsletter@example.com", subject: "", age: 7_200, id: "ghi789@example.com"),
     ]
+
+    /// Une boîte de réception inventée de `count` mails, du plus récent au plus ancien.
+    private func inbox(_ count: Int) -> [FakeMail] {
+        (0..<count).map { FakeMail(sender: "s\($0)", subject: "o\($0)", age: $0 * 60, id: "id\($0)@example.com") }
+    }
 
     // MARK: - Décodage
 
@@ -35,6 +42,40 @@ final class MailTests: XCTestCase {
         XCTAssertEqual(reading.messages[0].date, now.addingTimeInterval(-120))
         XCTAssertEqual(reading.messages.map { $0.id }, ["def456@mail.example.com", "abc123@mail.example.com", "ghi789@example.com"],
                        "Message-ID sans chevrons")
+        XCTAssertEqual(reading.messages.map { $0.snippet }, ["Jeudi 14 h, salle 2.", "Bonjour, Voici la facture.", ""],
+                       "début du texte sur une ligne")
+        XCTAssertEqual(reading.messages.map { $0.isUnread }, [true, false, true], "lus et non lus ensemble")
+    }
+
+    func testSnippetIsOneCleanCappedLine() {
+        XCTAssertEqual(MailScript.snippet(from: "Bonjour\n\nNicolas,   \u{FFFC}  merci\t!"), "Bonjour Nicolas, merci !")
+        let long = String(repeating: "mot ", count: 300)
+        XCTAssertEqual(MailScript.snippet(from: long).count, MailScript.snippetCharacters)
+        // Un séparateur dans le texte ne fait pas perdre le message : le texte est le dernier champ.
+        let us = String(MailScript.unitSeparator)
+        let answer = MailRig.answer(unread: 1, messages: [FakeMail(sender: "a", subject: "b", age: 5, id: "i@e.fr",
+                                                                    snippet: "avant\(us)après")])
+        guard case .reading(let reading)? = MailScript.parse(answer, now: MessagesFixtures.now) else { return XCTFail() }
+        XCTAssertEqual(reading.messages.first?.snippet, "avant\(us)après")
+    }
+
+    func testTheSameMessageInTwoFoldersAppearsOnce() {
+        let twice = [FakeMail(sender: "a", subject: "x", age: 10, id: "dup@example.com"),
+                     FakeMail(sender: "a", subject: "x", age: 10, id: "<dup@example.com>")]
+        guard case .reading(let reading)? = MailScript.parse(MailRig.answer(unread: 1, messages: twice),
+                                                              now: MessagesFixtures.now) else { return XCTFail() }
+        XCTAssertEqual(reading.messages.count, 1)
+    }
+
+    func testReplyOutcomes() {
+        XCTAssertNil(MailScript.replyFailure(.success("OK")))
+        XCTAssertEqual(MailScript.replyFailure(.success("NOTRUNNING")), .notRunning)
+        XCTAssertEqual(MailScript.replyFailure(.success("NOTFOUND")), .notFound)
+        XCTAssertEqual(MailScript.replyFailure(.success("FAILED")), .failed)
+        XCTAssertEqual(MailScript.replyFailure(.success("")), .failed, "une réponse vide ne vaut pas succès")
+        XCTAssertEqual(MailScript.replyFailure(.failure(.notAuthorized)), .notAuthorized)
+        XCTAssertEqual(MailScript.replyFailure(.failure(.timedOut)), .timedOut)
+        XCTAssertEqual(MailScript.replyFailure(.failure(.failed(code: 5))), .failed)
     }
 
     func testRefusesUnreadableAnswers() {
@@ -81,6 +122,57 @@ final class MailTests: XCTestCase {
         XCTAssertEqual(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             .trimmingCharacters(in: .newlines), "NOTRUNNING")
         XCTAssertTrue(NSRunningApplication.runningApplications(withBundleIdentifier: bundle).isEmpty, "Mail n'a pas été lancé")
+    }
+
+    /// Même garde pour la réponse : Mail fermé, aucun message sortant n'est créé et Mail n'est pas lancé. Sauté si
+    /// Mail tourne (on ne lui envoie jamais de réponse en test, même avec un faux identifiant).
+    func testRealReplyScriptDoesNotLaunchMailWhenItIsClosed() throws {
+        let bundle = MailScript.bundleIdentifier
+        try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: "/usr/bin/osascript"), "osascript absent")
+        try XCTSkipUnless(NSRunningApplication.runningApplications(withBundleIdentifier: bundle).isEmpty,
+                          "Mail tourne : on ne lui envoie rien en test")
+        let output = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", MailScript.replySource, "--", "absent@example.com", "texte", "send"]
+        process.standardOutput = output
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+        XCTAssertEqual(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .trimmingCharacters(in: .newlines), "NOTRUNNING")
+        XCTAssertTrue(NSRunningApplication.runningApplications(withBundleIdentifier: bundle).isEmpty, "Mail n'a pas été lancé")
+    }
+
+    /// Les deux scripts se compilent (vocabulaire de Mail : `reply … opening window`, `send`, `content`,
+    /// `messages 1 thru N of inbox`). Compiler ne les exécute pas et ne lance pas Mail.
+    func testScriptsCompile() throws {
+        try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: "/usr/bin/osacompile"), "osacompile absent")
+        let wasRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: MailScript.bundleIdentifier).isEmpty
+        let directory = try makeTemporaryDirectory(self)
+        for (name, source) in [("lecture", MailScript.source), ("reponse", MailScript.replySource)] {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/osacompile")
+            process.arguments = ["-e", source, "-o", directory.appendingPathComponent("\(name).scpt").path]
+            let errors = Pipe()
+            process.standardError = errors
+            try process.run()
+            process.waitUntilExit()
+            XCTAssertEqual(process.terminationStatus, 0,
+                           "\(name) : \(String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))")
+        }
+        if !wasRunning {
+            XCTAssertTrue(NSRunningApplication.runningApplications(withBundleIdentifier: MailScript.bundleIdentifier).isEmpty,
+                          "compiler n'a pas lancé Mail")
+        }
+    }
+
+    /// Le texte de l'utilisateur ne passe jamais dans le script (injection) : seulement en argument.
+    func testScriptsTakeUserTextAsArgumentsOnly() {
+        XCTAssertTrue(MailScript.replySource.contains("item 2 of argv"))
+        XCTAssertFalse(MailScript.replySource.contains("\\("), "aucune interpolation restante")
+        XCTAssertFalse(MailScript.source.contains("\\("))
+        XCTAssertTrue(MailScript.replySource.contains("is not running then return \"NOTRUNNING\""))
     }
 
     // MARK: - Module : repos
@@ -163,21 +255,55 @@ final class MailTests: XCTestCase {
         XCTAssertEqual(rig.runner.calls.first?.timeout, 20)
         XCTAssertTrue(module.messages.isEmpty)
         module.tabAppeared()
-        XCTAssertEqual(rig.runner.calls.last?.arguments, [String(MailModule.fetchLimit)])
+        XCTAssertEqual(rig.runner.calls.last?.arguments, ["5"], "5 derniers mails par défaut")
         XCTAssertEqual(module.messages.count, 3)
         XCTAssertEqual(module.messages.first?.sender, "Durand, Alex")
         XCTAssertEqual(module.unread, 3)
+        XCTAssertTrue(module.listLoaded)
     }
 
-    func testListIsCappedAtEight() {
+    func testListShowsTheLatestReceivedReadOrNot() {
         let rig = MailRig(self)
-        let many = (0..<12).map { (sender: "s\($0)", subject: "o\($0)", age: $0 * 60, id: "id\($0)@example.com") }
-        rig.runner.answers = [.success(MailRig.answer(unread: 12, messages: many))]
+        let module = rig.readyModule(unread: 0, messages: sample)
+        XCTAssertEqual(module.unread, 0)
+        XCTAssertEqual(module.messages.count, 3, "même sans non-lu, les derniers reçus sont là")
+        XCTAssertEqual(module.messages.filter(\.isUnread).count, 2)
+    }
+
+    func testListIsCappedAtTheChosenCountBetweenThreeAndFive() {
+        let rig = MailRig(self)
+        rig.runner.answers = [.success(MailRig.answer(unread: 7, messages: inbox(7)))]
         let module = rig.makeModule()
         module.tabAppeared()
         module.start()
-        XCTAssertEqual(module.messages.count, MailModule.maxShown)
+        XCTAssertEqual(MailModule.recentRange, 3...5)
+        XCTAssertEqual(module.recentCount, 5)
+        XCTAssertEqual(module.messages.count, 5)
         XCTAssertEqual(module.messages.first?.sender, "s0", "les plus récents")
+
+        rig.runner.answers = [.success(MailRig.answer(unread: 7, messages: inbox(3)))]
+        module.recentCount = 3
+        XCTAssertEqual(rig.runner.calls.last?.arguments, ["3"], "le réglage change ce que le script détaille")
+        XCTAssertEqual(module.messages.count, 3)
+        XCTAssertEqual(rig.defaults.integer(forKey: "mail.recentCount"), 3)
+
+        module.recentCount = 9
+        XCTAssertEqual(module.recentCount, 5, "borné à 5")
+        module.recentCount = 1
+        XCTAssertEqual(module.recentCount, 3, "borné à 3")
+        rig.defaults.set(42, forKey: "mail.recentCount")
+        XCTAssertEqual(rig.makeModule().recentCount, 5, "réglage hors bornes ramené dans les bornes")
+    }
+
+    func testHiddenTextMeansTheListIsNeverRead() {
+        let rig = MailRig(self)
+        rig.defaults.set(false, forKey: "mail.showSubjects")
+        rig.runner.answers = [.success(MailRig.answer(unread: 4))]
+        let module = rig.makeModule()
+        module.tabAppeared()
+        module.start()
+        XCTAssertEqual(rig.runner.calls.first?.arguments, ["0"], "texte masqué : on ne lit pas les messages")
+        XCTAssertTrue(module.messages.isEmpty)
     }
 
     func testEarsAreALowPriorityBadge() {
@@ -333,5 +459,173 @@ final class MailTests: XCTestCase {
         XCTAssertNotNil(module.makeCompactView())
         XCTAssertEqual(MailPanel.unreadText(1), "1 message non lu")
         XCTAssertEqual(MailPanel.unreadText(3), "3 messages non lus")
+    }
+
+    // MARK: - Réponse : rien ne part sans un geste explicite
+
+    private func readyForReply(_ rig: MailRig, count: Int = 5) -> MailModule {
+        rig.readyModule(unread: count, messages: inbox(count))
+    }
+
+    func testOpeningTheReplyFieldTypingAndClosingNeverSend() throws {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        let target = try XCTUnwrap(module.messages.first)
+        module.beginReply(target)
+        XCTAssertEqual(module.replyTarget?.id, target.id)
+        module.draft = "Oui, jeudi me va."
+        rig.runner.answers = [.success(MailRig.answer(unread: 5, messages: inbox(5)))]
+        module.refresh()
+        module.tabDisappeared()
+        module.tabAppeared()
+        rig.schedule.runPending()
+        XCTAssertTrue(rig.runner.replyCalls.isEmpty, "ouvrir, taper et relire n'envoient rien")
+        module.cancelReply()
+        XCTAssertNil(module.replyTarget)
+        XCTAssertEqual(module.draft, "")
+        XCTAssertTrue(rig.runner.replyCalls.isEmpty, "Échap non plus")
+        XCTAssertEqual(module.replyState, .idle)
+    }
+
+    func testSendRunsTheReplyScriptWithTheTextAsAnArgumentAndFlashesSent() throws {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        let target = module.messages[2]
+        module.beginReply(target)
+        module.draft = "  Merci, à jeudi !\n"
+        rig.runner.answers = [.success("OK")]
+        module.sendReply()
+        let call = try XCTUnwrap(rig.runner.replyCalls.first)
+        XCTAssertEqual(rig.runner.replyCalls.count, 1)
+        XCTAssertEqual(call.arguments, [target.id, "Merci, à jeudi !", "send"], "texte nettoyé, identifiant sans chevrons")
+        XCTAssertEqual(call.timeout, 60)
+        XCTAssertFalse(call.script.contains("Merci"), "le texte n'est jamais dans le script")
+        XCTAssertEqual(module.replyState, .sent)
+        XCTAssertEqual(module.draft, "", "texte parti : le champ est vidé")
+        XCTAssertEqual(rig.schedule.pendingDelays.filter { $0 == MailModule.sentFlash }, [MailModule.sentFlash])
+        rig.schedule.runPending()
+        XCTAssertNil(module.replyTarget, "« Envoyé » puis le champ se ferme")
+        XCTAssertEqual(module.replyState, .idle)
+    }
+
+    func testEmptyDraftNeverSendsAndSubmitTwiceSendsOnce() throws {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        module.beginReply(module.messages[0])
+        module.draft = " \n\t "
+        module.sendReply()
+        XCTAssertTrue(rig.runner.replyCalls.isEmpty, "rien à envoyer")
+
+        module.draft = "Bien reçu"
+        rig.runner.hold = true
+        module.sendReply()
+        module.sendReply()
+        XCTAssertEqual(rig.runner.replyCalls.count, 1, "Entrée deux fois : un seul envoi")
+        XCTAssertEqual(module.replyState, .sending)
+        module.cancelReply()
+        module.beginReply(module.messages[1])
+        XCTAssertEqual(module.replyTarget?.id, module.messages[0].id, "pendant l'envoi, on ne change pas de champ")
+        module.stop()
+        rig.runner.complete(.success("OK"))
+        XCTAssertNil(module.replyTarget, "arrêté : la fin tardive est ignorée")
+        XCTAssertEqual(module.replyState, .idle)
+    }
+
+    func testEveryFailureIsExplicitAndKeepsTheText() throws {
+        let cases: [(Result<String, AppleScriptFailure>, MailReplyFailure)] = [
+            (.success("NOTRUNNING"), .notRunning), (.success("NOTFOUND"), .notFound), (.success("FAILED"), .failed),
+            (.failure(.notAuthorized), .notAuthorized), (.failure(.timedOut), .timedOut),
+            (.failure(.failed(code: 12)), .failed),
+        ]
+        for (answer, expected) in cases {
+            let rig = MailRig(self)
+            let module = readyForReply(rig)
+            module.beginReply(module.messages[0])
+            module.draft = "Mon texte"
+            rig.runner.answers = [answer]
+            module.sendReply()
+            XCTAssertEqual(module.replyState, .failed(expected), "\(answer)")
+            XCTAssertEqual(module.draft, "Mon texte", "le texte est gardé pour réessayer")
+            XCTAssertEqual(module.replyTarget?.id, module.messages[0].id)
+            XCTAssertTrue(rig.schedule.pendingDelays.filter { $0 == MailModule.sentFlash }.isEmpty, "pas de « Envoyé »")
+            // Après une erreur, un nouvel appui sur Envoyer réessaie (et seulement lui).
+            rig.runner.answers = [.success("OK")]
+            module.sendReply()
+            XCTAssertEqual(rig.runner.replyCalls.count, 2)
+            XCTAssertEqual(module.replyState, .sent)
+        }
+    }
+
+    func testClosedMailIsNeverLaunchedByAReply() throws {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        module.beginReply(module.messages[0])
+        module.draft = "Texte"
+        rig.running = false
+        module.sendReply()
+        module.openReplyInMail()
+        XCTAssertTrue(rig.runner.replyCalls.isEmpty, "Mail fermé : aucun script, donc aucun lancement")
+        XCTAssertEqual(module.replyState, .failed(.notRunning))
+        XCTAssertEqual(module.draft, "Texte")
+        XCTAssertTrue(rig.opened.isEmpty, "et Mail n'est ouvert que sur un clic de l'utilisateur")
+        module.openMail()
+        XCTAssertEqual(rig.opened, [MailScript.appURL])
+    }
+
+    func testContinueInMailOpensTheReplyWindowWithTheTypedTextAndSendsNothing() throws {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        let target = module.messages[1]
+        module.beginReply(target)
+        module.draft = "Je termine dans Mail"
+        rig.runner.answers = [.success("OK")]
+        module.openReplyInMail()
+        XCTAssertEqual(rig.runner.replyCalls.first?.arguments, [target.id, "Je termine dans Mail", "draft"])
+        XCTAssertNil(module.replyTarget, "la suite se passe dans Mail")
+        XCTAssertEqual(module.draft, "")
+        XCTAssertEqual(module.replyState, .idle)
+        XCTAssertFalse(MailScript.replySource.isEmpty)
+        // Texte vide : la fenêtre de réponse s'ouvre quand même (citation seule).
+        module.beginReply(target)
+        rig.runner.answers = [.success("OK")]
+        module.openReplyInMail()
+        XCTAssertEqual(rig.runner.replyCalls.last?.arguments, [target.id, "", "draft"])
+    }
+
+    func testReplyingToAMessageThatLeftTheListKeepsItThere() throws {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        let target = module.messages[4]
+        module.beginReply(target)
+        module.draft = "En cours"
+        // Cinq nouveaux mails arrivent : le mail visé sort des cinq derniers.
+        let newer = (0..<5).map { FakeMail(sender: "n\($0)", subject: "x", age: $0, id: "new\($0)@example.com") }
+        rig.runner.answers = [.success(MailRig.answer(unread: 9, messages: newer))]
+        module.refresh()
+        XCTAssertEqual(module.messages.count, 6, "le mail auquel on écrit reste affiché")
+        XCTAssertEqual(module.messages.last?.id, target.id)
+        XCTAssertEqual(module.draft, "En cours")
+    }
+
+    func testReplyToggleAndMessagesWithoutIdentifier() {
+        let rig = MailRig(self)
+        let module = readyForReply(rig)
+        let first = module.messages[0]
+        module.beginReply(first)
+        module.draft = "x"
+        module.beginReply(module.messages[1])
+        XCTAssertEqual(module.replyTarget?.id, module.messages[1].id, "un autre mail : nouveau champ, texte jeté")
+        XCTAssertEqual(module.draft, "")
+        module.beginReply(module.messages[1])
+        XCTAssertNil(module.replyTarget, "un second clic referme")
+        module.beginReply(MailMessage(id: "", sender: "x", subject: "y", date: .distantPast))
+        XCTAssertNil(module.replyTarget, "sans identifiant, pas de réponse possible")
+    }
+
+    func testCompactViewNamesTheLatestUnreadNotTheLatestMail() {
+        let rig = MailRig(self)
+        let module = rig.readyModule(unread: 1, messages: sample)
+        XCTAssertEqual(module.messages.first(where: \.isUnread)?.sender, "Durand, Alex")
+        XCTAssertNotNil(module.makeCompactView())
     }
 }
