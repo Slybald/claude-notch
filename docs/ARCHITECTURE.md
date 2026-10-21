@@ -186,6 +186,17 @@ Apple Events and Bluetooth are already there) nor another module's files.
     last step. `~/.claude` is read only if the Claude card is offered. No macOS permission is requested. Run again
     from Settings › General (`HookSetup.showSetupAssistant`, `firstRun: false`): it starts from the current
     settings. `OnboardingView` keeps only the hook window (install, update).
+  - **Profiles** (`Profiles.swift`, `ProfileViews.swift`, `docs/EDITIONS.md`): several ways to start in ONE app (one
+    update, one signature). `NotchProfile` (developer, student, creative, minimal) is pure data: tab IDs in order
+    (an ID the app does not have yet, like `codex`, is ignored), opening mode, ears. `ProfilePlan` computes what a
+    profile shows and hides and writes only `tabs.enabled` (through `ModuleRegistry.setEnabled`), `tabs.order`,
+    `hover.trigger` and `appearance.showEars`: never a tab's data, the hooks, visibility, look or shortcuts (tested
+    on the keys of the defaults). Claude and Codex (`NotchProfile.agentTabs`) are offered only if detected or
+    already on. First step of the setup assistant: `SetupChoices.choose` ticks the profile's tabs, its order and
+    ears are written with the rest at "Apply". Settings › General › Change Profile… (`ProfileWindow`, same window
+    style as the assistant) previews the plan and applies it on confirmation; the current profile is
+    `NotchProfile.matching`, from the enabled tabs only (order ignored), else "Custom". Texts: table `Profiles`.
+    To add a tab to a profile: one ID in `NotchProfile.tabs`.
 - **Facts measured on Claude Code 2.1.29x**: `PermissionRequest` carries no `tool_use_id` (it is matched to the
   last active tool with the same name); internal agents send `SubagentStop` with an empty `agent_type`
   (ignored); a background agent's result comes back as a `UserPromptSubmit` starting with
