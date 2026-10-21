@@ -79,7 +79,7 @@ final class SQLiteMessagesDatabase: MessagesDatabase {
         var unread = 0
         db.query("""
             SELECT COUNT(*) FROM message m
-            WHERE m.is_from_me = 0 AND m.is_read = 0 AND m.date > ?1\(filters)
+            WHERE m.is_from_me = 0 AND m.is_read = 0 AND m.date > ?1\(filters) AND (\(hasContent))
               AND EXISTS (SELECT 1 FROM chat_message_join j WHERE j.message_id = m.ROWID)
             """, binds: [cutoff]) { unread = Int($0.int(0)) }
 
@@ -156,7 +156,8 @@ final class ReadOnlySQLite {
         return names
     }
 
-    /// `false` si la requête échoue (table absente…) ; les valeurs liées sont des entiers.
+    /// `false` si la requête échoue, à la préparation (table absente…) ou en route (base en lecture seule) ; les valeurs
+    /// liées sont des entiers.
     @discardableResult
     func query(_ sql: String, binds: [Int64] = [], _ onRow: (Row) -> Void) -> Bool {
         var statement: OpaquePointer?
@@ -166,8 +167,12 @@ final class ReadOnlySQLite {
         }
         defer { sqlite3_finalize(statement) }
         for (offset, value) in binds.enumerated() { sqlite3_bind_int64(statement, Int32(offset + 1), value) }
-        while sqlite3_step(statement) == SQLITE_ROW { onRow(Row(statement: statement)) }
-        return true
+        var step = sqlite3_step(statement)
+        while step == SQLITE_ROW {
+            onRow(Row(statement: statement))
+            step = sqlite3_step(statement)
+        }
+        return step == SQLITE_DONE
     }
 }
 

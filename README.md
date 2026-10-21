@@ -54,7 +54,7 @@ Interface available in English and French (follows the system language). Screens
 ## Tabs
 
 The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default, except Claude
-when Claude Code is not found on the Mac. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
+when Claude Code is not found on the Mac, and Messages and Mail, which stay off until you turn them on. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
 change the order, or pick the tab that opens by default. You can also do it in the notch, like apps on an iPhone:
 press and hold the tab bar, then drag the icons, hide a tab with **−** or bring one back with **+**, and click **Done**
 (or press Esc, or click outside the bar). The panel reopens on the last tab you used, or on Claude when a session
@@ -75,6 +75,11 @@ needs you.
   sleep and restarts.
 - **Quick notes**: plain-text notes. Pin the ones you use, delete with undo, and search once you have more than
   eight.
+- **Messages** (off by default): your recent iMessage and SMS conversations, an unread badge on the collapsed notch
+  and a quick reply. It reads the Messages database on your Mac, which needs Full Disk Access; nothing is stored or
+  sent anywhere. Details and limits in [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+- **Mail** (off by default): the unread count of Apple Mail and the latest unread messages (sender, subject). Click
+  one to open it in Mail. Claude Notch never launches Mail: it only reads it while it is open.
 
 ## Reply from the notch
 
@@ -242,6 +247,13 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
   and the "Done" ear still signal the end.
 - **Paste from other apps** (macOS 15.4 and later): so the Clipboard tab can read what you copy. macOS may ask each
   time, or block it. When it is blocked, nothing is recorded, and the tab and the settings link to System Settings.
+- **Full Disk Access** (Messages tab, off by default): to read the Messages database. macOS has no dialog for it: add
+  Claude Notch yourself in System Settings › Privacy & Security › Full Disk Access, then relaunch the app. Without it
+  the tab says so and links to System Settings.
+- **Contacts** (Messages tab): to show contact names instead of numbers. Asked when you click **Allow** in the tab.
+- **Automation: Messages** (Apple Events): to send a quick reply. macOS asks the first time you send.
+- **Automation: Mail** (Apple Events): to read the unread count and the latest messages. Asked when you click
+  **Allow** in the Mail tab.
 - **Desktop, Documents, Downloads**: only for the optional companion tools (see [Tools section](#tools-section)).
 - Wi-Fi: the network name is not read, so Location is not requested. If macOS refuses to change the Wi-Fi state,
   the tile says so.
@@ -468,7 +480,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 ### Onglets
 
 La notch déployée est une rangée d'onglets. Clique sur un onglet, ou survole-le un instant. Tous les onglets sont
-activés par défaut, sauf Claude si Claude Code n'est pas sur le Mac. Dans **Réglages › Onglets**, tu peux masquer
+activés par défaut, sauf Claude si Claude Code n'est pas sur le Mac, et Messages et Mail, qui restent désactivés tant
+que tu ne les actives pas. Dans **Réglages › Onglets**, tu peux masquer
 un onglet (un onglet masqué ne fait aucun travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Tu
 peux aussi le faire dans la notch, comme les apps sur iPhone : appui long sur la barre d'onglets, puis glisse les
 icônes, masque un onglet avec **−** ou remets-en un avec **+**, et clique sur **OK** (ou Échap, ou un clic hors de la
@@ -491,6 +504,12 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude quand
   règles. Il continue de compter après une mise en veille ou un redémarrage.
 - **Notes rapides** : des notes en texte brut. Épingle celles que tu utilises, supprime avec annulation, et cherche
   dès que tu en as plus de huit.
+- **Messages** (désactivé par défaut) : tes conversations iMessage et SMS récentes, une pastille de non-lus sur la
+  notch repliée et une réponse rapide. Il lit la base de Messages sur ton Mac, ce qui exige l'Accès complet au
+  disque ; rien n'est enregistré ni envoyé ailleurs. Détails et limites dans
+  [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+- **Mail** (désactivé par défaut) : le nombre de messages non lus d'Apple Mail et les derniers (expéditeur, objet).
+  Un clic en ouvre un dans Mail. Claude Notch ne lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
 
 ### Répondre depuis la notch
 
@@ -669,6 +688,14 @@ lancement.
 - **Coller depuis d'autres apps** (macOS 15.4 et plus récent) : pour que l'onglet Presse-papiers puisse lire ce que
   tu copies. macOS peut le demander à chaque fois, ou le bloquer. Bloqué, rien ne peut être enregistré ; l'onglet et
   les réglages renvoient vers Réglages Système.
+- **Accès complet au disque** (onglet Messages, désactivé par défaut) : pour lire la base de Messages. macOS n'a pas
+  de fenêtre pour ça : ajoute Claude Notch toi-même dans Réglages Système › Confidentialité et sécurité › Accès
+  complet au disque, puis relance l'app. Sans lui, l'onglet le dit et renvoie vers Réglages Système.
+- **Contacts** (onglet Messages) : pour afficher les noms des contacts au lieu des numéros. Demandé quand tu cliques
+  sur **Autoriser** dans l'onglet.
+- **Automatisation : Messages** (Apple Events) : pour envoyer une réponse rapide. macOS le demande au premier envoi.
+- **Automatisation : Mail** (Apple Events) : pour lire le nombre de non-lus et les derniers messages. Demandé quand
+  tu cliques sur **Autoriser** dans l'onglet Mail.
 - **Bureau, Documents, Téléchargements** : seulement pour les outils compagnons facultatifs (voir
   [Section outils](#section-outils)).
 - Wi-Fi : le nom du réseau n'est pas lu, donc la localisation n'est pas demandée. Si macOS refuse de changer l'état

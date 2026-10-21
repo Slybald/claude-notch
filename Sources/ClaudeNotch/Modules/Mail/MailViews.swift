@@ -3,10 +3,21 @@ import SwiftUI
 
 // MARK: - Onglet
 
+private struct ListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 /// Les derniers messages non lus (expéditeur, objet, heure) ; un clic ouvre le message dans Mail. Chaque état où
 /// Mail n'est pas lisible (fermé, pas autorisé, refusé, sans compte) dit quoi faire, avec le bon bouton.
 struct MailPanel: View {
     @ObservedObject var module: MailModule
+    @Environment(\.notchContentMaxHeight) private var contentMaxHeight
+
+    @State private var listHeight: CGFloat = 0
+
+    /// Ligne « et N autres non lus » sous la liste.
+    private static let footerHeight: CGFloat = 20
 
     var body: some View {
         Group {
@@ -65,16 +76,26 @@ struct MailPanel: View {
                              action: ModuleAction(title: L("Ouvrir Mail", table: "Mail"), symbol: "arrow.up.forward.app", run: module.openMail))
                 .padding(.vertical, 14)
         } else {
+            let more = module.unread > module.messages.count
+            let maxHeight = contentMaxHeight - (more ? Self.footerHeight + 6 : 0)
             VStack(spacing: 6) {
-                // Relu chaque minute : « il y a 3 min » reste juste tant que le panneau est ouvert.
-                TimelineView(.everyMinute) { context in
-                    VStack(spacing: 3) {
-                        ForEach(module.messages) { message in
-                            MailRow(message: message, now: context.date) { module.openMessage(message) }
+                ScrollView(.vertical, showsIndicators: false) {
+                    // Relu chaque minute : « il y a 3 min » reste juste tant que le panneau est ouvert.
+                    TimelineView(.everyMinute) { context in
+                        VStack(spacing: 3) {
+                            ForEach(module.messages) { message in
+                                MailRow(message: message, now: context.date) { module.openMessage(message) }
+                            }
                         }
+                        .background(GeometryReader { proxy in
+                            Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                        })
                     }
                 }
-                if module.unread > module.messages.count {
+                .frame(height: min(listHeight > 0 ? listHeight : CGFloat(module.messages.count) * 46, maxHeight))
+                .bottomFade(listHeight > maxHeight + 1)
+                .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
+                if more {
                     Text(verbatim: String(format: L("et %d autres non lus", table: "Mail"), module.unread - module.messages.count))
                         .font(.system(size: 10.5))
                         .foregroundColor(Palette.secondary)

@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Two optional tabs, **off by default** (turn them on in Settings › Tabs or by editing the tabs in the notch):
+  **Messages** shows your recent iMessage and SMS conversations with an unread badge on the collapsed notch and a quick
+  reply; **Mail** shows the unread count of Apple Mail and the latest unread messages, and opens one on click.
+  Messages needs Full Disk Access (macOS has no dialog for it: the tab explains it and links to System Settings),
+  Contacts for names, and Automation to reply. Mail needs Automation and is never launched by Claude Notch. Nothing
+  is stored or sent outside the Mac, and no permission is asked before you open the tab. Feasibility, measures and
+  limits: [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+
 ## [1.5.0] - 2026-10-21
 
 ### Added
