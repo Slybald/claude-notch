@@ -581,8 +581,9 @@ private struct AppearanceSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(!prefs.showEars)
-                SettingsNote(L("Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un "
-                    + "intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend "
+                SettingsNote(L("Les intercalaires s'empilent en éventail contre la notch. Toujours visibles : chacun "
+                    + "montre son icône. Rétractés : une fine languette chacun. Dans les deux cas, passe la souris sur "
+                    + "un intercalaire pour l'ouvrir, clique dessus pour ouvrir son onglet. Une alerte (Claude attend "
                     + "ta réponse) reste toujours visible."))
                 Toggle("Teinter aussi la notch repliée", isOn: $prefs.tintCollapsed)
                 SettingsNote(L("Écrans sans encoche seulement : sur une vraie encoche, elle reste noire."))

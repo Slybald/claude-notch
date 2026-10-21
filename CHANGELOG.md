@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **Index tabs fan out like cards on a table.** At rest the tabs of each side overlap: the most important one is on
+  top, against the notch, with its icon and short text; each of the others slides under the previous one and shows a
+  regular slice with its icon only, with a thin light edge and a soft shadow so the stack reads. Hover a slice and the
+  tab opens wide with its details, with the usual spring; the tabs closer to the notch stay where they are and the
+  ones further out go under it, so nothing slides under a still pointer. Click a tab to open the panel on it, as
+  before. *Always Visible* is the half-closed fan, *Retracted* the tight one (a thin sliver per tab); an alert still
+  stays open. Nothing runs at rest and the hover zones are the exact shapes.
+
 ### Added
 
 - **Your own index tabs: local API and `notch` command** (off by default, **Settings › Scripts**). Scripts and

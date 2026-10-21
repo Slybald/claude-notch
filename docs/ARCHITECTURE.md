@@ -163,24 +163,32 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     display: screen width − the two auxiliary areas) and `contentSize` equals the notch; the 6 pt flares are kept only on
     the virtual notch and once expanded. The tab against the notch has exactly its height (no step), its rank-0 `overlap`
     runs down to the notch's bottom so no gap is left in the notch's rounded bottom corners, and the deployed card's inner
-    corner radius never starts above the notch's bottom.
-  - **Look** (`EarTabViews.swift`): each tab is its own shape (rounded outer bottom corner) drawn in the notch's black,
-    the first as tall as the notch, then one step shorter than the previous one going outwards (a staircase,
-    `EarTabs.height`), with a discreet accent per
-    activity (`EarTabs.accentHex`: Claude takes the accent of the settings). Setting `appearance.earTabs`
-    (`EarTabsMode`): **visible** (default: icon and a very short text, `4:59`, `1·6`, equalizer bars, always readable at a
-    glance, same footprint as the old ears for the usual Claude + player case) or **retracted** (8 pt sliver until
-    hovered, for a quiet notch). An alert (Claude waiting, Codex waiting for an approval: `ModuleEars.alert`) stays
-    deployed in both. The old "Alternate Claude and the other ears" setting migrates once (`Preferences.migratedEarTabs`):
+    corner radius never starts above the bottom of what precedes it (`EarTabsLayout.cardInnerRadius`: the notch for rank 0,
+    the tab above for the others).
+  - **Look** (`EarTabViews.swift`): a fan, like cards spread on a table. Each tab is its own shape (rounded outer
+    bottom corner) drawn in the notch's black, the first as tall as the notch, then one step shorter than the previous one
+    going outwards (a staircase, `EarTabs.height`), with a discreet accent per activity (`EarTabs.accentHex`: Claude takes
+    the accent of the settings). Rank 0 (against the notch) is on top; the body of every other tab slides under the
+    previous one (`EarTabs.overlap`) and only its **slice** shows (`EarTabsLayout.Item.width`, see `EarTabs.slice(of:rank:mode:)`;
+    `frame` is the slice, `bodyFrame` the whole tab). Stacking is `zIndex(-rank)`; a thin light edge (`EarTabEdge`), a soft
+    shadow and a slight lightening per rank make the overlap readable (rank 0 keeps the notch's pure black). Setting
+    `appearance.earTabs` (`EarTabsMode`): **visible** (default, the half-closed fan: rank 0 shows icon and a very short
+    text, `4:59`, `1·6`, equalizer bars; the others a regular 28 pt slice with their icon only) or **retracted** (the tight
+    fan, an 8 pt sliver per tab, for a quiet notch). An alert (Claude waiting, Codex waiting for an approval:
+    `ModuleEars.alert`) stays open, at any rank, in both. The old "Alternate Claude and the other ears" setting migrates once (`Preferences.migratedEarTabs`):
     on or never set → visible, off → retracted; the old key is removed.
   - **Hover and click** (`EarTabsLayout`, pure; `NotchController.collapsedHit`): the window ignores the mouse while
     collapsed, so the controller decides from mouse events. The zones are the real shapes (rounded corner included), in
     one coordinate system shared with the view (origin at the top centre of the notch): the notch centre (panel opens as
-    before, with the same 2 pt margin under the band), each tab, and the deployed tab. They never overlap, so a tab does
-    not open the panel and the centre does not unfold a tab. A tab unfolds after 0.12 s of hover (crossing the menu bar
-    unfolds nothing) and folds 0.2 s after the mouse leaves, or at once when it reaches the notch centre. Unfolded, its
-    inner edge does not move: it grows outwards and downwards over its outer neighbours, nothing slides under a still
-    pointer (the 1.2.1 tab bar lesson). The card shows the module's `makeTabDetailView()` (default: its compact
+    before, with the same 2 pt margin under the band), each tab, and the deployed tab. `hit` goes from the top of the stack
+    down (rank 0 first) and takes the first body that contains the point, so the rounded corner of a tab shows the tab
+    below it, and the zones never overlap: a tab does not open the panel and the centre does not unfold a tab. A tab
+    unfolds after 0.12 s of hover (crossing the menu bar unfolds nothing) and folds 0.2 s after the mouse leaves, or at once
+    when it reaches the notch centre. Unfolded, it opens from its own slice: its inner edge (where the tab above it ends)
+    does not move, it grows outwards and downwards over the tabs further out and keeps its rank in the stack, so the tabs
+    closer to the notch are never covered. Its zone always contains the one it had at rest and no other point changes
+    target (`EarTabsFanTests.testOpeningATabOnlyGrowsItsOwnZone`): nothing slides under a still pointer (the 1.2.1 tab bar
+    lesson). To reach a tab hidden under an open one, leave it and come back. The card shows the module's `makeTabDetailView()` (default: its compact
     summary, so Claude lists its sessions and their state, the timer its clock and a pause button; the player has its own:
     artwork, title, previous / play-pause / next). Its height is measured by the view and handed to the controller
     (`NotchViewModel.tabCardHeight`) so the zone follows the real size. Click on a tab (unfolded or not): the panel opens

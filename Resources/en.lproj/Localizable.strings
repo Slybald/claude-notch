@@ -222,7 +222,7 @@
 "Intercalaires" = "Index Tabs";
 "Rétractés" = "Retracted";
 "Toujours visibles" = "Always Visible";
-"Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible." = "Retracted: a thin sliver at rest. Either way, hover a tab to unfold it and click it to open its tab in the panel. An alert (Claude is waiting for you) always stays visible.";
+"Les intercalaires s'empilent en éventail contre la notch. Toujours visibles : chacun montre son icône. Rétractés : une fine languette chacun. Dans les deux cas, passe la souris sur un intercalaire pour l'ouvrir, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible." = "The tabs fan out against the notch like cards on a table. Always Visible: each shows its icon. Retracted: a thin sliver each. Either way, hover a tab to open it and click it to open its tab in the panel. An alert (Claude is waiting for you) always stays visible.";
 "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide." = "New versions come from GitHub releases and are only installed if their signature is valid.";
 "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic." = "Independent project, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.";
 "Licences" = "Licenses";

@@ -222,7 +222,7 @@
 "Intercalaires" = "Intercalaires";
 "Rétractés" = "Rétractés";
 "Toujours visibles" = "Toujours visibles";
-"Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible." = "Rétractés : une fine languette au repos. Dans les deux cas, passe la souris sur un intercalaire pour le déployer, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible.";
+"Les intercalaires s'empilent en éventail contre la notch. Toujours visibles : chacun montre son icône. Rétractés : une fine languette chacun. Dans les deux cas, passe la souris sur un intercalaire pour l'ouvrir, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible." = "Les intercalaires s'empilent en éventail contre la notch. Toujours visibles : chacun montre son icône. Rétractés : une fine languette chacun. Dans les deux cas, passe la souris sur un intercalaire pour l'ouvrir, clique dessus pour ouvrir son onglet. Une alerte (Claude attend ta réponse) reste toujours visible.";
 "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide." = "Les nouvelles versions viennent des releases GitHub et ne sont installées que si leur signature est valide.";
 "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic." = "Projet indépendant, ni affilié ni approuvé par Anthropic. Claude est une marque d'Anthropic.";
 "Licences" = "Licences";
