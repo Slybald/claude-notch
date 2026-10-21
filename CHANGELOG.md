@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0] - 2026-10-21
 
 **Claude Notch is now Oriel.** Same app, same settings, same data: the automatic update installs it in place and it
 renames itself at its first launch (see *Changed* below and `docs/RENAME.md`). Entries below use the new name.
