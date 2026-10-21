@@ -105,7 +105,7 @@ final class BubbleSnapshotTests: XCTestCase {
                 FerroCanvas(shapes: shapes, notch: notch, notchColor: .black, fill: fill)
                 if !shapes.outline.isEmpty {
                     RevolverBubble(tabs: tabs(6), turn: 0, activity: [], claudeEars: nil, fill: fill,
-                                   nearNotch: state.strength > 0.5, outline: BubbleRootView.outline(shapes),
+                                   nearNotch: state.bridged, outline: BubbleRootView.outline(shapes),
                                    contentScale: shapes.contentScale, contentOpacity: Double(shapes.contentOpacity),
                                    rimOpacity: Double(shapes.rimOpacity))
                         .position(shapes.center)
@@ -113,33 +113,43 @@ final class BubbleSnapshotTests: XCTestCase {
             }
             .frame(width: field.width, height: field.height, alignment: .topLeading)
         }
-        func approach(_ gap: CGFloat, dx: CGFloat = 40) -> FerroState {
-            let wanted = CGPoint(x: screenNotch.midX + dx, y: screenNotch.minY - BubbleGeometry.radius - gap)
-            let pulled = Ferro.attract(wanted, notch: screenNotch)
-            return FerroState(notch: notch, center: local.point(pulled.center), strength: pulled.strength)
+        /// Glisser simulé jusqu'à `gaps` (le pont garde son histoire), image prise `after` secondes après le dernier.
+        func dragged(_ gaps: [CGFloat], after: TimeInterval = 1, dx: CGFloat = 40) -> (FerroState, Date) {
+            var state = FerroState(notch: notch, center: .zero)
+            var date = start
+            for gap in gaps {
+                let wanted = CGPoint(x: screenNotch.midX + dx, y: screenNotch.minY - BubbleGeometry.radius - gap)
+                let pulled = Ferro.attract(wanted, notch: screenNotch)
+                date = date.addingTimeInterval(1)
+                state.move(to: local.point(pulled.center), strength: pulled.strength, at: date)
+            }
+            return (state, date.addingTimeInterval(after))
         }
         var stages: [(String, FerroState, Date)] = []
-        for (name, gap) in [("1", 140.0), ("2", 95.0), ("3", 60.0), ("4", 34.0)] as [(String, CGFloat)] {
-            stages.append(("bubble-ferro-\(name)-approach", approach(gap), start))
+        for (name, gaps, after) in [("1-approach", [140.0], 1.0), ("2-approach", [105], 1), ("3-contact", [78], 1),
+                                    ("4-bridge-forming", [78, 66], 0.05), ("5-bridge", [78, 50], 1),
+                                    ("6-bridge-thick", [78, 30], 1), ("7-stretched", [78, 30, 95], 1),
+                                    ("8-broken", [78, 30, 112], 0.06)] as [(String, [CGFloat], TimeInterval)] {
+            let (state, date) = dragged(gaps, after: after)
+            stages.append(("bubble-ferro-\(name)", state, date))
         }
-        let captured = approach(30)
-        for (name, t) in [("5", 0.2), ("6", 0.5), ("7", 0.8), ("8", 0.97), ("9", 1.08), ("10", 1.45)] {
+        let (captured, capturedAt) = dragged([78, 30, 18])
+        for (name, t) in [("9", 0.3), ("10", 0.7), ("11", 0.95), ("12", 1.12), ("13", 1.3)] {
             var state = captured
-            state.mode = .aspirate(start: start, from: captured.center)
-            stages.append(("bubble-ferro-\(name)-aspirate", state, start.addingTimeInterval(t * Ferro.aspirateDuration)))
+            state.mode = .aspirate(start: capturedAt, from: captured.center)
+            stages.append(("bubble-ferro-\(name)-aspirate", state,
+                           capturedAt.addingTimeInterval(t * Ferro.aspirateDuration)))
         }
-        var relax = approach(50)
-        relax.mode = .relax(start: start, from: relax.strength)
-        stages.append(("bubble-ferro-11-relax", relax, start.addingTimeInterval(0.24)))
+        var (relax, relaxAt) = dragged([90])
+        relax.mode = .relax(start: relaxAt, from: relax.strength)
+        stages.append(("bubble-ferro-14-relax", relax, relaxAt.addingTimeInterval(0.24)))
         for (name, state, date) in stages {
             try TimerNotesSnapshot.render(scene(state, date), name, dir, size: field.size, background: Self.wallpaper)
         }
         let tinted = Color(red: 0.12, green: 0.16, blue: 0.32)
-        var aspirating = captured
-        aspirating.mode = .aspirate(start: start, from: captured.center)
-        try TimerNotesSnapshot.render(scene(aspirating, start.addingTimeInterval(0.4 * Ferro.aspirateDuration),
-                                            fill: tinted),
-                                      "bubble-ferro-12-tinted", dir, size: field.size, background: Self.wallpaper)
+        let (bridged, bridgedAt) = dragged([78, 40])
+        try TimerNotesSnapshot.render(scene(bridged, bridgedAt, fill: tinted), "bubble-ferro-15-tinted", dir,
+                                      size: field.size, background: Self.wallpaper)
     }
 
     /// Barillet de 4 à 10 onglets ; activités (anneau, pastille, points sur les chambres) ; aimantée par la notch.

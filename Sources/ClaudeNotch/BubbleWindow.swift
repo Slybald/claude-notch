@@ -259,6 +259,8 @@ final class BubbleController {
         window.alphaValue = 1
         window.ignoresMouseEvents = false
         bubble.scale = 1
+        bubble.ghost = false
+        setNearNotch(false)
         clearField()
         foldNow()
         endGoo(after: 0)
@@ -404,6 +406,8 @@ final class BubbleController {
         if model.reduceMotion {
             collapseNotch()
             showBubble()
+            // « Réduire les animations » activé en plein glisser : la goutte déjà montrée s'efface.
+            if goo.state != nil { endGoo(after: 0) }
             return
         }
         // La goutte reste un instant sous la bulle et la suit (`moved`), puis le corps rentre dans la notch.
@@ -598,11 +602,14 @@ final class BubbleController {
             return moveWindow()
         }
         let pulled = Ferro.attract(wanted, notch: notch)
-        setNearNotch(pulled.gap < BubbleGeometry.magnetGap)
         center = pulled.center
         if notchPending { goo.liveDrop = GooCoordinates(gooFrame).point(center) }
         if pulled.gap <= Ferro.captureGap { return reattach() }
-        guard pulled.strength > 0 else {
+        // Un pont qui vient de casser finit de revenir dans le champ ; hors de portée, la fenêtre suit la bulle.
+        let recoiling = bubble.ferro.map { !$0.bridged && Date().timeIntervalSince($0.bridgeChanged) < Ferro.breakDuration }
+            ?? false
+        guard pulled.strength > 0 || recoiling, fieldFits(center) else {
+            setNearNotch(false)
             leaveField()
             return moveWindow()
         }
@@ -610,10 +617,10 @@ final class BubbleController {
         relaxWork?.cancel()
         relaxWork = nil
         if var ferro = bubble.ferro {
-            ferro.center = local.point(center)
-            ferro.strength = pulled.strength
-            ferro.mode = .approach
+            ferro.move(to: local.point(center), strength: pulled.strength, at: Date())
             bubble.ferro = ferro
+            // Pontée : un lâcher l'aspire ; le bord s'allume.
+            setNearNotch(ferro.bridged)
         }
         bubble.layout(center: local.point(center), window: local.frame.size)
     }
@@ -635,12 +642,20 @@ final class BubbleController {
         savePosition()
         guard let strength = bubble.ferro?.strength, fieldFrame != nil else { return }
         bubble.ferro?.mode = .relax(start: Date(), from: strength)
+        relaxWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.leaveField() }
         relaxWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Ferro.relaxDuration, execute: work)
     }
 
     // MARK: - Champ de la notch (retour aimanté)
+
+    /// La bulle (et sa marge) tient dans le champ de la notch.
+    private func fieldFits(_ center: CGPoint) -> Bool {
+        let margin = BubbleGeometry.radius + BubbleGeometry.windowMargin
+        let field = Ferro.fieldFrame(notch: notchRect())
+        return center.x - margin >= field.minX && center.x + margin <= field.maxX && center.y - margin >= field.minY
+    }
 
     /// Fenêtre agrandie au champ de la notch, une seule fois : la bulle s'y déplace ensuite sans que la fenêtre bouge,
     /// et la pointe de la notch y est dessinée avec elle (même image, rien ne décroche).
@@ -912,7 +927,8 @@ final class BubbleController {
         // La souris reste à la fenêtre : un glisser en cours sur la bulle doit recevoir son relâchement.
         bubble.ferro?.mode = .aspirate(start: Date(), from: local.point(center))
         DispatchQueue.main.asyncAfter(deadline: .now() + Ferro.aspirateDuration) { [weak self] in
-            self?.haptic(.levelChange)
+            guard let self, self.model.bubble == .reattaching else { return }
+            self.haptic(.levelChange)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + FerroState.aspirateTotal) { [weak self] in
             self?.finishAttach()

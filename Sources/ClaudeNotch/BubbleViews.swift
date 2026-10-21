@@ -202,8 +202,8 @@ struct GooCanvas: View {
     }
 }
 
-/// Côté notch du retour aimanté : la pointe qui descend vers la bulle, le col de l'aspiration (dégradé de la couleur
-/// de la notch à celle de la bulle), le renflement du bas de la notch. Le contour de la bulle est dessiné par
+/// Côté notch du retour aimanté : la pointe qui descend vers la bulle et le pont (dégradé de la couleur de la notch à
+/// celle de la bulle), le bord bas de la notch bombé ou parcouru par l'onde. Le contour de la bulle est dessiné par
 /// `RevolverBubble`, avec le barillet.
 struct FerroCanvas: View {
     let shapes: FerroShapes
@@ -225,20 +225,9 @@ struct FerroCanvas: View {
             let shading = GraphicsContext.Shading.linearGradient(
                 Gradient(colors: [notchColor, fill]), startPoint: CGPoint(x: shapes.center.x, y: notch.maxY),
                 endPoint: CGPoint(x: shapes.center.x, y: max(shapes.center.y, notch.maxY + 1)))
+            context.fill(Self.polygon(shapes.edge), with: .color(notchColor))
             context.fill(Self.polygon(shapes.cone), with: shading)
             context.fill(Self.polygon(shapes.bridge), with: shading)
-            guard shapes.swell > 0.3 else { return }
-            // Renflement sous la notch, centré sous la bulle avalée, sans toucher ses coins arrondis.
-            let half = notch.width * 0.42
-            let x = min(max(shapes.center.x, notch.minX + half), notch.maxX - half)
-            var swell = Path()
-            swell.move(to: CGPoint(x: x - half, y: notch.maxY - 4))
-            swell.addLine(to: CGPoint(x: x - half, y: notch.maxY))
-            swell.addQuadCurve(to: CGPoint(x: x + half, y: notch.maxY),
-                               control: CGPoint(x: x, y: notch.maxY + 2 * shapes.swell))
-            swell.addLine(to: CGPoint(x: x + half, y: notch.maxY - 4))
-            swell.closeSubpath()
-            context.fill(swell, with: .color(notchColor))
         }
         .allowsHitTesting(false)
     }
