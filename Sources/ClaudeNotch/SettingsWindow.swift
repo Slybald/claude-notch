@@ -156,7 +156,7 @@ struct SettingsView: View {
     private var detail: some View {
         switch selection ?? .general {
         case .general:
-            GeneralSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled,
+            GeneralSettings(prefs: prefs, registry: registry, claudeEnabled: registry.isClaudeEnabled,
                             runAssistant: { HookSetup.shared.showSetupAssistant(registry: registry, prefs: prefs) })
         case .tabs: TabsSettings(prefs: prefs, registry: registry)
         case .appearance: AppearanceSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled)
@@ -196,6 +196,7 @@ struct SettingsNote: View {
 
 private struct GeneralSettings: View {
     @ObservedObject var prefs: Preferences
+    @ObservedObject var registry: ModuleRegistry
     let claudeEnabled: Bool
     let runAssistant: () -> Void
     @ObservedObject var hotKeys: HotKeyCenter = .shared
@@ -207,6 +208,19 @@ private struct GeneralSettings: View {
 
     var body: some View {
         SettingsPane {
+            Section(L("Profil", table: "Profiles")) {
+                LabeledContent {
+                    Button(L("Changer de profil…", table: "Profiles")) {
+                        ProfileWindow.shared.show(registry: registry, prefs: prefs)
+                    }
+                } label: {
+                    Text(verbatim: NotchProfile.matching(enabled: registry.enabled.map { $0.id },
+                                                         known: registry.modules.map { $0.id })?.title
+                         ?? L("Personnalisé"))
+                }
+                SettingsNote(L("Un profil règle les onglets, leur ordre, l'ouverture du panneau et les oreilles. "
+                               + "Tes données ne changent pas.", table: "Profiles"))
+            }
             Section {
                 Toggle("Lancer à l'ouverture de session", isOn: $prefs.launchAtLogin)
             }
