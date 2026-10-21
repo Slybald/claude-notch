@@ -30,10 +30,12 @@ Interface available in English and French (follows the system language). Screens
   (Settings › Appearance to turn it off).
 - **Permissions**: the card shows what Claude is asking for (`Terminal · rm -rf build`, the file to edit,
   the question asked).
-- **Reply from the notch** (Settings › Claude, off by default): allow or deny a permission (with an optional
-  reason for Claude), answer a question (single or multiple choice, or your own text), approve a plan or ask
-  for changes, and send a message to a session (hover its card: **Message**). The terminal dialog stays usable
-  at the same time: the first answer wins. Never "always allow" from the notch. Return sends, Esc closes.
+- **Reply from the notch** (off by default; a card at the top of the Claude tab offers to turn it on, and so does
+  Settings › Claude): allow or deny a permission (with an optional reason for Claude), answer a question
+  (single or multiple choice, or your own text), approve a plan or ask for changes, and talk to a session
+  (hover its card: **Chat**): what Claude just said, your own messages, and a field to write. It works for the
+  CLI and for the Code tab of Claude Desktop. The terminal dialog (or Claude Desktop) stays usable at the same
+  time: the first answer wins. Never "always allow" from the notch. Return sends, Esc closes.
 - **Tasks**: progress bar and current task of Claude Code's task list; the chevron unfolds the whole list.
 - **Subagents**: number of subagents running in each session.
 - **Click to go back**: clicking a card brings the host app to the front (Terminal, iTerm2, Ghostty, VS Code,
@@ -74,23 +76,31 @@ when a session needs you.
 
 ## Reply from the notch
 
-Off by default: turn it on in **Settings › Claude**. Then Claude Code waits for your answer in the notch as well
-as in the terminal:
+Off by default: the Claude tab shows a card (**Turn On** / **Later**) and **Settings › Claude** has the switch.
+Then Claude Code waits for your answer in the notch as well as in the terminal or in Claude Desktop:
 
 - **Permissions**: allow or deny a tool call, with an optional reason that Claude reads. The notch never offers
   "always allow".
 - **Questions**: pick one answer or several, or write your own.
 - **Plans**: approve a plan, or ask for changes.
-- **Messages**: hover a session card and click **Message** to write to Claude. The message reaches Claude after
-  the current action, or starts a new turn if Claude was waiting.
+- **Conversation**: hover a session card and click **Chat**. You see Claude's last messages (what it said when it
+  stopped, what its subagents reported), what you wrote, and a field to write to Claude. The message reaches
+  Claude after the current action, or starts a new turn (about 3 s) if Claude was waiting. Click a long message
+  to unfold it.
 
 The terminal dialog stays usable: the first answer wins. If the notch gives no answer in time (4 seconds when its
 card never appeared, about 590 seconds otherwise), the request goes back to the terminal. The same happens when the
 app is closed or the setting is off, so nothing is ever approved by default.
 
-For sessions without a terminal (`claude -p`, the Agent SDK, the Code tab of Claude Desktop) there is no **Message**
-button, and permissions, questions and plans were not tested. A session opened before the update gets replies only
-after it restarts.
+**Claude Desktop (Code tab).** Checked with Claude Code 2.1.304, started the way the Code tab starts it: the
+permission hook is called and its decision applied (in "bypass permissions" mode nothing asks for permission, but
+questions still reach the notch), a question answered from the notch is received by Claude, and a message sent
+from the notch wakes Claude (a new turn about 3 s later, or read after the current action). Plans were not checked
+with Desktop. How the Desktop window shows a turn started from the notch was not checked either.
+
+When the notch cannot write to a session (`claude -p`, the Agent SDK, an IDE, or a session opened before the hook
+script was updated) the conversation says "Answer in *app*" with an **Open** button instead of a field. A session
+opened before the update gets replies only after it restarts.
 
 ## Notch settings
 
@@ -241,8 +251,12 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
     message is read after the current action. Without a waiting hook (session opened before the hooks were
     updated, app restarted), the message is queued until the end of the turn. Messages are capped at
     1,800 bytes and control characters are removed. Sessions without a terminal (`claude -p`, the Agent SDK,
-    IDEs, the Code tab of Claude Desktop) do not get messages from the notch: there, Claude waits for this hook
-    before reading the prompt, so the app lets it go at once (measured with Claude Code 2.1.304).
+    IDEs) do not get messages from the notch: there, Claude waits for this hook before reading the prompt (or
+    before exiting), so the app lets it go at once. The Code tab of Claude Desktop is the exception, at the end of
+    a turn only (`Stop`; the script sends the Desktop session ID): the turn result has already gone out and the
+    next prompt does not wait, whereas held at `SessionStart` the hook delayed the first prompt by the whole wait
+    (measured with Claude Code 2.1.304). When a Desktop session is closed, SIGTERM ends it at once; closing its
+    input leaves Claude up to about 30 s.
 - After an update of the app, hooks installed by a previous version are updated silently, with the usual
   timestamped backup of `settings.json`.
 - From that process ID, the app walks up the process tree to find the Claude process (to detect the end of
@@ -300,8 +314,10 @@ hooks it already receives:
 - After a permission is granted in the terminal, the card stays on "waiting for your permission" until the
   tool finishes: no hook reports the approval itself. (Granted from the notch, the card updates at once.)
 - Reply from the notch: a session opened before the hooks were updated receives replies only after it
-  restarts. Sessions without a terminal (Code tab of Claude Desktop, `claude -p`, SDK) cannot receive a
-  message (no **Message** button); permissions, questions and plans are not checked with them.
+  restarts. Sessions without a terminal other than the Code tab of Claude Desktop (`claude -p`, SDK, IDEs)
+  cannot receive a message: the conversation offers to open the session instead. With Claude Desktop, plans were
+  not checked, nor how its window shows a turn started from the notch. The conversation keeps the last 6 lines
+  per session, in memory only.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -416,11 +432,13 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
   toutes les 4 secondes pendant qu'il travaille (Réglages › Apparence pour le désactiver).
 - **Permissions** : la carte montre ce que Claude demande (`Terminal · rm -rf build`, le fichier à modifier,
   la question posée).
-- **Répondre depuis la notch** (Réglages › Claude, désactivé par défaut) : autoriser ou refuser une
-  permission (avec un motif facultatif pour Claude), répondre à une question (choix unique ou multiple, ou
-  texte libre), approuver un plan ou demander des changements, et écrire à une session (survole sa carte :
-  **Écrire**). Le dialogue du terminal reste utilisable en même temps : la première réponse gagne. Jamais de
-  « toujours autoriser » depuis la notch. Entrée envoie, Échap ferme.
+- **Répondre depuis la notch** (désactivé par défaut ; une carte en haut de l'onglet Claude propose de
+  l'activer, comme Réglages › Claude) : autoriser ou refuser une permission (avec un motif facultatif pour
+  Claude), répondre à une question (choix unique ou multiple, ou texte libre), approuver un plan ou demander des
+  changements, et discuter avec une session (survole sa carte : **Converser**) : ce que Claude vient de dire,
+  tes messages et un champ pour écrire. Ça marche pour le CLI et pour l'onglet Code de Claude Desktop. Le
+  dialogue du terminal (ou de Claude Desktop) reste utilisable en même temps : la première réponse gagne.
+  Jamais de « toujours autoriser » depuis la notch. Entrée envoie, Échap ferme.
 - **Tâches** : barre de progression et tâche en cours de la liste de Claude Code ; le chevron déplie la liste.
 - **Sous-agents** : nombre de sous-agents en cours dans chaque session.
 - **Clic → retour à la session** : un clic sur une carte ramène l'app hôte au premier plan (Terminal, iTerm2,
@@ -460,23 +478,32 @@ utilisé, ou sur Claude quand une session a besoin de toi.
 
 ### Répondre depuis la notch
 
-Désactivé par défaut : active-le dans **Réglages › Claude**. Claude Code attend alors ta réponse dans la notch
-comme dans le terminal :
+Désactivé par défaut : l'onglet Claude affiche une carte (**Activer** / **Plus tard**) et **Réglages › Claude**
+a l'interrupteur. Claude Code attend alors ta réponse dans la notch comme dans le terminal ou dans Claude Desktop :
 
 - **Permissions** : autoriser ou refuser un appel d'outil, avec un motif facultatif que Claude lit. La notch ne
   propose jamais « toujours autoriser ».
 - **Questions** : choisir une ou plusieurs réponses, ou écrire la tienne.
 - **Plans** : approuver un plan, ou demander des changements.
-- **Messages** : survole la carte d'une session et clique sur **Écrire** pour écrire à Claude. Le message lui
-  parvient après l'action en cours, ou démarre un tour s'il attendait.
+- **Conversation** : survole la carte d'une session et clique sur **Converser**. Tu vois les derniers messages
+  de Claude (ce qu'il a dit en s'arrêtant, ce que ses sous-agents ont rapporté), ce que tu as écrit, et un champ
+  pour écrire à Claude. Le message lui parvient après l'action en cours, ou démarre un tour (3 s environ) s'il
+  attendait. Un clic sur un long message le déplie.
 
 Le dialogue du terminal reste utilisable : la première réponse gagne. Si la notch ne répond pas à temps (4 secondes
 si sa carte n'a jamais été affichée, environ 590 secondes sinon), la demande revient au terminal. Il en va de même
 quand l'app est fermée ou le réglage coupé : rien n'est jamais approuvé par défaut.
 
-Pour les sessions sans terminal (`claude -p`, le SDK Agent, l'onglet Code de Claude Desktop), il n'y a pas de bouton
-**Écrire**, et les permissions, questions et plans n'ont pas été testés. Une session ouverte avant la mise à jour ne
-reçoit les réponses qu'après son redémarrage.
+**Claude Desktop (onglet Code).** Vérifié avec Claude Code 2.1.304 lancé comme le lance l'onglet Code : le hook de
+permission est appelé et sa décision appliquée (en mode « ignorer les autorisations », rien ne demande de
+permission, mais les questions arrivent bien dans la notch), une question répondue depuis la notch est reçue par
+Claude, et un message envoyé depuis la notch réveille Claude (un nouveau tour 3 s plus tard, ou lu après l'action
+en cours). Les plans n'ont pas été vérifiés avec Desktop, ni la façon dont la fenêtre de Desktop montre un tour
+démarré depuis la notch.
+
+Quand la notch ne peut pas écrire à une session (`claude -p`, SDK Agent, IDE, ou session ouverte avant la mise à jour
+du script de hook), la conversation affiche « Réponds dans *app* » avec un bouton **Ouvrir** à la place du champ.
+Une session ouverte avant la mise à jour ne reçoit les réponses qu'après son redémarrage.
 
 ### Réglages de la notch
 
@@ -638,9 +665,13 @@ lancement.
     un message tapé dans la notch, puis le remet à Claude, qui démarre un tour (3 s environ). Pendant un tour,
     le message est lu après l'action en cours. Sans attente (session ouverte avant la mise à jour des hooks,
     app relancée), le message reste en file jusqu'à la fin du tour. Taille limitée à 1 800 octets, caractères
-    de contrôle retirés. Les sessions sans terminal (`claude -p`, SDK, IDE, onglet Code de Claude Desktop) ne
-    reçoivent pas de message depuis la notch : Claude y attend la fin de ce hook avant de lire le prompt, l'app
-    le libère donc tout de suite (mesuré avec Claude Code 2.1.304).
+    de contrôle retirés. Les sessions sans terminal (`claude -p`, SDK, IDE) ne reçoivent pas de message depuis la
+    notch : Claude y attend la fin de ce hook avant de lire le prompt (ou avant de sortir), l'app le libère donc
+    tout de suite. L'onglet Code de Claude Desktop fait exception, à la fin d'un tour seulement (`Stop` ; le
+    script envoie l'identifiant de session Desktop) : le résultat du tour est déjà parti et le prompt suivant
+    n'attend pas, alors que tenu sur `SessionStart` le hook retardait le premier prompt de toute l'attente (mesuré
+    avec Claude Code 2.1.304). À la fermeture d'une session Desktop, SIGTERM la termine aussitôt ; fermer son
+    entrée laisse Claude jusqu'à 30 s environ.
 - Après une mise à jour de l'app, des hooks posés par une version précédente sont mis à jour sans rien
   demander, avec la sauvegarde horodatée habituelle de `settings.json`.
 - À partir de ce PID, l'app remonte la chaîne de processus pour trouver le processus Claude (détection de
@@ -699,8 +730,10 @@ partir de hooks qu'elle reçoit déjà :
 - Après une permission accordée dans le terminal, la carte reste en « Attend ta permission » jusqu'à la fin
   de l'outil : aucun hook ne signale l'accord lui-même. (Accordée depuis la notch, la carte suit tout de suite.)
 - Répondre depuis la notch : une session ouverte avant la mise à jour des hooks ne reçoit les réponses
-  qu'après son redémarrage. Une session sans terminal (onglet Code de Claude Desktop, `claude -p`, SDK) ne peut
-  pas recevoir de message (pas de bouton **Écrire**) ; permissions, questions et plans pas vérifiés avec elles.
+  qu'après son redémarrage. Une session sans terminal autre que l'onglet Code de Claude Desktop (`claude -p`,
+  SDK, IDE) ne peut pas recevoir de message : la conversation propose d'ouvrir la session. Avec Claude Desktop,
+  les plans n'ont pas été vérifiés, ni la façon dont sa fenêtre montre un tour démarré depuis la notch. La
+  conversation garde les 6 dernières répliques de chaque session, en mémoire seulement.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app

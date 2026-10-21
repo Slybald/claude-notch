@@ -34,7 +34,9 @@ organised and why some choices were made, so they are not undone by accident.
 - `ProcessInspector`: walks the ancestors of the hook's `$PPID` to find the Claude process, the host app
   (outermost `.app` bundle) and the source (CLI or Desktop). `ClaudeMonitor`: is Claude Desktop running,
   which `claude` processes are alive (2 s scan, only while the Claude tab is on).
-- `SessionStore`: per-session state machine, task lists (`~/.claude/tasks/<session_id>/`), Esc detection.
+- `SessionStore`: per-session state machine, task lists (`~/.claude/tasks/<session_id>/`), Esc detection, the last
+  6 lines of each conversation (`Utterance`: prompt, `Stop`, `SubagentStop`; memory only, never on disk or in
+  `/state`).
 - `NotchController` (window, hover, visibility, full screen), `NotchViews` (root, ears, panel, tab bar,
   session cards), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen. `NotchShell`: rules tested without a real screen (visibility, screen choice, real or
@@ -42,7 +44,9 @@ organised and why some choices were made, so they are not undone by accident.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
   per module:
   - `Claude/`: sessions, compact summary, Claude settings. `ReplyCenter` holds the long requests of `/permission`
-    and `/inbox` (one waiter per session, FIFO queue of messages); `ReplyViews` draws the cards.
+    and `/inbox` (one waiter per session, FIFO queue of messages); `ReplyViews` draws the cards;
+    `ConversationViews` draws the conversation of a session (last lines, message field, or "Answer in *app*" +
+    **Open**) and the card that proposes to turn replies on.
   - `Media/` (`media`): `MediaModule` (life cycle, settings), `NowPlaying` (state rebuilt from the
     `mediaremote-adapter` JSON lines; `MediaRemoteAdapter` runs the helper and restarts it with a growing delay),
     `MediaCalendar` (EventKit and the Calendar opener), `MediaViews`.
@@ -178,14 +182,43 @@ Apple Events and Bluetooth are already there) nor another module's files.
   - Without a terminal (`-p`/`--print`, or `--input-format`/`--output-format` as passed by the SDK and the Code
     tab of Claude Desktop, without `-p`), Claude **waits for the `asyncRewake` hooks** before reading the prompt
     (`claude -p` never answered with a held waiter). `ReplyCenter.wait` reads the argv of `X-Claude-PPID`
-    (`KERN_PROCARGS2`) and answers 204 at once; such sessions get no **Message** button. Checked with the real
-    `claude -p` and stream-json against the real server: about 5 s, as without the hooks.
+    (`KERN_PROCARGS2`) and answers 204 at once; such sessions are listed in `headless` and the conversation offers
+    "Answer in *app*" + **Open** instead of a field. Checked with the real `claude -p` and stream-json against the
+    real server: about 5 s, as without the hooks.
+- **Claude Desktop (Code tab), facts measured on Claude Code 2.1.304** (a real `claude` started with the Code tab's
+  flags: stream-json in and out, `--permission-prompt-tool=stdio`, then the same hook script against a test
+  server; spikes kept out of the repository):
+  - `PermissionRequest` is called, alongside Desktop's own `can_use_tool` request. A decision from the hook runs
+    the tool and Desktop gets a `control_cancel_request` for its dialog; when Desktop answers first, the tool
+    runs at once and the late hook answer is ignored. In `bypassPermissions` mode Bash raises no
+    `PermissionRequest` (nothing to allow) but AskUserQuestion still does: `allow` + `updatedInput.answers` is
+    applied (`tool_result`: "Your questions have been answered…").
+  - `Stop` carries `last_assistant_message` (~30 ms after the `result` line); a woken turn comes back as a
+    `UserPromptSubmit` `<task-notification>` then a `Stop`.
+  - `asyncRewake` held on `Stop` blocks neither the `result` nor the next prompt, and its exit 2 starts a turn
+    ~3 s later when Claude is idle, or is read right after the running tool (`<task-notification>` at the end of a
+    25 s Bash call). Held on `SessionStart` it delays the first prompt by the whole wait (21 s for a 20 s hold):
+    never held there. Closing: SIGTERM exits at once; closing stdin makes Claude wait for the held hooks, then
+    give up after ~30 s (SessionEnd fires only then).
+  - Hence `ReplyCenter.wait(desktop:atStop:)`: the script sends `X-Host-Session-Id` (`CLAUDE_CODE_HOST_SESSION_ID`,
+    `local_…`); a headless session with that ID, without `-p`, is held at `Stop` only. Any other headless session
+    (SDK, IDE, `-p`, an old script without the header) keeps the 204 and gets "Answer in *app*". End to end with
+    the real server, script and `claude`: waiter held at `Stop`, message delivered, answer ~3 s later.
+  - Not checked: ExitPlanMode with Desktop, and how the Desktop window displays a turn started by a hook.
+- **CLI, same version** (interactive `claude` in a pty): `PermissionRequest` is called for Bash and AskUserQuestion,
+  the terminal dialog stays up ("Allowed by PermissionRequest hook" when the hook answers first).
 - **Reply design**: one long connection per request; the app answers on the first of: the user's decision; the
   `PostToolUse` (same tool and input), `Stop`, `UserPromptSubmit` or `SessionEnd` of the session; the connection
   closing; the deadline (4 s if the card was never on screen, 590 s once it was, under the hook's 600 s). No
   decision = 204. One waiter per session (a new one closes the old with 204), FIFO queue (10 messages), waiters
   closed when their claude PID exits (kqueue `DispatchSourceProcess`, no polling). No route lets a client
   decide: a decision only exists as the answer to a hook's request, after a click. Never "always allow".
+- **Conversation and the "turn on" card** (Claude tab): the "Chat" button opens `ConversationView` under the card
+  (the list then takes the whole panel height and scrolls to it). Replies off, the conversation still shows what
+  was said and offers to turn them on. The card at the top of the tab (`ReplyPromptCard`) shows while replies are
+  off, not dismissed (`claude.replyPromptDismissed`) and the tools pane is closed (open, it would push the panel
+  past 460 pt, measured). "Turn On" sets the setting and applies `HookSetup.repairNeeded`: nothing, a silent
+  update, or the install window (the choice stays with the user). Nothing is decided without a click.
 - **Hook token**: 32 hex, new at each launch, written (0600, `O_EXCL` + `rename`) only once the listener is
   ready, so a second instance that cannot bind never overwrites it. The script passes it with `curl -H @file`
   (never in argv) and `-q --noproxy '*'` (no `~/.curlrc`, no proxy). `permission` and `inbox` modes run curl
