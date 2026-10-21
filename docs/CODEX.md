@@ -7,7 +7,7 @@ Short feasibility notes behind the **Codex** tab. Everything below was checked o
 ## Conclusion
 
 Codex ships **hooks** (the same idea as Claude Code's), which is the official, supported way to follow a session and
-to answer an approval. Claude Notch uses them, and nothing else:
+to answer an approval. Oriel uses them, and nothing else:
 
 | Need | Source | Status |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ to answer an approval. Claude Notch uses them, and nothing else:
 - **Hooks** live in `~/.codex/hooks.json` (or inline `[hooks]` in `config.toml`, or per project). Several sources
   run together, so ours never replaces the user's. `[features] hooks = false` turns them all off.
 - **Trust**: a new or changed hook is skipped until the user reviews it with `/hooks` in Codex. Codex then writes
-  `hooks.state."<file>:<event>:<group>:<hook>".trusted_hash` in `config.toml`. Claude Notch does not write this: the
+  `hooks.state."<file>:<event>:<group>:<hook>".trusted_hash` in `config.toml`. Oriel does not write this: the
   review stays the user's. `hooks/list` (app-server) reports `trustStatus` (`untrusted`, `trusted`, `modified`).
 - **Payload** (stdin JSON): `session_id`, `cwd`, `hook_event_name`, `model`, `permission_mode`, `transcript_path`
   (null here), plus `turn_id`, `prompt` (`UserPromptSubmit`), `tool_name` / `tool_input` / `tool_use_id`
@@ -74,7 +74,7 @@ stdio as a child process, on the default `~/.codex`. Measured with that very bin
   `session_id`) that opens the conversation. Not clicked live, so as not to move the user's window.
 - **Speed.** `hooks/list` answers in 0.1 to 0.5 s on a warm `CODEX_HOME`, 8 to 15 s on a brand-new one.
 
-## What Claude Notch does with it
+## What Oriel does with it
 
 - **State, read only.** `hooks.json` and `config.toml` (never written) give an estimate: not installed, installed, and
   per hook whether `config.toml` has a `trusted_hash` for its key. Then `codex app-server` is started for a moment
@@ -109,8 +109,13 @@ stdio as a child process, on the default `~/.codex`. Measured with that very bin
 Settings › Codex › **Install Codex hooks** copies `codex-notch-hook.sh` to `~/.codex/hooks/` and adds one entry per
 event to `~/.codex/hooks.json`, after a timestamped backup (`hooks.json.claude-notch-YYYYMMDD-HHMMSS.bak`). It keeps
 the user's own hooks and key order, writes nothing when nothing changes, refuses an invalid file, and never touches
-`config.toml` or its `notify`. **Remove the hooks** (or Uninstall Claude Notch) takes only its entries away. Then
+`config.toml` or its `notify`. **Remove the hooks** (or Uninstall Oriel) takes only its entries away. Then
 **Approve in Codex** (or **Review hooks** in the ChatGPT app, or `/hooks` in a terminal), and start a new conversation.
+
+The app is now called Oriel (formerly Claude Notch), but the Codex entries keep their former name on purpose: the script
+`codex-notch-hook.sh` and the `statusMessage` "Claude Notch" that Codex shows while the notch holds a request. Codex
+drops its approval as soon as an entry changes, so they will change only with the next mandatory change of the Codex
+hooks. A refusal from the notch reaches Codex as "Denied from Oriel." (see [RENAME.md](RENAME.md)).
 
 Not covered: a hook turned off by hand in Codex (`enabled = false` in `hooks.state`) still counts as active, and no
 free-text answer or Codex question is possible (see above).
@@ -125,7 +130,7 @@ ChatGPT 0.162), pas supposées.
 ## Conclusion
 
 Codex a des **hooks** (même principe que ceux de Claude Code) : c'est la voie officielle pour suivre une session et
-répondre à une approbation. Claude Notch n'utilise qu'eux.
+répondre à une approbation. Oriel n'utilise qu'eux.
 
 - **Marche** : sessions en cours, travaille / terminé, dernier message ; autoriser ou refuser une commande ou un patch
   (hook `PermissionRequest` synchrone) ; ramener l'app hôte devant (app ChatGPT : ouvrir la conversation par
@@ -137,7 +142,7 @@ répondre à une approbation. Claude Notch n'utilise qu'eux.
 ## Points mesurés
 
 - Hooks dans `~/.codex/hooks.json` ; ils s'ajoutent à ceux de l'utilisateur. Un hook neuf ou modifié est **ignoré tant
-  que l'utilisateur ne l'a pas validé** avec `/hooks` dans Codex : Claude Notch n'écrit pas cette validation.
+  que l'utilisateur ne l'a pas validé** avec `/hooks` dans Codex : Oriel n'écrit pas cette validation.
 - Le hook tourne **avant** l'invite de Codex et **elle l'attend** : contrairement à Claude Code, le terminal n'affiche
   pas son dialogue en parallèle. La notch tient donc la demande 4 s si sa carte n'a jamais été vue, 60 s sinon, puis
   rend la main (sans décision) ; « Dans le terminal » la rend tout de suite. Timeout du hook : 75 s.
@@ -172,7 +177,7 @@ L'app Codex fait maintenant partie de **ChatGPT** (`/Applications/ChatGPT.app`, 
   `session_id` du hook) qui ouvre la conversation. Non cliqué en vrai, pour ne pas bouger la fenêtre de l'utilisateur.
 - **Vitesse.** `hooks/list` répond en 0,1 à 0,5 s sur un `CODEX_HOME` déjà utilisé, 8 à 15 s sur un neuf.
 
-## Ce que fait Claude Notch
+## Ce que fait Oriel
 
 - **État, en lecture seule.** `hooks.json` et `config.toml` (jamais écrit) donnent une estimation : non posés, posés, et
   pour chaque hook, présence d'un `trusted_hash` à sa clé. Puis `codex app-server` est lancé un instant (le binaire de
@@ -200,7 +205,13 @@ L'app Codex fait maintenant partie de **ChatGPT** (`/Applications/ChatGPT.app`, 
 Réglages › Codex › **Installer les hooks Codex** : copie du script dans `~/.codex/hooks/`, une entrée par événement dans
 `~/.codex/hooks.json`, après une sauvegarde horodatée ; tes hooks et l'ordre des clés restent ; rien n'est écrit si rien
 ne change ; un fichier invalide est refusé ; ton `notify` n'est jamais touché ; `config.toml` n'est jamais écrit par l'installateur. **Retirer les hooks**
-(ou désinstaller Claude Notch) n'enlève que nos entrées. Ensuite, **Approuver dans Codex** (ou **Review hooks** dans l'app
+(ou désinstaller Oriel) n'enlève que nos entrées. Ensuite, **Approuver dans Codex** (ou **Review hooks** dans l'app
 ChatGPT, ou `/hooks` dans un terminal), puis ouvre une nouvelle conversation.
+
+L'app s'appelle maintenant Oriel (anciennement Claude Notch), mais les entrées Codex gardent leur ancien nom, exprès :
+le script `codex-notch-hook.sh` et le `statusMessage` « Claude Notch » que Codex affiche pendant qu'une demande est
+tenue par la notch. Codex annule son approbation dès qu'une entrée change : elles ne changeront qu'avec le prochain
+changement obligatoire des hooks Codex. Un refus depuis la notch arrive chez Codex sous la forme « Denied from Oriel. »
+(voir [RENAME.md](RENAME.md)).
 
 Non couvert : un hook désactivé à la main dans Codex (`enabled = false` dans `hooks.state`) compte encore comme actif.

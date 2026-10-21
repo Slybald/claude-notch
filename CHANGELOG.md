@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **Renamed to Oriel.** The app, its menus, settings, setup assistant, alerts and macOS permission prompts now say
+  Oriel. The bundle is `Oriel.app`, the disk image `Oriel-<v>.dmg` (volume "Oriel"). The repository is now
+  `github.com/Slybald/oriel`; the old address redirects.
+- **Existing users have nothing to do.** The automatic update installs the new version in place of `ClaudeNotch.app`;
+  at its first launch the app renames itself `Oriel.app`, points open-at-login to the new path and restarts (one
+  instance only). macOS permissions, settings, hooks and data are kept: the bundle identifier
+  (`io.github.slybald.claudenotch`), the signing certificate, the data and log folders and the hook scripts keep their
+  names. An older `ClaudeNotch.app` found next to `Oriel.app` is moved to the Trash. Details in `docs/RENAME.md`.
+- **Two disk images per release.** `Oriel-<v>.dmg` (with `Oriel.app`) is the one to download. A second signed image,
+  `ClaudeNotch-<v>.dmg` (the same app in a `ClaudeNotch.app` folder), is still published because versions 1.1.0 to
+  1.8.0 only look for that name when they update themselves.
+- Messages sent to Claude now say "Message from Oriel" and "Message from the user, sent from Oriel:", and a denial
+  from the notch says "The user denied this from Oriel." (Codex: "Denied from Oriel."). The Claude Code hook entries
+  are rewritten at launch, with a timestamped backup of `settings.json`; sessions already open keep the old text,
+  which is still recognised. The Codex hook entries are not touched, so Codex does not ask for their approval again;
+  its status line during a held request still reads "Claude Notch" until the Codex hooks next change.
+
 ## [1.8.0] - 2026-10-21
 
 ### Changed
@@ -318,6 +339,6 @@ First public release.
 - Universal app (Apple silicon and Intel), macOS 13 or later, distributed as a DMG built by GitHub Actions
   from version tags.
 
-[1.2.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.2.0
-[1.1.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.1.0
-[1.0.0]: https://github.com/Slybald/claude-notch/releases/tag/v1.0.0
+[1.2.0]: https://github.com/Slybald/oriel/releases/tag/v1.2.0
+[1.1.0]: https://github.com/Slybald/oriel/releases/tag/v1.1.0
+[1.0.0]: https://github.com/Slybald/oriel/releases/tag/v1.0.0
