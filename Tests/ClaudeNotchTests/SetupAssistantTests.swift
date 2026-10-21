@@ -256,7 +256,10 @@ final class SetupAssistantTests: XCTestCase {
             XCTAssertTrue(lines.insert(usage).inserted, "ligne d'usage en double pour \(module.id)")
             XCTAssertFalse(SetupTab(module).title.isEmpty)
         }
-        XCTAssertEqual(SetupAssistantTests.ids, notch.registry.modules.map { $0.id }, "la liste des tests suit l'app")
+        // Codex a sa propre règle de proposition (détecté ou déjà activé) : testée dans CodexModuleTests.
+        XCTAssertEqual(SetupAssistantTests.ids, notch.registry.modules.map { $0.id }.filter { $0 != "codex" },
+                       "la liste des tests suit l'app")
+        XCTAssertTrue(notch.registry.modules.contains { $0.id == "codex" })
     }
 
     /// La vraie fenêtre (jamais affichée ici) garde la même taille à chaque étape et tient sur un petit écran.

@@ -107,10 +107,34 @@ final class CodexStoreTests: XCTestCase {
         // Autorisé dans le terminal : c'est le PostToolUse qui le dit.
         store.markWaiting(sessionId: sid, tool: tool, context: CodexFixtures.terminal, cwd: nil, now: t0.addingTimeInterval(4))
         store.handle(CodexFixtures.bash("touch marker.txt", "PostToolUse"), context: CodexFixtures.terminal,
-                     now: t0.addingTimeInterval(5))
+                     now: t0.addingTimeInterval(6))
         session = try XCTUnwrap(store.sessions[sid])
         XCTAssertEqual(session.phase, .working)
         XCTAssertNil(session.attention)
+    }
+
+    /// Mesuré avec le vrai Codex : le relais asynchrone d'un `PreToolUse` arrive après le `PermissionRequest` synchrone
+    /// du même appel. Il ne doit pas effacer l'attente ; passé le court délai, un événement d'outil la lève.
+    func testAsyncRelaysArrivingAfterThePermissionDoNotEraseTheWait() throws {
+        let store = makeStore()
+        store.handle(CodexFixtures.event("UserPromptSubmit", ["prompt": "x"]), context: CodexFixtures.terminal, now: t0)
+        let tool = CodexTools.describe(name: "Bash", input: ["command": "touch marker.txt"])
+        store.markWaiting(sessionId: sid, tool: tool, context: CodexFixtures.terminal, cwd: nil, now: t0.addingTimeInterval(1))
+
+        store.handle(CodexFixtures.bash("touch marker.txt"), context: CodexFixtures.terminal, now: t0.addingTimeInterval(1.1))
+        XCTAssertEqual(store.sessions[sid]?.phase, .waitingApproval, "PreToolUse tardif du même appel")
+        store.handle(CodexFixtures.bash("ls", "PostToolUse"), context: CodexFixtures.terminal, now: t0.addingTimeInterval(1.2))
+        XCTAssertEqual(store.sessions[sid]?.phase, .waitingApproval, "PostToolUse tardif de l'outil d'avant")
+        XCTAssertEqual(store.sessions[sid]?.toolCount, 1, "mais il est compté")
+        XCTAssertEqual(store.sessions[sid]?.status.detail, "touch marker.txt")
+        XCTAssertEqual(store.indicator, .attention)
+
+        // Approuvé dans le terminal : le PostToolUse arrive bien après le délai.
+        store.handle(CodexFixtures.bash("touch marker.txt", "PostToolUse"), context: CodexFixtures.terminal,
+                     now: t0.addingTimeInterval(1 + CodexStore.reorderWindow + 0.1))
+        XCTAssertEqual(store.sessions[sid]?.phase, .working)
+        XCTAssertNil(store.sessions[sid]?.attention)
+        XCTAssertNil(store.sessions[sid]?.waitingSince)
     }
 
     func testInterruptReturnsToReady() throws {

@@ -34,6 +34,8 @@ Interface available in English and French (follows the system language). Screens
   reason for Claude), answer a question (single or multiple choice, or your own text), approve a plan or ask
   for changes, and send a message to a session (hover its card: **Message**). The terminal dialog stays usable
   at the same time: the first answer wins. Never "always allow" from the notch. Return sends, Esc closes.
+- **Codex tab** (optional, see [Codex tab](#codex-tab)): the sessions of OpenAI's Codex (CLI or app), working, waiting for
+  an approval or done, with the last message; allow or deny a command or a patch from the notch.
 - **Tasks**: progress bar and current task of Claude Code's task list; the chevron unfolds the whole list.
 - **Subagents**: number of subagents running in each session.
 - **Click to go back**: clicking a card brings the host app to the front (Terminal, iTerm2, Ghostty, VS Code,
@@ -52,15 +54,18 @@ Interface available in English and French (follows the system language). Screens
 ## Tabs
 
 The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default, except Claude
-when Claude Code is not found on the Mac. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
+and Codex when they are not found on the Mac. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
 change the order, or pick the tab that opens by default. You can also do it in the notch, like apps on an iPhone:
 press and hold the tab bar, then drag the icons, hide a tab with **−** or bring one back with **+**, and click **Done**
-(or press Esc, or click outside the bar). The panel reopens on the last tab you used, or on Claude when a session
+(or press Esc, or click outside the bar). The panel reopens on the last tab you used, or on Claude (or Codex) when a session
 needs you.
 
 - **Claude**: your sessions, with their state, permissions, questions and plans. Optional: on first launch it is
   on only if Claude Code is found on the Mac (`~/.claude` or `$CLAUDE_CONFIG_DIR`). Off, nothing Claude-related
   runs: no process scan, no session tracking, hook events ignored.
+- **Codex**: your Codex sessions, with their state and approvals (see [Codex tab](#codex-tab)). Optional like Claude: on at
+  first launch only if Codex is found on the Mac (`~/.codex`, the Codex app, or the `codex` command). Off, nothing
+  Codex-related runs.
 - **Player**: the track playing in Music, Spotify or your browser, with artwork, progress (drag to seek) and
   controls. Below it, a week view of your calendar: click an event to open it in Calendar.
 - **Quick Settings**: Wi-Fi, Bluetooth, Focus, Low Power Mode, caffeine (keeps the Mac awake for 1 h, 2 h or
@@ -93,6 +98,23 @@ app is closed or the setting is off, so nothing is ever approved by default.
 For sessions without a terminal (`claude -p`, the Agent SDK, the Code tab of Claude Desktop) there is no **Message**
 button, and permissions, questions and plans were not tested. A session opened before the update gets replies only
 after it restarts.
+
+## Codex tab
+
+Codex has hooks of its own, so the tab works like Claude's. Details and measurements: [docs/CODEX.md](docs/CODEX.md).
+
+1. **Settings › Codex › Install Codex hooks**. This adds one entry per event to `~/.codex/hooks.json` (timestamped
+   backup first, your own hooks stay) and copies `codex-notch-hook.sh` to `~/.codex/hooks/`. `config.toml` and its
+   `notify` are never touched.
+2. In Codex, type `/hooks` once and trust the Claude Notch hooks: Codex skips a new hook until you have reviewed it.
+3. Each card shows the project, the host app, the model, what Codex is doing (the command or the file), and its last
+   message. Click a card to bring the host app to the front.
+
+**Approve from the notch** (Settings › Codex, off by default): when Codex asks to run a command or apply a patch, the
+card shows it, with **Allow**, **Deny** and **In the terminal**. Unlike Claude Code, Codex waits for the notch before
+asking in the terminal, so the hold is short: 4 seconds if the card never appeared, 60 seconds otherwise, then Codex asks
+you itself. Nothing is approved by default, and there is no "always allow". Not possible: writing a message to a
+running Codex session, or answering Codex's own questions.
 
 ## Notch settings
 
@@ -164,6 +186,7 @@ needs one. It is shown once, and not after an update from a version that was alr
 
 - macOS 13 Ventura or later, Apple silicon or Intel.
 - For the Claude tab only: Claude Code (CLI, or the Code tab of Claude Desktop).
+- For the Codex tab only: Codex (CLI or app), version 0.154 tested, with hooks on (the default).
 - Claude Code configuration in `~/.claude`. `CLAUDE_CONFIG_DIR` is not supported by the app: the hooks are
   always installed in `~/.claude`.
 
@@ -209,13 +232,15 @@ Claude Notch updates itself from the [Releases](https://github.com/Slybald/claud
   Dashlane or KeePassXC (the list can be edited). By default the history stays in memory and is cleared when you
   quit the app or turn the tab off. If you keep it across restarts, only text and links are written, never images
   or files. Pausing the capture stops the checks until the next launch.
-- What the app reads: the hook events, the end of the transcript of a running session (to detect Esc),
+- What the app reads: the hook events (Claude Code and Codex), the end of the transcript of a running session (to detect Esc),
   Claude Code's task files, the process list (to find the host app), the track playing and its artwork (Player),
   the events of the calendars you chose to show, the state of Wi-Fi and Bluetooth, and the battery level.
 - What the app writes: the logs and token files in `~/Library/Application Support/ClaudeNotch/` (see
   [Shared logs](#shared-logs)), and the data of the tabs in the same folder: `shelf.json` (references to your
   files), `notes.json`, `timer.json`, and `clipboard-history.json` only if you keep the history. These files are
-  readable by your account only. Also the hooks in `~/.claude` when you ask for it, and during an update the DMG in
+  readable by your account only. Also the hooks in `~/.claude` when you ask for it, and the Codex hooks (`~/.codex/hooks.json` and
+  `~/.codex/hooks/codex-notch-hook.sh`) when you ask for it; `~/.codex/config.toml` is only read (to show the state of the
+  hooks), never written. During an update the DMG in
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (deleted afterwards) and the new app in place of
   the old one. The messages you type are sent to the Claude Code session only, never stored.
 
@@ -257,6 +282,10 @@ Claude Notch asks for a permission only when you use the feature that needs it. 
     1,800 bytes and control characters are removed. Sessions without a terminal (`claude -p`, the Agent SDK,
     IDEs, the Code tab of Claude Desktop) do not get messages from the notch: there, Claude waits for this hook
     before reading the prompt, so the app lets it go at once (measured with Claude Code 2.1.304).
+- Codex: its hooks use the same local server (`/codex/hook`, and `/codex/permission` for the synchronous
+  `PermissionRequest` hook), the same token and the same proof. Codex runs that hook *before* its own prompt and
+  waits for it, so the app holds a request for 4 s if its card was never shown and for 60 s once it was, then
+  answers "no decision" and Codex asks in the terminal (hook timeout: 75 s).
 - After an update of the app, hooks installed by a previous version are updated silently, with the usual
   timestamped backup of `settings.json`.
 - From that process ID, the app walks up the process tree to find the Claude process (to detect the end of
@@ -316,6 +345,10 @@ hooks it already receives:
 - Reply from the notch: a session opened before the hooks were updated receives replies only after it
   restarts. Sessions without a terminal (Code tab of Claude Desktop, `claude -p`, SDK) cannot receive a
   message (no **Message** button); permissions, questions and plans are not checked with them.
+- Codex: a new hook only runs after you trust it with `/hooks` in Codex. `codex exec` never asks for approvals, so
+  nothing is held there; the interactive CLI and the app's engine do. The Codex app's own window was not driven during
+  development. No free message to a running session, no answer to Codex's own questions (no hook for them), and a card
+  stays on "needs your approval" after an approval given in the terminal until the tool ends.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -344,7 +377,8 @@ hooks it already receives:
 
 ## Uninstall
 
-**…** menu › **Uninstall Claude Notch…** removes the hooks and what the app installed, then quits.
+**…** menu › **Uninstall Claude Notch…** removes the hooks (Claude Code's, and Codex's if you installed them) and what the app
+installed, then quits.
 Then drag `ClaudeNotch.app` from Applications to the Trash.
 
 ## Development
@@ -435,6 +469,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
   texte libre), approuver un plan ou demander des changements, et écrire à une session (survole sa carte :
   **Écrire**). Le dialogue du terminal reste utilisable en même temps : la première réponse gagne. Jamais de
   « toujours autoriser » depuis la notch. Entrée envoie, Échap ferme.
+- **Onglet Codex** (optionnel, voir [Onglet Codex](#onglet-codex)) : les sessions de Codex (OpenAI, CLI ou app), qui travaillent,
+  attendent une approbation ou ont fini, avec le dernier message ; autoriser ou refuser une commande ou un patch depuis la notch.
 - **Tâches** : barre de progression et tâche en cours de la liste de Claude Code ; le chevron déplie la liste.
 - **Sous-agents** : nombre de sous-agents en cours dans chaque session.
 - **Clic → retour à la session** : un clic sur une carte ramène l'app hôte au premier plan (Terminal, iTerm2,
@@ -450,11 +486,11 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 ### Onglets
 
 La notch déployée est une rangée d'onglets. Clique sur un onglet, ou survole-le un instant. Tous les onglets sont
-activés par défaut, sauf Claude si Claude Code n'est pas sur le Mac. Dans **Réglages › Onglets**, tu peux masquer
+activés par défaut, sauf Claude et Codex s'ils ne sont pas sur le Mac. Dans **Réglages › Onglets**, tu peux masquer
 un onglet (un onglet masqué ne fait aucun travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Tu
 peux aussi le faire dans la notch, comme les apps sur iPhone : appui long sur la barre d'onglets, puis glisse les
 icônes, masque un onglet avec **−** ou remets-en un avec **+**, et clique sur **OK** (ou Échap, ou un clic hors de la
-barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude quand une session a besoin de toi.
+barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou Codex) quand une session a besoin de toi.
 
 - **Claude** : tes sessions, avec leur état, leurs permissions, leurs questions et leurs plans. En option : au
   premier lancement, il n'est activé que si Claude Code est sur le Mac (`~/.claude` ou `$CLAUDE_CONFIG_DIR`).
@@ -493,6 +529,24 @@ quand l'app est fermée ou le réglage coupé : rien n'est jamais approuvé par 
 Pour les sessions sans terminal (`claude -p`, le SDK Agent, l'onglet Code de Claude Desktop), il n'y a pas de bouton
 **Écrire**, et les permissions, questions et plans n'ont pas été testés. Une session ouverte avant la mise à jour ne
 reçoit les réponses qu'après son redémarrage.
+
+### Onglet Codex
+
+Codex a ses propres hooks : l'onglet marche comme celui de Claude. Détails et mesures : [docs/CODEX.md](docs/CODEX.md).
+
+1. **Réglages › Codex › Installer les hooks Codex**. Une entrée par événement est ajoutée à `~/.codex/hooks.json`
+   (sauvegarde horodatée d'abord, tes hooks restent) et `codex-notch-hook.sh` est copié dans `~/.codex/hooks/`.
+   `config.toml` et son `notify` ne sont jamais touchés.
+2. Dans Codex, tape `/hooks` une fois et fais confiance aux hooks de Claude Notch : Codex ignore un hook neuf tant que
+   tu ne l'as pas validé.
+3. Chaque carte montre le projet, l'app hôte, le modèle, ce que fait Codex (la commande ou le fichier) et son dernier
+   message. Un clic sur la carte ramène l'app hôte devant.
+
+**Approuver depuis la notch** (Réglages › Codex, désactivé par défaut) : quand Codex demande à lancer une commande ou à
+appliquer un patch, la carte l'affiche, avec **Autoriser**, **Refuser** et **Dans le terminal**. Contrairement à Claude
+Code, Codex attend la notch avant de demander dans le terminal : l'attente est courte, 4 secondes si la carte n'a jamais
+été affichée, 60 secondes sinon, puis Codex te demande lui-même. Rien n'est approuvé par défaut, jamais de « toujours
+autoriser ». Impossible : écrire à une session Codex en cours, ou répondre aux questions propres de Codex.
 
 ### Réglages de la notch
 
@@ -566,6 +620,7 @@ aussi s'installer plus tard depuis **Réglages › Claude** ; une session déjà
 
 - macOS 13 Ventura ou plus récent, Apple silicon ou Intel.
 - Pour l'onglet Claude seulement : Claude Code (CLI, ou onglet Code de Claude Desktop).
+- Pour l'onglet Codex seulement : Codex (CLI ou app), version 0.154 testée, hooks activés (par défaut).
 - Configuration de Claude Code dans `~/.claude`. `CLAUDE_CONFIG_DIR` n'est pas pris en charge par l'app :
   les hooks sont toujours installés dans `~/.claude`.
 
@@ -622,7 +677,8 @@ Claude Notch se met à jour seule depuis la page [Releases](https://github.com/S
   (voir [Registres partagés](#registres-partagés)), et les données des onglets dans le même dossier :
   `shelf.json` (les références à tes fichiers), `notes.json`, `timer.json`, et `clipboard-history.json` seulement
   si tu gardes l'historique. Ces fichiers ne sont lisibles que par ton compte. Il y a aussi les hooks dans
-  `~/.claude` quand tu le demandes et, pendant une mise à jour, le DMG dans
+  `~/.claude` quand tu le demandes, les hooks Codex (`~/.codex/hooks.json` et `~/.codex/hooks/codex-notch-hook.sh`) quand tu
+  le demandes (`~/.codex/config.toml` n'est que lu, pour montrer l'état des hooks, jamais écrit) et, pendant une mise à jour, le DMG dans
   `~/Library/Caches/io.github.slybald.claudenotch/updates/` (supprimé ensuite) et la nouvelle app à la place de
   l'ancienne. Les messages que tu tapes partent à la session Claude Code seulement, sans être enregistrés.
 
@@ -654,6 +710,10 @@ lancement.
 
 ### Fonctionnement
 
+- Codex : ses hooks passent par le même serveur local (`/codex/hook`, et `/codex/permission` pour le hook `PermissionRequest`
+  synchrone), avec le même jeton et la même preuve. Codex lance ce hook *avant* sa propre invite et l'attend : l'app tient
+  donc une demande 4 s si sa carte n'a jamais été affichée, 60 s sinon, puis répond « pas de décision » et Codex demande
+  dans le terminal (timeout du hook : 75 s).
 - Chaque événement de hook est relayé par `curl` vers `http://127.0.0.1:47823/hook`, avec le PID du
   processus parent du hook et quelques variables d'environnement. Ces hooks sont déclarés `async: true` :
   aucune latence pour Claude.
@@ -730,6 +790,10 @@ partir de hooks qu'elle reçoit déjà :
 - Répondre depuis la notch : une session ouverte avant la mise à jour des hooks ne reçoit les réponses
   qu'après son redémarrage. Une session sans terminal (onglet Code de Claude Desktop, `claude -p`, SDK) ne peut
   pas recevoir de message (pas de bouton **Écrire**) ; permissions, questions et plans pas vérifiés avec elles.
+- Codex : un hook neuf ne tourne qu'après ta validation par `/hooks` dans Codex. `codex exec` ne demande jamais d'approbation :
+  rien n'y est tenu ; le CLI interactif et le moteur de l'app, si. La fenêtre de l'app Codex elle-même n'a pas été pilotée
+  pendant le développement. Pas de message libre à une session en cours, pas de réponse aux questions propres de Codex (aucun hook), et
+  la carte reste sur « Attend ton approbation » après une approbation donnée dans le terminal, jusqu'à la fin de l'outil.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app
@@ -760,7 +824,8 @@ partir de hooks qu'elle reçoit déjà :
 
 ### Désinstallation
 
-Menu **…** › **Désinstaller Claude Notch…** retire les hooks et ce que l'app a installé, puis la quitte.
+Menu **…** › **Désinstaller Claude Notch…** retire les hooks (ceux de Claude Code, et ceux de Codex si tu les as installés) et ce
+que l'app a installé, puis la quitte.
 Jette ensuite `ClaudeNotch.app` du dossier Applications à la Corbeille.
 
 ### Développement

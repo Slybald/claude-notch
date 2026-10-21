@@ -290,9 +290,12 @@ struct CodexApprovalCard: View {
                                     text: L("Texte coupé : lis-le en entier dans la session", table: "Codex"))
                 }
             }
-            ReplyStatusLine(icon: "clock", color: Palette.secondary,
-                            text: String(format: L("Sans clic sous %d s, Codex te le redemande dans le terminal.", table: "Codex"),
-                                         Int(CodexApprovals.engagedDelay)))
+            // Étroit (plein écran compact) : la ligne serait coupée ; le délai reste dit dans les réglages.
+            if !compact {
+                ReplyStatusLine(icon: "clock", color: Palette.secondary,
+                                text: String(format: L("Sans clic sous %d s, Codex te le redemande dans le terminal.", table: "Codex"),
+                                             Int(CodexApprovals.engagedDelay)))
+            }
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 ReplyButton(title: L("Dans le terminal", table: "Codex"), style: .secondary) { decide(.terminal) }

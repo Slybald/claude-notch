@@ -14,6 +14,10 @@ final class CodexStore: ObservableObject {
     /// Session sans processus connu et sans activité : oubliée.
     static let orphanTimeout: TimeInterval = 3 * 3600
     static let maxMessage = 280
+    /// Les relais sont asynchrones (aucune latence pour Codex) mais `PermissionRequest` est synchrone : le `PreToolUse`
+    /// (ou le `PostToolUse` de l'outil d'avant) du même appel peut arriver APRÈS lui (mesuré avec le vrai Codex). Pendant
+    /// ce court délai, ils ne font pas repasser la session de « attend ton approbation » à « travaille ».
+    static let reorderWindow: TimeInterval = 1.5
 
     private var started = false
     /// Sessions terminées : leurs événements tardifs (hooks async) sont ignorés, sauf un nouveau `SessionStart`
@@ -111,15 +115,21 @@ final class CodexStore: ObservableObject {
             session.doneFlashUntil = nil
         case "PreToolUse":
             if !session.inTurn { beginTurn(&session, now: now) }
-            session.phase = .working
-            session.attention = nil
-            session.currentTool = event.toolName.map { CodexTools.describe(name: $0, input: event.toolInput) }
+            if !isWaitingForReorderedEvent(session, now: now) {
+                session.phase = .working
+                session.attention = nil
+                session.waitingSince = nil
+                session.currentTool = event.toolName.map { CodexTools.describe(name: $0, input: event.toolInput) }
+            }
         case "PostToolUse":
             if !session.inTurn { beginTurn(&session, now: now) }
-            session.phase = .working
-            session.attention = nil
-            session.currentTool = nil
             session.toolCount += 1
+            if !isWaitingForReorderedEvent(session, now: now) {
+                session.phase = .working
+                session.attention = nil
+                session.waitingSince = nil
+                session.currentTool = nil
+            }
         case "Stop":
             endTurn(&session, now: now)
             session.phase = .done
@@ -147,6 +157,7 @@ final class CodexStore: ObservableObject {
         if !session.inTurn { beginTurn(&session, now: now) }
         session.phase = .waitingApproval
         session.attention = tool
+        session.waitingSince = now
         session.lastActivity = now
         sessions[sessionId] = session
         watch(session)
@@ -159,8 +170,14 @@ final class CodexStore: ObservableObject {
         guard var session = sessions[sessionId], session.phase == .waitingApproval else { return }
         session.phase = .working
         session.attention = nil
+        session.waitingSince = nil
         session.lastActivity = now
         sessions[sessionId] = session
+    }
+
+    private func isWaitingForReorderedEvent(_ session: CodexSession, now: Date) -> Bool {
+        guard session.phase == .waitingApproval, let since = session.waitingSince else { return false }
+        return now.timeIntervalSince(since) < Self.reorderWindow
     }
 
     private func beginTurn(_ session: inout CodexSession, now: Date) {
@@ -168,6 +185,7 @@ final class CodexStore: ObservableObject {
         session.turnStart = now
         session.phase = .working
         session.attention = nil
+        session.waitingSince = nil
         session.currentTool = nil
     }
 
@@ -176,6 +194,7 @@ final class CodexStore: ObservableObject {
         session.inTurn = false
         session.currentTool = nil
         session.attention = nil
+        session.waitingSince = nil
     }
 
     private func finish(_ session: inout CodexSession, now: Date) {

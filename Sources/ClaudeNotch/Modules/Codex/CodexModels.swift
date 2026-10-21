@@ -82,6 +82,8 @@ struct CodexSession: Identifiable, Equatable {
     var lastMessage: String?
     var currentTool: CodexToolText?
     var attention: CodexToolText?
+    /// Début de l'attente d'une approbation (voir `CodexStore.reorderWindow`).
+    var waitingSince: Date?
     var toolCount = 0
     var doneFlashUntil: Date?
     var endedAt: Date?
