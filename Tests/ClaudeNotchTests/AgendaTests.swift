@@ -97,6 +97,13 @@ final class AgendaTests: XCTestCase {
             "https://webex.com/",
             "https://facetime.apple.com/",
             "https://fakefacetime.apple.com.evil.example/join",
+            // Hôte déguisé : caractère codé, antislash, octet nul, lettre cyrillique.
+            "https://evil.example%2f.zoom.us/j/123456789",
+            "https://evil.example%252f.zoom.us/j/123456789",
+            "https://zoom.us%2eevil.example/j/123456789",
+            "https://evil.example\\.zoom.us/j/123456789",
+            "https://zoom.us%00.evil.example/j/123456789",
+            "https://zооm.us/j/123456789",
         ]
         for text in refused { XCTAssertNil(link(text), text) }
         for text in ["javascript:alert(1)", "file:///Applications/Calculator.app", "ssh://evil.example",

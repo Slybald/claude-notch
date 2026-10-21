@@ -73,7 +73,10 @@ struct MeetingLink: Equatable {
         guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
               parts.scheme?.lowercased() == "https", parts.user == nil, parts.password == nil,
               parts.port == nil || parts.port == 443,
-              let host = parts.host?.lowercased() else { return nil }
+              let host = parts.host?.lowercased(),
+              // Un nom d'hôte ordinaire : un caractère codé (%2f), un antislash ou une lettre d'un autre alphabet
+              // pourrait faire lire à `URLComponents` un autre domaine que celui que le système ouvrira.
+              host.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }) else { return nil }
         let path = parts.path.lowercased()
         guard let provider = Provider.allCases.first(where: { $0.accepts(host: host, path: path) }) else { return nil }
         return MeetingLink(provider: provider, url: url)
