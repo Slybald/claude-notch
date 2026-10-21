@@ -58,6 +58,8 @@ struct NotchActions {
     var detach: (() -> Void)?
     /// « Rattacher à la notch » (panneau de la bulle) ; nil = pas d'entrée.
     var reattach: (() -> Void)?
+    /// Panneau de la bulle : bouton retour au barillet ; nil = pas de bouton (notch attachée).
+    var backToRevolver: (() -> Void)?
 }
 
 final class NotchPanel: NSPanel {

@@ -492,7 +492,10 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     the command bar opens inside the bubble panel (and closes with it, or at reattach), a keyboard approval opens its
     card there (`revealApproval`), `collapse()` (open a session, settings…) closes it. A file dragged to the notch does not open the Shelf then.
   - **Handle**: an arc and a dot in the bottom right corner of the expanded panel (not in compact full screen nor in tab
-    edit mode). A 0.3 s long press (SwiftUI) starts the drag; the drags and the mouse-up then come from a local event
+    edit mode). A 3 pt drag or a 0.3 s long press (SwiftUI) starts the drag (the long press alone failed as soon as the
+    mouse moved before 0.3 s, and nothing happened). Hovering the corner shows "Drag the corner to detach the notch"
+    right away (the tooltip takes a second), and so do the first three panel openings, for 3.5 s
+    (`Preferences.takeHandleHint`; never again once the gesture is found); the drags and the mouse-up then come from a local event
     monitor (they go to the window of the mouse-down, even outside it) that is removed at the mouse-up. Menu, right
     click and VoiceOver detach without dragging (`detachAutomatically`).
   - **Drop** ("gooey" metaballs): a separate window under the notch, a `Canvas` with `blur` then `alphaThreshold`
@@ -500,16 +503,45 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     panel shrinking halfway towards the notch), a neck drawn as a band (circles alone break into beads once thin) pinched
     in the middle down to 5.5 pt (`neckFloor`: thinner, the threshold erases it), and the drop. At 120 pt
     (`detachDistance`) it snaps: the body springs back into the notch, the bubble window takes the drop's place at the
-    same size (scale 0.72) and bounces to 1, and the same drag keeps moving it. Released earlier, the drop goes back. The
-    notch view fades out while the drop replaces it (`gooActive`). `TimelineView(.animation)` only exists while a drop is
-    drawn; afterwards `goo = nil` and the window is ordered out. "Reduce motion": no drop, a half-transparent bubble
-    follows the mouse, then a fade.
+    same size (scale 0.72) and springs to 1 (damping 0.7), and the same drag keeps moving it. Released earlier, the drop
+    goes back. The notch view fades out while the drop replaces it (`gooActive`). `TimelineView(.animation)` only exists
+    while a drop is animated (`.rest` draws a still image); afterwards `goo = nil` and the window is ordered out.
+    "Reduce motion": no drop, a half-transparent bubble follows the mouse, then a fade.
+  - **Detach frame budget** (measured offscreen by `BubbleFrameBenchTests`, main thread, release; the drawing itself,
+    blur included, is RenderBox's work on the GPU: SwiftUI views are `RBDrawingLayer`s): the drop costs 0.4 ms a
+    frame. The snap used to do everything in one frame: first image of the bubble window (55 ms), notch folding
+    (17 ms), saved setting (5 ms), phase (1.5 ms), 79 ms in all. Now: the bubble views and the drop window are built at
+    launch (`start`); the bubble window is ordered in transparent and click-through at the grab (`prepareBubble`), so
+    its first image is drawn during the pull; the snap frame only flips it opaque (2 ms); the notch folds and the
+    setting is saved at the mouse-up (`notchPending`, `finishDetach`), hidden under the drop resting in the notch, then
+    the notch fades back in. The drop follows the mouse through `GooModel.liveDrop`, read by the timeline at each frame
+    and not published: one image per screen refresh, not one more per mouse move. For three frames after the snap the
+    drop stays drawn under the new bubble and follows it (`snapOverlap`): a bubble window one frame late shows nothing
+    missing.
   - **Bubble window**: same level, collection behavior and "hide from capture" as the notch (`isFloatingPanel` before
     `level`), created on first detach (`defer`), clamped to the visible frames (menu bar and Dock excluded). Position
     stored per display label (`NotchScreenPicker.labels`) as an offset from the display origin, plus the last display;
-    a display that disappears sends the bubble back to the notch's display. Within 44 pt of the notch bottom it is
-    magnetized; released there it merges back (reverse drop). Hidden with the notch ("Hide the notch", full screen
-    "hidden").
+    a display that disappears sends the bubble back to the notch's display. Hidden with the notch ("Hide the notch",
+    full screen "hidden").
+  - **Magnetic return (ferrofluid)** (`Ferro`, `FerroState`, `FerroShapes`, pure; `FerroCanvas`): like a drop rejoining
+    a puddle, drawn at every frame of the drag. Within 150 pt (`reach`, gap between the bubble's edge and the notch
+    bottom right above it, `Ferro.base`) the bubble is pulled toward the notch, up to 30 pt, with a strength that
+    grows faster and faster as the gap shrinks (square of the closeness). The bubble window then grows once to the
+    notch's field (`Ferro.fieldFrame`, notch included) and stops moving: the bubble moves inside it, and its outline
+    (`RevolverBubble.outline`), the notch's cone, the bridge and the notch edge are drawn in the same view, so nothing
+    lags behind. Bubble and notch reach toward each other (`reachOut`): the bubble stretches into a drop with seven
+    cone-shaped spikes (sharp tips, bases tangent to the circle, on a 360-point outline whose spikes fall on points),
+    the notch grows a cone (40 % of the gap) and its bottom bulges; at 70 pt (`bridgeGap`) the tips touch and a
+    bridge forms (its neck grows from nothing in 0.12 s), thicker as the bubble comes closer. Pulled away, the bridge
+    stretches into a thread and breaks only beyond 105 pt (`breakGap`, hysteresis: it does not flicker at the limit);
+    both halves spring back (`recoil`). A bridged bubble lights its rim and is sucked in when released; within 16 pt
+    (`captureGap`) it is sucked in without waiting. Aspiration (0.42 s) starts from the bridge as it is (no jump): the
+    bubble accelerates into the notch, shrinks, its spikes and cylinder fade, the bridge widens into a funnel (its base
+    stays within the notch's flat bottom); then a ripple runs along the notch bottom toward both corners and dies out
+    (0.6 s), and the window is ordered out. Released unbridged in the field: the bubble relaxes (damped, slightly
+    flattened, then round) and the window shrinks back. The bridge goes from the notch's color (black on a real notch)
+    to the bubble's. "Reduce motion": a plain magnet (pulled halfway within 44 pt) and a fade. Reattach from the menu or
+    a double click from far away: the bubble glides under the notch first.
   - **Revolver** (`Revolver`, pure): one chamber per enabled tab in the user's order, active tab at the top (fixed
     mark), `turn` counts detents without bounds so the spring always turns the short way. Scroll: 1 detent per wheel
     line or per 28 pt of trackpad, momentum ignored (`RevolverScroll`); circular drag on the chambers: one detent per
@@ -517,9 +549,12 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     opens. A drag elsewhere moves the bubble, a double click on the rim reattaches. Scroll wheel and right click come
     from an `NSHostingView` subclass (no scroll wheel API in SwiftUI before macOS 14). VoiceOver: one adjustable
     element (swipe up/down turns), default action opens, a named action reattaches.
-  - **Bubble panel**: the same `ExpandedPanel` in a rounded shape; the window grows to the panel (top at the bubble's
-    top, clamped to the screen) and shrinks back after the transition. Closes like the notch panel: mouse leaving
-    after the close delay, click outside, Esc.
+  - **Bubble panel**: the same `ExpandedPanel` in a rounded shape, with a back button at the start of the tab bar
+    (`NotchActions.backToRevolver`); the window grows to the panel (top at the bubble's top, clamped to the screen) and
+    shrinks back after the transition. The content grows out of the top chamber (`chamberAnchor`) and folds back into
+    it. Back to the cylinder (`back()`: leaves tab edit mode first): the back button, Esc when the panel has the
+    keyboard, a pinch, a click outside (always, whatever "Close on click outside" says), or the mouse leaving after the
+    close delay. Every phase can reach the notch again (`testEveryPhaseHasAWayOut`).
 - **Shape size** is reported through `NotchSizeKey` with a `max` reduce (a plain `nextValue()` let a sibling's
   default value win, leaving the hover zone at zero). The expanded panel stays under 460 pt.
 - **Window level**: `isFloatingPanel = true` must be set *before* `level`: that setter resets the level to

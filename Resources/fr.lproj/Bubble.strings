@@ -2,10 +2,9 @@
 "Bulle" = "Bulle";
 "Permettre de détacher la notch" = "Permettre de détacher la notch";
 "Revenir à la notch au redémarrage" = "Revenir à la notch au redémarrage";
-"Maintiens l'angle en bas à droite du panneau puis glisse : la notch se décolle en bulle, à poser où tu veux. Ramène-la sous la notch, double-clique sur son bord ou choisis « Rattacher à la notch » pour la remettre." = "Maintiens l'angle en bas à droite du panneau puis glisse : la notch se décolle en bulle, à poser où tu veux. Ramène-la sous la notch, double-clique sur son bord ou choisis « Rattacher à la notch » pour la remettre.";
+"Glisse l'angle en bas à droite du panneau : la notch se décolle en bulle, à poser où tu veux. Approche-la de la notch, qui l'attire et l'aspire, double-clique sur son bord ou choisis « Rattacher à la notch » pour la remettre." = "Glisse l'angle en bas à droite du panneau : la notch se décolle en bulle, à poser où tu veux. Approche-la de la notch, qui l'attire et l'aspire, double-clique sur son bord ou choisis « Rattacher à la notch » pour la remettre.";
 "Détacher la notch" = "Détacher la notch";
 "Rattacher à la notch" = "Rattacher à la notch";
-"Maintiens puis glisse pour détacher la notch" = "Maintiens puis glisse pour détacher la notch";
 "La notch devient une bulle à poser où tu veux." = "La notch devient une bulle à poser où tu veux.";
 "Bulle de la notch" = "Bulle de la notch";
 "Centre : ouvrir. Molette ou glisser sur les onglets : tourner. Bord : déplacer ; double-clic pour rattacher à la notch." = "Centre : ouvrir. Molette ou glisser sur les onglets : tourner. Bord : déplacer ; double-clic pour rattacher à la notch.";
@@ -13,3 +12,6 @@
 "%@, onglet %d sur %d" = "%@, onglet %d sur %d";
 "Activité : %@" = "Activité : %@";
 "Ouvrir" = "Ouvrir";
+"Revenir au barillet" = "Revenir au barillet";
+"Glisse pour détacher la notch" = "Glisse pour détacher la notch";
+"Glisse l'angle pour détacher la notch" = "Glisse l'angle pour détacher la notch";

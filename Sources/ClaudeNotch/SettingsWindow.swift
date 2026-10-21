@@ -291,9 +291,9 @@ private struct GeneralSettings: View {
                 if prefs.allowsDetach {
                     Toggle(L("Revenir à la notch au redémarrage", table: "Bubble"), isOn: $prefs.bubbleReturnsOnRelaunch)
                 }
-                SettingsNote(L("Maintiens l'angle en bas à droite du panneau puis glisse : la notch se décolle en bulle, "
-                               + "à poser où tu veux. Ramène-la sous la notch, double-clique sur son bord ou choisis "
-                               + "« Rattacher à la notch » pour la remettre.", table: "Bubble"))
+                SettingsNote(L("Glisse l'angle en bas à droite du panneau : la notch se décolle en bulle, à poser où tu "
+                               + "veux. Approche-la de la notch, qui l'attire et l'aspire, double-clique sur son bord ou "
+                               + "choisis « Rattacher à la notch » pour la remettre.", table: "Bubble"))
             }
             Section {
                 HStack {

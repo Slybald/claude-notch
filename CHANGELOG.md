@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The bubble comes back like a drop rejoining a puddle, in ferrofluid**, live while you drag. As soon as it nears
+  the notch it is pulled in, harder and harder: it stretches into a spiky drop, the notch bulges and reaches down to
+  it, and when they touch a bridge of fluid forms and thickens as you come closer. Pull away and the bridge stretches
+  into a thread, then breaks, and both spring back. Let go while bridged, or bring it close, and the notch sucks it in
+  in one motion, then a ripple runs along its edge. "Reduce motion" keeps the simple magnet and fade.
+- **The detach corner shows itself**: hovering it says "Drag the corner to detach the notch" at once, and so do the
+  first three panel openings.
+- **Back to the cylinder** from a tab opened in the bubble: a back button at the start of the tab bar, Esc (when the
+  panel has the keyboard), a pinch, or a click outside the panel. The content folds back into its chamber.
+
+### Changed
+
+- Detaching the notch starts as soon as you drag its corner: the 0.3 s hold is no longer required (dragging earlier
+  used to do nothing). The bubble's spring after it peels off is softer.
+
+### Fixed
+
+- **Detaching no longer stutters.** At the moment the drop peeled off, the app redrew the bubble for the first time,
+  folded the notch and saved the setting in a single frame: 79 ms measured, about five dropped frames. The bubble is
+  now drawn, transparent, while you drag; the notch folds and the setting is saved when you let go. The drop is redrawn
+  once per screen refresh instead of once more at each mouse move.
+- A click outside the bubble's panel always brings back the cylinder, whatever "Close on Click Outside" says.
+
 ## [2.0.0] - 2026-10-21
 
 **Claude Notch is now Oriel.** Same app, same settings, same data: the automatic update installs it in place and it

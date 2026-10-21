@@ -18,16 +18,23 @@ final class BubbleModel: ObservableObject {
     @Published var scale: CGFloat = 1
     /// « Réduire les animations » : bulle à demi transparente qui suit la souris avant le décollage.
     @Published var ghost = false
+    /// Retour aimanté en cours (fenêtre agrandie au champ de la notch) ; nil ailleurs.
+    @Published var ferro: FerroState?
 
     func layout(center: CGPoint, window: CGSize) {
         if centerInWindow != center { centerInWindow = center }
         if windowSize != window { windowSize = window }
     }
 
-    /// Point de la fenêtre d'où sort (et où rentre) le panneau.
-    var anchor: UnitPoint {
-        UnitPoint(x: windowSize.width > 0 ? centerInWindow.x / windowSize.width : 0.5,
-                  y: windowSize.height > 0 ? centerInWindow.y / windowSize.height : 0.5)
+    /// Centre de la bulle, point fixe de son apparition.
+    var anchor: UnitPoint { unit(centerInWindow) }
+
+    /// Chambre du haut (onglet actif) : le panneau en sort et s'y referme.
+    var chamberAnchor: UnitPoint { unit(CGPoint(x: centerInWindow.x, y: centerInWindow.y - Revolver.ringRadius)) }
+
+    private func unit(_ point: CGPoint) -> UnitPoint {
+        UnitPoint(x: windowSize.width > 0 ? point.x / windowSize.width : 0.5,
+                  y: windowSize.height > 0 ? point.y / windowSize.height : 0.5)
     }
 }
 
@@ -40,6 +47,8 @@ struct BubbleInput {
     var moved: () -> Void = {}
     var moveEnded: () -> Void = {}
     var panelSized: (CGSize) -> Void = { _ in }
+    /// Panneau ouvert : revenir au barillet (pincement).
+    var back: () -> Void = {}
 }
 
 // MARK: - Poignée
@@ -51,14 +60,18 @@ struct DetachHandle: View {
     let detach: () -> Void
     /// Rayon du coin du panneau, pour que l'arc le suive.
     var cornerRadius: CGFloat = 24
+    /// Premières ouvertures du panneau : l'indice s'affiche seul quelques secondes (vrai = à montrer, déjà compté).
+    var takeHint: () -> Bool = { false }
 
     @State private var hovering = false
     @State private var pressing = false
+    @State private var hinting = false
 
     static let size: CGFloat = 26
+    static let hintDuration: TimeInterval = 3.5
 
     var body: some View {
-        DetachGrip(cornerRadius: cornerRadius, lit: hovering || pressing, pressed: pressing)
+        DetachGrip(cornerRadius: cornerRadius, lit: hovering || pressing || hinting, pressed: pressing)
             .frame(width: Self.size, height: Self.size)
             // Seulement la marge du panneau (14 pt) : les contrôles d'un module dans ce coin gardent leurs clics.
             .contentShape(CornerBand(width: ExpandedPanel.bottomPadding))
@@ -68,14 +81,53 @@ struct DetachHandle: View {
                 if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
             .onDisappear { if hovering { NSCursor.pop() } }
-            .onLongPressGesture(minimumDuration: 0.3, maximumDistance: 8, perform: begin,
+            // Indice sous l'angle : tout de suite au survol (l'info-bulle met une seconde), et seul aux premières
+            // ouvertures. Hors du panneau, sans prendre la souris.
+            .overlay(alignment: .topTrailing) {
+                if hovering || hinting {
+                    DetachHint()
+                        .fixedSize()
+                        .offset(y: Self.size + 4)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: hovering || hinting)
+            .onAppear {
+                guard takeHint() else { return }
+                hinting = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.hintDuration) { hinting = false }
+            }
+            // Glisser tout de suite, ou appui maintenu : la goutte part au premier mouvement (l'appui long seul
+            // échouait dès qu'on glissait avant 0,3 s, et rien ne se passait).
+            .onLongPressGesture(minimumDuration: 0.3, maximumDistance: 3, perform: begin,
                                 onPressingChanged: { pressing = $0 })
-            .help(L("Maintiens puis glisse pour détacher la notch", table: "Bubble"))
+            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in begin() })
+            .help(L("Glisse pour détacher la notch", table: "Bubble"))
             .accessibilityElement()
             .accessibilityLabel(Text(L("Détacher la notch", table: "Bubble")))
             .accessibilityHint(Text(L("La notch devient une bulle à poser où tu veux.", table: "Bubble")))
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { detach() }
+    }
+}
+
+/// « Glisse l'angle pour détacher la notch », sous l'angle du panneau.
+struct DetachHint: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.down.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(Palette.accent)
+            Text(L("Glisse l'angle pour détacher la notch", table: "Bubble"))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Palette.primary)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 22)
+        .background(Capsule().fill(Color.black.opacity(0.88)))
+        .overlay(Capsule().strokeBorder(Palette.accent.opacity(0.55), lineWidth: 1))
+        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -122,17 +174,30 @@ struct DetachGrip: View {
 final class GooModel: ObservableObject {
     /// nil = rien à dessiner.
     @Published var state: GooState?
+    /// Goutte sous la souris, lue à chaque image sans être publiée : une image par rafraîchissement de l'écran, et non
+    /// une de plus à chaque mouvement de souris.
+    var liveDrop: CGPoint?
+
+    func shapes(at date: Date) -> GooShapes? {
+        guard var state else { return nil }
+        if let liveDrop { state.drop = liveDrop }
+        return state.shapes(at: date)
+    }
 }
 
-/// Fenêtre de la goutte : redessinée à chaque image tant qu'une animation est en cours, rien sinon.
+/// Fenêtre de la goutte : redessinée à chaque image tant qu'une animation est en cours ; au repos, une image fixe.
 struct GooView: View {
     @ObservedObject var goo: GooModel
     let color: Color
 
     var body: some View {
-        if let goo = goo.state {
-            TimelineView(.animation) { timeline in
-                GooCanvas(shapes: goo.shapes(at: timeline.date), color: color)
+        if let state = goo.state {
+            if state.mode == .rest {
+                GooCanvas(shapes: state.shapes(at: Date()), color: color)
+            } else {
+                TimelineView(.animation) { timeline in
+                    if let shapes = goo.shapes(at: timeline.date) { GooCanvas(shapes: shapes, color: color) }
+                }
             }
         }
     }
@@ -177,6 +242,37 @@ struct GooCanvas: View {
     }
 }
 
+/// Côté notch du retour aimanté : la pointe qui descend vers la bulle et le pont (dégradé de la couleur de la notch à
+/// celle de la bulle), le bord bas de la notch bombé ou parcouru par l'onde. Le contour de la bulle est dessiné par
+/// `RevolverBubble`, avec le barillet.
+struct FerroCanvas: View {
+    let shapes: FerroShapes
+    /// Notch dans la fenêtre (y vers le bas).
+    let notch: CGRect
+    let notchColor: Color
+    let fill: Color
+
+    static func polygon(_ points: [CGPoint]) -> Path {
+        var path = Path()
+        guard points.count > 2 else { return path }
+        path.addLines(points)
+        path.closeSubpath()
+        return path
+    }
+
+    var body: some View {
+        Canvas { context, _ in
+            let shading = GraphicsContext.Shading.linearGradient(
+                Gradient(colors: [notchColor, fill]), startPoint: CGPoint(x: shapes.center.x, y: notch.maxY),
+                endPoint: CGPoint(x: shapes.center.x, y: max(shapes.center.y, notch.maxY + 1)))
+            context.fill(Self.polygon(shapes.edge), with: .color(notchColor))
+            context.fill(Self.polygon(shapes.cone), with: shading)
+            context.fill(Self.polygon(shapes.bridge), with: shading)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 // MARK: - Bulle
 
 /// Racine de la fenêtre de la bulle : la bulle en barillet, ou le panneau qui en sort.
@@ -192,20 +288,18 @@ struct BubbleRootView: View {
     private var motion: Animation { NotchMotion.animation(prefs.animationSpeed, reduceMotion: model.reduceMotion) }
     private var panelOpen: Bool { model.bubble == .bubblePanel }
 
+    /// Repliée sur une vraie encoche, la notch est noire (voir `NotchRootView.fill`).
+    private var notchColor: Color { prefs.tintCollapsed && !model.hasNotch ? prefs.panelColor : .black }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             if panelOpen {
                 panel
+                    // Le contenu sort de la chambre du haut (son icône) et s'y referme.
                     .transition(model.reduceMotion ? .opacity
-                                : .scale(scale: 0.25, anchor: bubble.anchor).combined(with: .opacity))
+                                : .scale(scale: 0.08, anchor: bubble.chamberAnchor).combined(with: .opacity))
             } else {
-                RevolverBubble(tabs: registry.enabled.map { RevolverBubble.Tab($0) }, turn: bubble.turn,
-                               activity: registry.earTabs(claude: store.indicator, claudeEars: store.ears),
-                               claudeEars: store.ears, fill: prefs.panelColor, nearNotch: bubble.nearNotch,
-                               reduceMotion: model.reduceMotion, input: input)
-                    .scaleEffect(bubble.scale)
-                    .opacity(bubble.ghost ? 0.55 : 1)
-                    .position(bubble.centerInWindow)
+                revolver
                     .transition(model.reduceMotion ? .opacity
                                 : .scale(scale: 0.6, anchor: bubble.anchor).combined(with: .opacity))
             }
@@ -216,6 +310,38 @@ struct BubbleRootView: View {
         .animation(.easeOut(duration: 0.15), value: bubble.ghost)
         // Les couleurs d'accent sont lues au rendu : la vue est reconstruite quand l'accent change.
         .id(prefs.accentHex)
+    }
+
+    /// La bulle ; près de la notch, son contour de ferrofluide et la pointe de la notch, redessinés à chaque image. Même
+    /// place dans la hiérarchie dans les deux cas : le glisser en cours sur la bulle n'est pas interrompu.
+    private var revolver: some View {
+        let tabs = registry.enabled.map { RevolverBubble.Tab($0) }
+        let activity = registry.earTabs(claude: store.indicator, claudeEars: store.ears)
+        let ferro = bubble.ferro
+        return TimelineView(.animation(minimumInterval: nil, paused: ferro == nil)) { timeline in
+            let shapes = ferro?.shapes(at: timeline.date)
+            ZStack(alignment: .topLeading) {
+                if let ferro, let shapes {
+                    FerroCanvas(shapes: shapes, notch: ferro.notch, notchColor: notchColor, fill: prefs.panelColor)
+                }
+                RevolverBubble(tabs: tabs, turn: bubble.turn, activity: activity, claudeEars: store.ears,
+                               fill: prefs.panelColor, nearNotch: bubble.nearNotch, reduceMotion: model.reduceMotion,
+                               input: input, outline: shapes.map { Self.outline($0) },
+                               contentScale: shapes?.contentScale ?? 1,
+                               contentOpacity: Double(shapes?.contentOpacity ?? 1),
+                               rimOpacity: Double(shapes?.rimOpacity ?? 1))
+                    .scaleEffect(bubble.scale)
+                    .opacity(bubble.ghost ? 0.55 : 1)
+                    .position(shapes?.center ?? bubble.centerInWindow)
+            }
+        }
+    }
+
+    /// Contour du ferrofluide dans le repère de la bulle (coin haut gauche de son cadre).
+    static func outline(_ shapes: FerroShapes) -> Path {
+        let half = BubbleGeometry.radius
+        return FerroCanvas.polygon(shapes.outline)
+            .offsetBy(dx: half - shapes.center.x, dy: half - shapes.center.y)
     }
 
     /// Le panneau de la notch (onglets, menu « … », contenu, ou la barre de commande), dans une forme arrondie au lieu
@@ -240,6 +366,8 @@ struct BubbleRootView: View {
                 Color.clear.preference(key: BubblePanelSizeKey.self, value: proxy.size)
             })
             .onPreferenceChange(BubblePanelSizeKey.self) { input.panelSized($0) }
+            // Pincer : retour au barillet.
+            .simultaneousGesture(MagnificationGesture().onEnded { if $0 < 0.8 { input.back() } })
             .shadow(color: .black.opacity(prefs.panelShadow ? 0.45 : 0), radius: 14, y: 6)
             .animation(motion, value: model.selectedTab)
             .animation(motion, value: model.isEditingTabs)
@@ -249,6 +377,53 @@ struct BubbleRootView: View {
 
     /// Marge au-dessus de la barre d'onglets (la notch y a la bande de la barre des menus).
     static let panelTopInset: CGFloat = 8
+}
+
+/// Panneau de la bulle : retour au barillet, en tête de la barre d'onglets. Une flèche et un petit barillet, sur une
+/// capsule qui s'allume au survol.
+struct BackToRevolverButton: View {
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: "chevron.backward")
+                    .font(.system(size: 10, weight: .bold))
+                RevolverGlyph()
+                    .frame(width: 13, height: 13)
+            }
+            .foregroundColor(hovering ? .black : Palette.primary)
+            .padding(.horizontal, 7)
+            .frame(height: 20)
+            .background(Capsule().fill(hovering ? Palette.accent : Color.white.opacity(0.12)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .help(L("Revenir au barillet", table: "Bubble"))
+        .accessibilityLabel(Text(L("Revenir au barillet", table: "Bubble")))
+    }
+}
+
+/// Petit barillet : six chambres autour d'un moyeu, à la couleur du texte.
+struct RevolverGlyph: View {
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let ring = min(size.width, size.height) / 2 - 2
+            for index in 0..<6 {
+                let angle = Double(index) * .pi / 3
+                let point = CGPoint(x: center.x + ring * sin(angle), y: center.y - ring * cos(angle))
+                context.fill(Path(ellipseIn: CGRect(x: point.x - 1.6, y: point.y - 1.6, width: 3.2, height: 3.2)),
+                             with: .foreground)
+            }
+            context.fill(Path(ellipseIn: CGRect(x: center.x - 1.4, y: center.y - 1.4, width: 2.8, height: 2.8)),
+                         with: .foreground)
+        }
+    }
 }
 
 /// `max`, comme `NotchSizeKey` : la valeur par défaut d'un voisin n'écrase pas la mesure.
@@ -293,6 +468,12 @@ struct RevolverBubble: View {
     var nearNotch = false
     var reduceMotion = false
     var input = BubbleInput()
+    /// Retour aimanté : contour de ferrofluide (repère de la bulle, pointes comprises) à la place du cercle ; le
+    /// barillet rapetisse et s'efface pendant l'aspiration.
+    var outline: Path?
+    var contentScale: CGFloat = 1
+    var contentOpacity: Double = 1
+    var rimOpacity: Double = 1
 
     private enum Drag {
         case pending(Revolver.Zone)
@@ -334,16 +515,24 @@ struct RevolverBubble: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(fill)
-            cylinder
-            firingMark
-            hub
-            Circle()
-                .strokeBorder(rimColor, lineWidth: nearNotch ? 3 : (top == nil ? 1 : 2.5))
+            if let outline { outline.fill(fill) } else { Circle().fill(fill) }
+            Group {
+                cylinder
+                firingMark
+                hub
+            }
+            .scaleEffect(contentScale)
+            .opacity(contentOpacity)
+            // Bord dans la forme, comme `strokeBorder` : deux fois plus épais, coupé par le contour.
+            if let outline {
+                outline.stroke(rimColor, lineWidth: 2 * rimWidth).clipShape(outline).opacity(rimOpacity)
+            } else {
+                Circle().strokeBorder(rimColor, lineWidth: rimWidth)
+            }
         }
         .frame(width: Self.diameter, height: Self.diameter)
         .contentShape(Circle())
-        .overlay(alignment: .bottom) { pill }
+        .overlay(alignment: .bottom) { pill.opacity(contentOpacity) }
         .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
         .gesture(gesture)
         .help(L("Centre : ouvrir. Molette ou glisser sur les onglets : tourner. Bord : déplacer ; double-clic pour "
@@ -371,6 +560,8 @@ struct RevolverBubble: View {
         if let top { value += ". " + String(format: L("Activité : %@", table: "Bubble"), top.label(tabs)) }
         return value
     }
+
+    private var rimWidth: CGFloat { nearNotch ? 3 : (top == nil ? 1 : 2.5) }
 
     private var rimColor: Color {
         if nearNotch { return Palette.accent }
