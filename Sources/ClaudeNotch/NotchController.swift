@@ -6,8 +6,13 @@ import SwiftUI
 final class NotchViewModel: ObservableObject {
     @Published var isExpanded = false {
         // Le panneau qui se replie sort du mode édition des onglets.
-        didSet { if !isExpanded, isEditingTabs { isEditingTabs = false } }
+        didSet {
+            if !isExpanded, isEditingTabs { isEditingTabs = false }
+            if !isExpanded, isCommandBarOpen { isCommandBarOpen = false }
+        }
     }
+    /// Barre de commande ouverte : elle remplace le contenu du panneau (`CommandBarView`).
+    @Published var isCommandBarOpen = false
     /// Mode édition des onglets (appui long sur la barre) : glisser, masquer, remettre. Tant qu'il dure, le survol
     /// ne change plus d'onglet et le panneau ne se replie pas.
     @Published var isEditingTabs = false
@@ -40,6 +45,9 @@ struct NotchActions {
     var openSettings: () -> Void = {}
     /// Ouvre le panneau sur l'onglet de cette activité (clic sur un intercalaire).
     var openTab: (String) -> Void = { _ in }
+    /// Barre de commande : ouvrir (menu « … »), refermer avec le panneau (Échap, action lancée).
+    var openCommandBar: () -> Void = {}
+    var closeCommandBar: () -> Void = {}
 }
 
 final class NotchPanel: NSPanel {
@@ -158,7 +166,9 @@ final class NotchController {
             quit: { NSApp.terminate(nil) },
             revealFile: { [weak self] path in self?.reveal(path) },
             openSettings: { [weak self] in self?.openSettings() },
-            openTab: { [weak self] id in self?.openTab(id) }
+            openTab: { [weak self] id in self?.openTab(id) },
+            openCommandBar: { [weak self] in self?.openCommandBar() },
+            closeCommandBar: { [weak self] in self?.closeCommandBar() }
         )
         claude.actions = actions
         codex.openHost = { [weak self] bundleId, link in
@@ -234,7 +244,7 @@ final class NotchController {
             "closeOnClickOutside": prefs.closeOnClickOutside,
             "openedByKeyboard": openedByKeyboard,
             "editingTabs": model.isEditingTabs,
-            "hotKeys": [prefs.toggleHotKey.rawValue, prefs.hideHotKey.rawValue],
+            "hotKeys": [prefs.toggleHotKey.rawValue, prefs.hideHotKey.rawValue, prefs.commandHotKey.rawValue],
             "hotKeysUnavailable": HotKeyCenter.shared.unavailable.map { $0.rawValue }.sorted(),
             "approvalKeys": ApprovalQueue.shared.debugInfo,
             "panelWidth": prefs.expandedWidth(compact: false),
@@ -869,7 +879,8 @@ final class NotchController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.scheduleUnhide() }
             .store(in: &cancellables)
-        Publishers.Merge(prefs.$toggleHotKey.map { _ in () }, prefs.$hideHotKey.map { _ in () })
+        Publishers.Merge3(prefs.$toggleHotKey.map { _ in () }, prefs.$hideHotKey.map { _ in () },
+                          prefs.$commandHotKey.map { _ in () })
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.registerHotKeys() }
             .store(in: &cancellables)
@@ -908,8 +919,10 @@ final class NotchController {
         let center = HotKeyCenter.shared
         center.set(.none, for: .togglePanel) {}
         center.set(.none, for: .toggleHidden) {}
+        center.set(.none, for: .commandBar) {}
         center.set(prefs.toggleHotKey, for: .togglePanel) { [weak self] in self?.togglePanelFromKeyboard() }
         center.set(prefs.hideHotKey, for: .toggleHidden) { [weak self] in self?.toggleHiddenFromKeyboard() }
+        center.set(prefs.commandHotKey, for: .commandBar) { [weak self] in self?.toggleCommandBarFromKeyboard() }
     }
 
     /// Raccourci global : ouvre le panneau avec le clavier (même notch masquée), ou le ferme.
@@ -924,6 +937,26 @@ final class NotchController {
         expand()
         openedByKeyboard = true
         NotchKeyboard.take()
+    }
+
+    /// Raccourci global : ouvre la barre de commande (le panneau s'ouvre avec elle, même notch masquée), ou la ferme.
+    func toggleCommandBarFromKeyboard() {
+        if model.isCommandBarOpen { closeCommandBar() } else { openCommandBar() }
+    }
+
+    func openCommandBar() {
+        if !model.isExpanded { togglePanelFromKeyboard() }
+        // Le clavier est au champ : le panneau reste ouvert tant que la barre l'est.
+        openedByKeyboard = true
+        model.isEditingTabs = false
+        model.isCommandBarOpen = true
+    }
+
+    /// Échap, action lancée, raccourci de nouveau : la barre et le panneau se referment ensemble.
+    func closeCommandBar() {
+        guard model.isCommandBarOpen else { return }
+        suppressUntilExit = true
+        collapse()
     }
 
     /// Premier appui de « Approuver au clavier » quand la carte n'est pas à l'écran : on la montre, sans rien décider

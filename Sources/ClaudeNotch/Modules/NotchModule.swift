@@ -36,7 +36,7 @@ struct LicenseNotice: Identifiable, Equatable {
 /// - Les vues sont construites à la demande (onglet affiché, mode compact, réglages) puis jetées : l'état qui
 ///   doit survivre vit dans le module (propriétés `@Published`).
 /// - Textes : table de traduction du module, `L("…", table: "<Module>")` ou `Text("…", tableName: "<Module>")`.
-protocol NotchModule: ObservableObject where ObjectWillChangePublisher == ObservableObjectPublisher {
+protocol NotchModule: CommandSource, ObservableObject where ObjectWillChangePublisher == ObservableObjectPublisher {
     /// Identifiant stable (« media ») : clé des réglages (ordre, activation, onglet par défaut). Ne change jamais.
     var id: String { get }
     /// Titre localisé : onglet actif, réglages.
@@ -71,6 +71,16 @@ protocol NotchModule: ObservableObject where ObjectWillChangePublisher == Observ
     func makeTabDetailView() -> AnyView?
 }
 
+/// Ce que la barre de commande interroge : un module, ou l'API locale (intercalaires des scripts).
+protocol CommandSource: AnyObject {
+    /// Verbe de la barre de commande (« t » pour le minuteur) ; nil = pas de commande ici.
+    var commandVerb: CommandVerb? { get }
+    /// Actions proposées pour cette saisie (voir `CommandBarModel`). Pure : rien ne s'exécute ici, seulement dans
+    /// `NotchCommand.run`, appelé quand l'utilisateur valide. Sans verbe tapé (`query.verb == nil`), ne répondre
+    /// qu'à une saisie sans ambiguïté. Lue seulement quand le module tourne : la recherche ne réveille aucun module.
+    func commands(for query: CommandQuery) -> [NotchCommand]
+}
+
 extension NotchModule {
     var isEnabledByDefault: Bool { true }
     var keepsRunningWhenCollapsed: Bool { false }
@@ -83,6 +93,8 @@ extension NotchModule {
     func makeTabIcon() -> AnyView? { nil }
     func makeHeaderAccessory() -> AnyView? { nil }
     func makeTabDetailView() -> AnyView? { makeCompactView() }
+    var commandVerb: CommandVerb? { nil }
+    func commands(for query: CommandQuery) -> [NotchCommand] { [] }
 }
 
 // MARK: - Environnement des vues de module

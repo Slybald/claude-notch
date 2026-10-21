@@ -199,36 +199,36 @@ final class NotchCommandTests: XCTestCase {
         let directory = try makeTemporaryDirectory(self)
         let destination = directory.appendingPathComponent(".local/bin/notch")
         let bundled = Self.script
-        XCTAssertEqual(NotchCommand.status(bundled: nil, destination: destination), .unavailable)
-        XCTAssertEqual(NotchCommand.status(bundled: bundled, destination: destination), .notInstalled)
+        XCTAssertEqual(NotchCLI.status(bundled: nil, destination: destination), .unavailable)
+        XCTAssertEqual(NotchCLI.status(bundled: bundled, destination: destination), .notInstalled)
 
-        try NotchCommand.install(bundled: bundled, destination: destination)
-        XCTAssertEqual(NotchCommand.status(bundled: bundled, destination: destination), .installed)
+        try NotchCLI.install(bundled: bundled, destination: destination)
+        XCTAssertEqual(NotchCLI.status(bundled: bundled, destination: destination), .installed)
         let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o755)
         XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: bundled))
 
         // Une ancienne version de la nôtre : mise à jour.
-        try Data("#!/bin/sh\n\(NotchCommand.marker)\necho old\n".utf8).write(to: destination)
-        XCTAssertEqual(NotchCommand.status(bundled: bundled, destination: destination), .outdated)
-        try NotchCommand.install(bundled: bundled, destination: destination)
-        XCTAssertEqual(NotchCommand.status(bundled: bundled, destination: destination), .installed)
-        try NotchCommand.remove(destination: destination)
+        try Data("#!/bin/sh\n\(NotchCLI.marker)\necho old\n".utf8).write(to: destination)
+        XCTAssertEqual(NotchCLI.status(bundled: bundled, destination: destination), .outdated)
+        try NotchCLI.install(bundled: bundled, destination: destination)
+        XCTAssertEqual(NotchCLI.status(bundled: bundled, destination: destination), .installed)
+        try NotchCLI.remove(destination: destination)
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
 
         // Un autre programme du même nom : jamais remplacé ni retiré.
         let foreign = Data("#!/bin/sh\necho someone else\n".utf8)
         try foreign.write(to: destination)
-        XCTAssertEqual(NotchCommand.status(bundled: bundled, destination: destination), .foreign)
-        XCTAssertThrowsError(try NotchCommand.install(bundled: bundled, destination: destination))
-        XCTAssertThrowsError(try NotchCommand.remove(destination: destination))
+        XCTAssertEqual(NotchCLI.status(bundled: bundled, destination: destination), .foreign)
+        XCTAssertThrowsError(try NotchCLI.install(bundled: bundled, destination: destination))
+        XCTAssertThrowsError(try NotchCLI.remove(destination: destination))
         XCTAssertEqual(try Data(contentsOf: destination), foreign)
     }
 
     /// Le script livré porte la marque, est exécutable et passe la vérification de syntaxe de sh.
     func testBundledScript() throws {
         let text = try String(contentsOf: Self.script, encoding: .utf8)
-        XCTAssertTrue(text.hasPrefix("#!/bin/sh\n\(NotchCommand.marker)\n"))
+        XCTAssertTrue(text.hasPrefix("#!/bin/sh\n\(NotchCLI.marker)\n"))
         let attributes = try FileManager.default.attributesOfItem(atPath: Self.script.path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o755)
         let check = Process()

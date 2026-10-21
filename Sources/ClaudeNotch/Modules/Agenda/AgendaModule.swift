@@ -65,7 +65,7 @@ final class AgendaModule: NotchModule {
 
     private let defaults: UserDefaults
     let calendar: CalendarSource
-    private let clock: () -> Date
+    let clock: () -> Date
     private let scheduler: ModuleScheduler
     private let center: NotificationCenter
     private let workspaceCenter: NotificationCenter

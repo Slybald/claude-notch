@@ -43,10 +43,10 @@ struct ExternalEarDetail: View {
 /// Réglages › Scripts : l'API locale (coupée par défaut), la commande `notch`, les derniers programmes appelants.
 struct LocalAPISettings: View {
     @ObservedObject var api: LocalAPI
-    var bundled: URL? = NotchCommand.bundled
-    var destination: URL = NotchCommand.standardDestination
+    var bundled: URL? = NotchCLI.bundled
+    var destination: URL = NotchCLI.standardDestination
 
-    @State private var command: NotchCommand.Status = .unavailable
+    @State private var command: NotchCLI.Status = .unavailable
     @State private var failure: String?
 
     private static let time: DateFormatter = {
@@ -73,16 +73,16 @@ struct LocalAPISettings: View {
                         Text(verbatim: Self.label(command)).foregroundColor(.secondary)
                         switch command {
                         case .notInstalled:
-                            Button { run { try NotchCommand.install(bundled: bundled, destination: destination) } } label: {
+                            Button { run { try NotchCLI.install(bundled: bundled, destination: destination) } } label: {
                                 Text("Installer", tableName: "API")
                             }
                         case .outdated, .installed:
                             if command == .outdated {
-                                Button { run { try NotchCommand.install(bundled: bundled, destination: destination) } } label: {
+                                Button { run { try NotchCLI.install(bundled: bundled, destination: destination) } } label: {
                                     Text("Mettre à jour", tableName: "API")
                                 }
                             }
-                            Button { run { try NotchCommand.remove(destination: destination) } } label: {
+                            Button { run { try NotchCLI.remove(destination: destination) } } label: {
                                 Text("Retirer", tableName: "API")
                             }
                         case .foreign, .unavailable:
@@ -121,7 +121,7 @@ struct LocalAPISettings: View {
                 SettingsNote(L("Le nom que chaque programme se donne, gardé en mémoire jusqu'à la fermeture de l'app.", table: "API"))
             }
         }
-        .onAppear { command = NotchCommand.status(bundled: bundled, destination: destination) }
+        .onAppear { command = NotchCLI.status(bundled: bundled, destination: destination) }
     }
 
     private func run(_ action: () throws -> Void) {
@@ -131,10 +131,10 @@ struct LocalAPISettings: View {
         } catch {
             failure = error.localizedDescription
         }
-        command = NotchCommand.status(bundled: bundled, destination: destination)
+        command = NotchCLI.status(bundled: bundled, destination: destination)
     }
 
-    static func label(_ status: NotchCommand.Status) -> String {
+    static func label(_ status: NotchCLI.Status) -> String {
         switch status {
         case .unavailable: return L("Pas livrée avec cette copie de l'app", table: "API")
         case .notInstalled: return L("Pas installée", table: "API")

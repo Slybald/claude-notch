@@ -511,4 +511,27 @@ final class AgendaTests: XCTestCase {
         XCTAssertNotNil(module.makeHeaderAccessory())
         _ = module.makeView()
     }
+
+    // MARK: - Barre de commande
+
+    /// « a » liste les prochains rendez-vous (finis et journées entières exclus) ; ⏎ rejoint par `join`, rien avant.
+    func testCommandBarListsUpcomingEventsAndJoinsOnlyOnRun() throws {
+        let meeting = event("l", at: t0.addingTimeInterval(240), notes: zoom, title: "Point équipe")
+        let later = event("p", at: t0.addingTimeInterval(7200), title: "Dentiste")
+        let past = event("x", at: t0.addingTimeInterval(-7200), title: "Point passé")
+        let allDay = event("d", at: t0, minutes: 24 * 60, allDay: true, title: "Congés")
+        let r = rig(events: [later, past, meeting, allDay])
+        r.module.start()
+        func ids(_ verb: String?, _ argument: String) -> [String] {
+            r.module.commands(for: CommandQuery(verb: verb, argument: argument)).map(\.id)
+        }
+        XCTAssertEqual(ids("a", ""), ["agenda.join.l", "agenda.open.p"])
+        XCTAssertEqual(ids("a", "dent"), ["agenda.open.p"])
+        XCTAssertEqual(ids(nil, "po"), [], "sans verbe, trois lettres au moins")
+        XCTAssertEqual(ids(nil, "point"), ["agenda.join.l"])
+        let join = try XCTUnwrap(r.module.commands(for: CommandQuery(verb: "a", argument: "équipe")).first)
+        XCTAssertTrue(r.opened.urls.isEmpty, "rien ne s'ouvre avant ⏎")
+        XCTAssertNil(join.run())
+        XCTAssertEqual(r.opened.urls.map(\.absoluteString), [zoom])
+    }
 }

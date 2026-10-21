@@ -162,6 +162,7 @@ final class Preferences: ObservableObject {
         static let haptics = "hover.haptics"
         static let toggleHotKey = "keyboard.togglePanel"
         static let hideHotKey = "keyboard.toggleHidden"
+        static let commandHotKey = "keyboard.commandBar"
         static let fullScreen = "fullScreen.behavior"
         static let screen = "display.screen"
         static let tabOrder = "tabs.order"
@@ -190,8 +191,8 @@ final class Preferences: ObservableObject {
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
         static let notchSettings = [
             alwaysVisible, visibility, hiddenUntil, openTrigger, closeOnClickOutside, openDelay, closeDelay, haptics,
-            toggleHotKey, hideHotKey, fullScreen, screen, accent, panelSize, customWidth, background, customBackground,
-            tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
+            toggleHotKey, hideHotKey, commandHotKey, fullScreen, screen, accent, panelSize, customWidth, background,
+            customBackground, tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
         ]
     }
 
@@ -248,6 +249,7 @@ final class Preferences: ObservableObject {
             defaults.set(toggleHotKey.rawValue, forKey: Key.toggleHotKey)
             // Une combinaison ne sert qu'à une chose.
             if toggleHotKey != .none, hideHotKey == toggleHotKey { hideHotKey = .none }
+            if toggleHotKey != .none, commandHotKey == toggleHotKey { commandHotKey = .none }
         }
     }
 
@@ -256,6 +258,16 @@ final class Preferences: ObservableObject {
         didSet {
             defaults.set(hideHotKey.rawValue, forKey: Key.hideHotKey)
             if hideHotKey != .none, toggleHotKey == hideHotKey { toggleHotKey = .none }
+            if hideHotKey != .none, commandHotKey == hideHotKey { commandHotKey = .none }
+        }
+    }
+
+    /// Raccourci global : ouvrir la barre de commande (aucun par défaut).
+    @Published var commandHotKey: HotKeyChoice {
+        didSet {
+            defaults.set(commandHotKey.rawValue, forKey: Key.commandHotKey)
+            if commandHotKey != .none, toggleHotKey == commandHotKey { toggleHotKey = .none }
+            if commandHotKey != .none, hideHotKey == commandHotKey { hideHotKey = .none }
         }
     }
 
@@ -409,6 +421,8 @@ final class Preferences: ObservableObject {
         toggleHotKey = toggle
         let hide = choice(Key.hideHotKey, HotKeyChoice.none)
         hideHotKey = hide == toggle ? .none : hide
+        let command = choice(Key.commandHotKey, HotKeyChoice.none)
+        commandHotKey = command == toggle || command == hide ? .none : command
         fullScreenBehavior = choice(Key.fullScreen, FullScreenBehavior.compact)
         screenChoice = defaults.string(forKey: Key.screen).flatMap { $0.isEmpty ? nil : $0 } ?? ScreenChoice.builtin
         hideFromCapture = defaults.object(forKey: Key.hideFromCapture) as? Bool ?? false
@@ -539,6 +553,7 @@ final class Preferences: ObservableObject {
         hapticFeedback = fresh.hapticFeedback
         toggleHotKey = fresh.toggleHotKey
         hideHotKey = fresh.hideHotKey
+        commandHotKey = fresh.commandHotKey
         fullScreenBehavior = fresh.fullScreenBehavior
         screenChoice = fresh.screenChoice
         hideFromCapture = fresh.hideFromCapture

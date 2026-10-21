@@ -52,6 +52,8 @@ Interface available in English and French (follows the system language). Screens
 - **Seven more tabs**: Player, Agenda, Quick Settings, Shelf, Clipboard, Timer and Quick notes (see [Tabs](#tabs)).
 - **Your own index tabs** (optional, see [Scripts](#scripts-local-api-and-notch-command)): `notch run -- make` shows an
   hourglass, then ✓ or ✗ with the duration; any script can show a short status through a local API.
+- **Command bar**: one field, one-key prefixes (see [Command bar](#command-bar)): `t 25` starts a timer, `n idea`
+  creates a note, `c link` searches your copies, `s presentation` applies a scene, `> message` writes to Claude.
 - Works on screens without a notch too (external display, closed lid): a small notch is drawn at the top
   center of the screen.
 
@@ -98,6 +100,30 @@ needs you.
   write an answer right in the notch. The reply is sent only when you click **Send** (or press Return), and **Continue
   in Mail** opens Mail's own reply window with your text already typed. Claude Notch never launches Mail: it only
   reads it while it is open.
+
+## Command bar
+
+A field in the notch to do things without looking for the right tab. Open it with its shortcut (Settings › General ›
+Shortcuts, none by default) or from **…** › **Command Bar…**, type, press Return. Nothing runs before Return (or a
+click on the row), and Esc closes it.
+
+| Type | What it does |
+|---|---|
+| `t 25`, `t 1h30`, `25 min` | Starts a timer (`t` alone: 25, 5 and 10 minutes, and the Pomodoro) |
+| `n some idea` | Creates a quick note |
+| `c link` | Searches the clipboard history; Return copies the entry again |
+| `s presentation` | Applies a Quick Settings scene (Battery Saver, Presentation, Normal); with a fixed fan speed, `s fans` gives the fans back to macOS |
+| `m invoice` | Searches the latest emails of the Mail tab; Return opens the email in Mail |
+| `a team` | Lists today's and tomorrow's appointments; Return joins the meeting (known link) or opens Calendar on that day |
+| `i backup` | Removes an index tab put up by one of your scripts (or all of them) |
+| `> run the tests again` | Writes to a Claude session (the same channel as the chat field; needs "Reply from the notch") |
+
+The prefixes are listed under the field and clickable. A prefix is one letter followed by a space (`>` needs no space);
+anything else is plain text, which only a duration with its unit (`25 min`), or a scene, an email or an appointment
+with three letters or more, can answer. When the names do not fit, only the keys are shown. The search ignores case and accents and forgives missing letters in short texts (`prsnt` finds
+Presentation). The bar asks only the tabs that are on and running: a hidden tab is not woken up, a turned-off Claude tab
+has no `>`. The clipboard and your scripts' tabs are never searched without
+their prefix. No natural language, no permission, nothing leaves your Mac.
 
 ## Reply from the notch
 
@@ -199,8 +225,8 @@ Open **…** › **Settings…** (⌘,).
   and in the right-click menu of the collapsed notch.
 - **Opening**: on hover (with an opening delay) or on click. **Close on click outside** keeps the panel open until
   you click elsewhere, instead of closing it when the mouse leaves.
-- **Shortcuts** (none by default): one opens or closes the panel, one hides or shows the notch. They work
-  everywhere, without the Accessibility permission. Once the panel is open from the keyboard, ← and → switch tabs,
+- **Shortcuts** (none by default): one opens or closes the panel, one hides or shows the notch, one opens the
+  [command bar](#command-bar). They work everywhere, without the Accessibility permission. Once the panel is open from the keyboard, ← and → switch tabs,
   ⌘1 to ⌘9 jump to a tab, and Esc closes it.
 - **Size and look**: panel width (compact, standard, large, or a custom width from 460 to 720 pt), background (black,
   graphite, midnight blue or a custom color), opacity, shadow, accent color and animation speed. With "Reduce
@@ -602,6 +628,9 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **Sept autres onglets** : Lecteur, Agenda, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
 - **Tes propres intercalaires** (en option, voir [Scripts](#scripts--api-locale-et-commande-notch)) : `notch run -- make`
   affiche un sablier, puis ✓ ou ✗ avec la durée ; n'importe quel script peut afficher un état court par une API locale.
+- **Barre de commande** : un champ, des préfixes d'une touche (voir [Barre de commande](#barre-de-commande)) : `t 25`
+  lance un minuteur, `n idée` crée une note, `c lien` cherche dans tes copies, `s présentation` applique une scène,
+  `> message` écrit à Claude.
 - Marche aussi sur un écran sans notch (écran externe, capot fermé) : une petite notch est dessinée en haut
   au centre de l'écran.
 
@@ -645,6 +674,31 @@ barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude (ou C
   **Répondre** ouvre un champ pour écrire la réponse dans la notch. Elle ne part que sur ton clic sur **Envoyer** (ou
   Entrée) ; **Continuer dans Mail** ouvre la fenêtre de réponse de Mail avec ton texte déjà tapé. Claude Notch ne
   lance jamais Mail : il ne le lit que pendant qu'il est ouvert.
+
+### Barre de commande
+
+Un champ dans la notch pour agir sans chercher le bon onglet. Ouvre-le avec son raccourci (Réglages › Général ›
+Raccourcis, aucun par défaut) ou par **…** › **Barre de commande…**, tape, appuie sur Entrée. Rien ne part avant
+Entrée (ou un clic sur la ligne), et Échap la ferme.
+
+| Tape | Effet |
+|---|---|
+| `t 25`, `t 1h30`, `25 min` | Lance un minuteur (`t` seul : 25, 5 et 10 minutes, et le Pomodoro) |
+| `n une idée` | Crée une note rapide |
+| `c lien` | Cherche dans l'historique du presse-papiers ; Entrée recopie l'élément |
+| `s présentation` | Applique une scène des Réglages rapides (Autonomie, Présentation, Normal) ; avec une vitesse fixe des ventilateurs, `s ventil` la rend à macOS |
+| `m facture` | Cherche dans les derniers mails de l'onglet Mail ; Entrée ouvre le mail dans Mail |
+| `a équipe` | Liste les rendez-vous d'aujourd'hui et de demain ; Entrée rejoint la réunion (lien reconnu) ou ouvre Calendrier à ce jour |
+| `i sauvegarde` | Retire un intercalaire posé par un de tes scripts (ou tous) |
+| `> relance les tests` | Écrit à une session Claude (le même canal que le champ de la conversation ; demande « Répondre depuis la notch ») |
+
+Les préfixes sont listés sous le champ, et cliquables. Un préfixe est une lettre suivie d'une espace (`>` n'en demande
+pas) ; le reste est du texte libre, auquel seule une durée avec son unité (`25 min`), ou une scène, un mail ou un rendez-vous d'au
+moins trois lettres, peut répondre. Quand les noms ne tiennent pas, seules les touches sont montrées. La recherche ignore la casse et les accents et pardonne des lettres manquantes dans un texte court
+(`prsnt` trouve Présentation). La barre n'interroge que les onglets activés et en marche : un onglet masqué n'est pas
+réveillé, un onglet Claude coupé n'a pas de `>`. Le presse-papiers et les intercalaires de tes scripts ne sont
+jamais cherchés sans leur préfixe. Pas de langage
+naturel, aucune permission, rien ne quitte ton Mac.
 
 ### Répondre depuis la notch
 
@@ -750,8 +804,8 @@ Ouvre **…** › **Réglages…** (⌘,).
   menu **…** et dans le menu du clic droit sur la notch repliée.
 - **Ouverture** : au survol (avec un délai) ou au clic. **Fermer au clic à l'extérieur** garde le panneau ouvert
   jusqu'à un clic ailleurs, au lieu de le refermer quand la souris le quitte.
-- **Raccourcis** (aucun par défaut) : l'un ouvre ou ferme le panneau, l'autre masque ou réaffiche la notch. Ils
-  marchent partout, sans l'autorisation d'accessibilité. Panneau ouvert au clavier : ← et → changent d'onglet, ⌘1 à
+- **Raccourcis** (aucun par défaut) : l'un ouvre ou ferme le panneau, l'autre masque ou réaffiche la notch, un
+  troisième ouvre la [barre de commande](#barre-de-commande). Ils marchent partout, sans l'autorisation d'accessibilité. Panneau ouvert au clavier : ← et → changent d'onglet, ⌘1 à
   ⌘9 vont à un onglet, Échap ferme.
 - **Taille et apparence** : largeur du panneau (compact, standard, grand, ou une largeur personnalisée de 460 à
   720 pt), fond (noir, graphite, bleu nuit ou couleur libre), opacité, ombre, couleur d'accent et vitesse des

@@ -52,6 +52,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   Measured with Claude Code 2.1.304. Only percentages and reset times are kept, in memory.
 - **Codex** (Settings › Codex › Show quota, on by default): read from Codex itself (`account/rateLimits/read`, ChatGPT
   sign-in) only while the panel is open, at most once a minute, then every 5 minutes. Measured with Codex 0.154 and 0.162.
+- **Command bar.** A field in the notch with one-key prefixes: `t 25` starts a timer (also `t 1h30`, or `25 min`
+  without the prefix; `t` alone offers 25, 5 and 10 minutes and the Pomodoro), `n idea` creates a quick note,
+  `c link` searches the clipboard history and copies the chosen entry again, `s presentation` applies a Quick Settings
+  scene (and `s fans` gives a fixed fan speed back to macOS), `m invoice` opens one of the latest emails in Mail,
+  `a team` joins the next meeting or opens Calendar on that day, `i backup` removes a tab put up by a script,
+  `> message` writes to a Claude session (only with "Reply from the notch" on). The prefixes are shown under the
+  field and can be clicked; typing one turns it into a pill, Backspace brings it back. ↑ ↓ choose, ⏎ runs, Esc closes;
+  nothing runs before ⏎ (or a click on the row). The panel opens with the bar and closes with it.
+  Settings › General › Shortcuts has a new "Command bar" shortcut (none by default, ⌥⌘K is offered), and
+  **…** › **Command Bar…** opens it without a shortcut. Fuzzy search ignores case and accents.
+- `NotchModule` gets two optional members, `commandVerb` and `commands(for:)` (empty by default): a module offers its
+  own actions to the bar, nothing is hard-coded in the bar. A stopped or hidden tab is never woken by a search.
 
 ### Fixed
 

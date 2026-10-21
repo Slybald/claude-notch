@@ -45,6 +45,9 @@ organised and why some choices were made, so they are not undone by accident.
   and `EarTabViews` (their drawing), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen. `NotchShell`: rules tested without a real screen (visibility, screen choice, real or
   virtual notch, "hidden until" text). `HotKeys`: global shortcuts and the keys of the panel.
+- `Command/`: the command bar. `CommandBarModel` (pure: `CommandVerb`, `CommandQuery`, `NotchCommand`, `CommandParser`,
+  `FuzzyMatch`, the model that routes a query to the modules and ranks the answers) and `CommandBarView` (the field, an
+  AppKit `NSTextField` because SwiftUI's `TextField` gets no ↑ ↓ before macOS 14, the rows, the prefix chips).
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
   per module:
   - `Claude/`: sessions, compact summary, Claude settings. `ReplyCenter` holds the long requests of `/permission`
@@ -102,7 +105,7 @@ organised and why some choices were made, so they are not undone by accident.
 - `Localization`: the `L()` helper, with an optional table. `LaunchAgent`: open at login.
 - `Updater`: automatic updates from GitHub releases (check, signature, install, relaunch) and its menu items.
 - `LocalAPI`: the local API of the user's scripts (`/api/v1/ears`, see [API.md](API.md)): token, strict schema
-  (`ExternalEar`), rate limit, expiry, the ear tabs it hands to `ModuleRegistry` (ids `api.<id>`), and `NotchCommand`
+  (`ExternalEar`), rate limit, expiry, the ear tabs it hands to `ModuleRegistry` (ids `api.<id>`), and `NotchCLI`
   (installs `hooks/notch` in `~/.local/bin`). `LocalAPIViews`: the unfolded card of a script's tab and Settings › Scripts.
 
 ## Modules (tabs)
@@ -116,7 +119,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   `title`, SF Symbol `symbol`, `makeView()`. Optional, with defaults: `makeCompactView()` (full-screen summary),
   `ears` (with a `priority`), `keepsRunningWhenCollapsed`, `makeSettingsView()` (a `SettingsPane`, listed in the
   settings sidebar), `licenseNotices` (About › Licenses), `makeTabIcon()`, `makeHeaderAccessory()`,
-  `isEnabledByDefault`, `start()` / `stop()`.
+  `isEnabledByDefault`, `start()` / `stop()`, `commandVerb` and `commands(for:)` (the command bar, below).
 - **Life cycle**: the registry calls `start()` when a module is enabled *and* useful (the panel is open, or the
   module returns `keepsRunningWhenCollapsed`, re-read after each of its `objectWillChange`), and `stop()` as soon
   as that is no longer true, including when it is disabled. Stopped, a module does no work at all: no timer, no
@@ -214,6 +217,30 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   AppleScript arguments never go through string interpolation. A Mail reply leaves only through
   `MailModule.sendReply()` (click on Send or Return in the field), never on open, refresh or close. Under XCTest the default accesses are inert
   (`ModuleEnvironment.isTesting`): tests never read real messages or run `osascript` (except the closed-Mail guard).
+- **Command bar** (`Command/`, opened by `keyboard.commandBar` or **…** › **Command Bar…**, `NotchViewModel.isCommandBarOpen`):
+  it replaces the panel's content while it is open (`NotchRootView`), takes the keyboard like a text field
+  (`NotchKeyboard`) and closes together with the panel (Esc, a command run, the shortcut again: `closeCommandBar` =
+  `collapse`). The commands come from the modules, not from a list in the bar: a module (or the local API: both are a `CommandSource`) declares one `commandVerb` (a
+  letter or `>`, never translated) and answers `commands(for: CommandQuery)` with `NotchCommand`s (id, symbol, title,
+  detail, score, `run`). Rules: `commands(for:)` is pure and `run` only executes on Return or a click on the row
+  (`CommandBarTests.testNothingRunsBeforeReturn`); `run` returns a failure message instead of closing the bar when the
+  action did not happen (Claude's full queue); the bar asks `registry.commandSources` (the modules enabled **and**
+  running, then the scripts' tabs), so a search never starts a stopped or hidden module; with a verb typed only that module is asked, without one every module
+  is asked and answers only what is unambiguous (a duration with its unit, a scene, an email or an event with 3+ letters),
+  the clipboard and the scripts' tabs never; at most five rows (the panel stays under 460 pt: `CommandBarSnapshotTests.testFullBarFitsInPanel`). The grammar
+  is one-key verbs shown under the field (`t` timer, `n` note, `c` clipboard, `s` scene or fans back to macOS, `m` latest
+  emails, `a` agenda, `i` scripts' tabs, `>` Claude; keys only when the names do not fit), no natural language; a letter is a verb only before a
+  space, so plain text stays plain. Typed, the verb leaves the field and becomes a pill; Backspace on an empty field
+  brings it back. Ranking: score, then tab order, then the module's own order; `FuzzyMatch` is case and accent blind,
+  every word must match, a word matches by inclusion (best at the start of the text or of a word) or, in a text of 64
+  characters or less, by letters that follow closely. A module's commands live in its folder (`TimerCommands`,
+  `NotesCommands`, `ClipboardCommands`, `QuickSettingsCommands`, `ClaudeCommands`, `MailCommands`, `AgendaCommands`,
+  and `LocalAPICommands` for the scripts' tabs); an email opens in Mail (never a reply), a meeting is joined through
+  `AgendaModule.join` (same link check as its button); texts are in the `Command` table.
+  The Claude verb exists only with "Reply from the notch" on, and sends through `ReplyCenter.send` like the chat
+  field. VoiceOver: the field is labelled, rows are buttons with title and detail, the chips say their key, and the
+  results count and the selected row are announced because the focus stays in the field (`announcementRequested`;
+  checked by the code only, not with a running VoiceOver).
 - **Localization per table**: `L("…", table: "Media")` or `Text("…", tableName: "Media")`; without a table,
   `Localizable`. `LocalizationTests` checks every table: each key used in the code is translated in its table, no
   unused keys, French identity, same format specifiers, same tables in `en.lproj` and `fr.lproj`.

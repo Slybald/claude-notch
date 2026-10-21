@@ -459,7 +459,7 @@ struct ExternalEar: Equatable, Identifiable {
 
 /// La commande `notch` (hooks/notch, livrée dans l'app) : copiée dans ~/.local/bin seulement sur un clic dans les
 /// réglages, jamais par-dessus un autre programme du même nom.
-enum NotchCommand {
+enum NotchCLI {
     /// Ligne que porte notre script : un fichier sans elle n'est pas à nous.
     static let marker = "# claude-notch-cli"
 

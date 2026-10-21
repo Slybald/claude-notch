@@ -385,3 +385,8 @@
 "Ouvre l'onglet correspondant" = "Ouvre l'onglet correspondant";
 "L'outil des ventilateurs reste en place" = "L'outil des ventilateurs reste en place";
 "Pour le retirer : sudo rm %@ %@" = "Pour le retirer : sudo rm %@ %@";
+
+/* Barre de commande */
+"Barre de commande…" = "Barre de commande…";
+"Barre de commande" = "Barre de commande";
+"Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎." = "Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎.";

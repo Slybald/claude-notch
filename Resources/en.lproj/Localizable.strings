@@ -385,3 +385,8 @@
 "Ouvre l'onglet correspondant" = "Opens the matching tab";
 "L'outil des ventilateurs reste en place" = "The fan tool is still installed";
 "Pour le retirer : sudo rm %@ %@" = "To remove it: sudo rm %@ %@";
+
+/* Barre de commande */
+"Barre de commande…" = "Command Bar…";
+"Barre de commande" = "Command Bar";
+"Barre de commande : t 25 lance un minuteur, n idée crée une note, c lien cherche dans les copies, s présentation applique une scène, > message écrit à Claude. Rien ne part sans ⏎." = "Command bar: t 25 starts a timer, n idea creates a note, c link searches your clipboard history, s presentation applies a scene, > message writes to Claude. Nothing runs without ⏎.";

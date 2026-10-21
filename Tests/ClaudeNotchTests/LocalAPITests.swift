@@ -427,4 +427,26 @@ final class LocalAPITests: XCTestCase {
                                                                          headers: [fixture.host, fixture.token]))
         XCTAssertEqual(response?.status, 404)
     }
+
+    // MARK: - Barre de commande
+
+    /// « i » retire un intercalaire d'un script (ou tous), seulement à ⏎ ; aucun verbe sans intercalaire, rien sans verbe.
+    func testCommandBarRemovesScriptTabsOnlyOnRun() throws {
+        let api = makeAPI()
+        XCTAssertNil(api.commandVerb)
+        XCTAssertEqual(post(api, ["id": "a", "title": "Sauvegarde", "client": "backup.sh"]).status, 200)
+        XCTAssertEqual(post(api, ["id": "b", "title": "Build fini", "client": "make.sh"]).status, 200)
+        XCTAssertEqual(api.commandVerb?.key, "i")
+        func ids(_ verb: String?, _ argument: String) -> [String] {
+            api.commands(for: CommandQuery(verb: verb, argument: argument)).map(\.id)
+        }
+        XCTAssertEqual(ids("i", ""), ["api.remove.b", "api.remove.a", "api.clear"], "le plus récent d'abord")
+        XCTAssertEqual(ids("i", "backup"), ["api.remove.a"], "cherche aussi le nom du programme")
+        XCTAssertEqual(ids(nil, "sauvegarde"), [], "pas dans une recherche libre")
+        let remove = try XCTUnwrap(api.commands(for: CommandQuery(verb: "i", argument: "sauv")).first)
+        XCTAssertEqual(api.items.count, 2, "rien n'est retiré avant ⏎")
+        XCTAssertNil(remove.run())
+        XCTAssertEqual(api.items.map(\.id), ["b"])
+        XCTAssertNotNil(remove.run(), "déjà retiré : la barre le dit")
+    }
 }
