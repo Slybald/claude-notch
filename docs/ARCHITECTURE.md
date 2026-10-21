@@ -45,6 +45,9 @@ organised and why some choices were made, so they are not undone by accident.
   and `EarTabViews` (their drawing), `ToolsViews` / `ToolsFeed` (tools section). `FullScreenDetector`: is the front app full screen
   on the notch's screen. `NotchShell`: rules tested without a real screen (visibility, screen choice, real or
   virtual notch, "hidden until" text). `HotKeys`: global shortcuts and the keys of the panel.
+- `Bubble` (pure: phases, detach and magnet thresholds, screen clamping, position per screen, revolver geometry and
+  detents, drop shapes), `BubbleViews` (corner handle, drop canvas, revolver bubble, bubble panel) and `BubbleWindow`
+  (`BubbleController`: the bubble window, the drop window, detaching and reattaching). See "Detached notch" below.
 - `Modules/`: `NotchModule` (the contract), `ModuleRegistry` (order, activation, life cycle, ears), one folder
   per module:
   - `Claude/`: sessions, compact summary, Claude settings. `ReplyCenter` holds the long requests of `/permission`
@@ -378,6 +381,40 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   - The window is 800 × 480 pt so the widest custom panel (720 pt), its radii and shadow fit. A light custom
     background is darkened (relative luminance ≤ 0.06): the panel is always dark-themed, its text white.
   - "Invisible in screenshots" sets `sharingType = .none`; it does not touch the window level.
+- **Detached notch (bubble)** (`Bubble*.swift`, `NotchViewModel.bubble`, settings `bubble.*`):
+  - **Phases** (`BubblePhase`, pure): attached → detaching (drag from the corner) → bubble ⇄ bubble panel → reattaching →
+    attached; `reset` goes straight back (setting turned off). While detached the notch never expands: hover and click on
+    the notch do nothing, an index tab opens the bubble panel on its tab, the global shortcut toggles the bubble panel,
+    `collapse()` (open a session, settings…) closes it. A file dragged to the notch does not open the Shelf then.
+  - **Handle**: an arc and a dot in the bottom right corner of the expanded panel (not in compact full screen nor in tab
+    edit mode). A 0.3 s long press (SwiftUI) starts the drag; the drags and the mouse-up then come from a local event
+    monitor (they go to the window of the mouse-down, even outside it) that is removed at the mouse-up. Menu, right
+    click and VoiceOver detach without dragging (`detachAutomatically`).
+  - **Drop** ("gooey" metaballs): a separate window under the notch, a `Canvas` with `blur` then `alphaThreshold`
+    (macOS 12+, no shader). Shapes are pure functions of the progress or the elapsed time (`Goo`, `GooState`): body (the
+    panel shrinking halfway towards the notch), a neck drawn as a band (circles alone break into beads once thin) pinched
+    in the middle down to 5.5 pt (`neckFloor`: thinner, the threshold erases it), and the drop. At 120 pt
+    (`detachDistance`) it snaps: the body springs back into the notch, the bubble window takes the drop's place at the
+    same size (scale 0.72) and bounces to 1, and the same drag keeps moving it. Released earlier, the drop goes back. The
+    notch view fades out while the drop replaces it (`gooActive`). `TimelineView(.animation)` only exists while a drop is
+    drawn; afterwards `goo = nil` and the window is ordered out. "Reduce motion": no drop, a half-transparent bubble
+    follows the mouse, then a fade.
+  - **Bubble window**: same level, collection behavior and "hide from capture" as the notch (`isFloatingPanel` before
+    `level`), created on first detach (`defer`), clamped to the visible frames (menu bar and Dock excluded). Position
+    stored per display label (`NotchScreenPicker.labels`) as an offset from the display origin, plus the last display;
+    a display that disappears sends the bubble back to the notch's display. Within 44 pt of the notch bottom it is
+    magnetized; released there it merges back (reverse drop). Hidden with the notch ("Hide the notch", full screen
+    "hidden").
+  - **Revolver** (`Revolver`, pure): one chamber per enabled tab in the user's order, active tab at the top (fixed
+    mark), `turn` counts detents without bounds so the spring always turns the short way. Scroll: 1 detent per wheel
+    line or per 28 pt of trackpad, momentum ignored (`RevolverScroll`); circular drag on the chambers: one detent per
+    angle step crossed, across ±π (`RevolverDrag`); click on a chamber turns it to the top; the hub or the top chamber
+    opens. A drag elsewhere moves the bubble, a double click on the rim reattaches. Scroll wheel and right click come
+    from an `NSHostingView` subclass (no scroll wheel API in SwiftUI before macOS 14). VoiceOver: one adjustable
+    element (swipe up/down turns), default action opens, a named action reattaches.
+  - **Bubble panel**: the same `ExpandedPanel` in a rounded shape; the window grows to the panel (top at the bubble's
+    top, clamped to the screen) and shrinks back after the transition. Closes like the notch panel: mouse leaving
+    after the close delay, click outside, Esc.
 - **Shape size** is reported through `NotchSizeKey` with a `max` reduce (a plain `nextValue()` let a sibling's
   default value win, leaving the hover zone at zero). The expanded panel stays under 460 pt.
 - **Window level**: `isFloatingPanel = true` must be set *before* `level`: that setter resets the level to

@@ -400,6 +400,8 @@ final class NotchController {
 
     func mouseMoved() {
         followMouseScreen()
+        // Bouton relâché sans que le relâchement nous parvienne (fenêtre retirée en plein glisser) : on termine.
+        if detachMonitor != nil || bubble.isMoving, NSEvent.pressedMouseButtons & 1 == 0 { endDetachDrag() }
         // Décollage ou bulle déplacée : la souris est à la bulle, la notch ne réagit pas à son passage.
         guard isShown, !bubble.isInteracting else { return }
         let point = mouseLocation()
@@ -829,7 +831,8 @@ final class NotchController {
             claudeActive: claude && store.indicator != .none,
             moduleEars: registry.moduleEars != nil,
             onDemand: shownOnDemand,
-            expanded: model.isExpanded,
+            // Le panneau de la bulle ouvert compte comme déplié : il ne se ferme pas parce que la notch se cache.
+            expanded: model.isExpanded || model.bubble == .bubblePanel,
             hiddenForFullScreen: hiddenForFullScreen,
             hiddenByUser: hiddenByUser))
     }
@@ -1069,15 +1072,16 @@ final class NotchController {
         bubble.beginPull(panel: expandedPanelRect)
         detachMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self] event in
             guard let self else { return event }
-            if event.type == .leftMouseUp {
-                if let monitor = self.detachMonitor { NSEvent.removeMonitor(monitor) }
-                self.detachMonitor = nil
-                self.bubble.pullEnded()
-            } else {
-                self.bubble.pullMoved()
-            }
+            if event.type == .leftMouseUp { self.endDetachDrag() } else { self.bubble.pullMoved() }
             return event
         }
+    }
+
+    /// Fin du glisser : goutte rentrée, ou bulle posée (rangée, ou rattachée près de la notch).
+    private func endDetachDrag() {
+        if let monitor = detachMonitor { NSEvent.removeMonitor(monitor) }
+        detachMonitor = nil
+        bubble.pullEnded()
     }
 
     /// « Détacher la notch » (menu « … », clic droit, VoiceOver) : sans glisser.

@@ -43,6 +43,7 @@ final class BubbleController {
     private static let shrinkDelay: TimeInterval = 0.45
 
     let bubble = BubbleModel()
+    private let goo = GooModel()
     let window: BubblePanel
     private let model: NotchViewModel
     private let prefs: Preferences
@@ -160,7 +161,9 @@ final class BubbleController {
     }
 
     /// La souris est prise par la bulle (déplacement, décollage) : la notch ne réagit pas à son passage.
-    var isInteracting: Bool { moveOffset != nil || model.bubble == .detaching }
+    var isInteracting: Bool { isMoving || model.bubble == .detaching }
+    /// La bulle suit la souris (glisser en cours).
+    var isMoving: Bool { moveOffset != nil }
 
     // MARK: - Lancement, réglages, écrans
 
@@ -290,7 +293,7 @@ final class BubbleController {
                 center = mouse
                 moveWindow()
             } else {
-                bubble.goo?.drop = GooCoordinates(gooFrame).point(mouse)
+                goo.state?.drop = GooCoordinates(gooFrame).point(mouse)
             }
             if hypot(mouse.x - pull.handle.x, mouse.y - pull.handle.y) >= BubbleGeometry.detachDistance {
                 detach(at: mouse, dragging: true)
@@ -360,8 +363,8 @@ final class BubbleController {
             showBubble()
             return
         }
-        bubble.goo?.drop = GooCoordinates(gooFrame).point(point)
-        bubble.goo?.mode = .snap(start: Date())
+        goo.state?.drop = GooCoordinates(gooFrame).point(point)
+        goo.state?.mode = .snap(start: Date())
         bubble.scale = 0.72
         showBubble()
         withAnimation(.spring(response: 0.42, dampingFraction: 0.48)) { bubble.scale = 1 }
@@ -377,9 +380,9 @@ final class BubbleController {
             window.orderOut(nil)
             return
         }
-        guard var goo = bubble.goo else { return endGoo(after: 0) }
-        goo.mode = .cancel(start: Date(), from: goo.drop, progress: goo.progress)
-        bubble.goo = goo
+        guard var state = goo.state else { return endGoo(after: 0) }
+        state.mode = .cancel(start: Date(), from: state.drop, progress: state.progress)
+        goo.state = state
         endGoo(after: Goo.cancelDuration)
     }
 
@@ -393,10 +396,10 @@ final class BubbleController {
             .integral
         let panel = gooWindow ?? makeGooWindow()
         // Couleur relue à chaque goutte : le fond des réglages a pu changer.
-        (panel.contentView as? NSHostingView<GooView>)?.rootView = GooView(bubble: bubble, color: prefs.panelColor)
+        (panel.contentView as? NSHostingView<GooView>)?.rootView = GooView(goo: goo, color: prefs.panelColor)
         panel.setFrame(frame, display: false)
         gooFrame = frame
-        bubble.goo = state(GooCoordinates(frame))
+        goo.state = state(GooCoordinates(frame))
         if let notch = notchWindow(), notch.isVisible {
             panel.order(.below, relativeTo: notch.windowNumber)
         } else {
@@ -410,7 +413,7 @@ final class BubbleController {
         Self.configure(panel)
         panel.ignoresMouseEvents = true
         panel.sharingType = window.sharingType
-        let hosting = NSHostingView(rootView: GooView(bubble: bubble, color: prefs.panelColor))
+        let hosting = NSHostingView(rootView: GooView(goo: goo, color: prefs.panelColor))
         hosting.sizingOptions = []
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
@@ -427,7 +430,7 @@ final class BubbleController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
                 guard let self, self.gooGeneration == generation else { return }
                 self.gooWindow?.orderOut(nil)
-                self.bubble.goo = nil
+                self.goo.state = nil
             }
         }
     }
@@ -443,9 +446,11 @@ final class BubbleController {
     /// Fenêtre ajustée à la bulle, centrée sur `center`.
     private func fitWindowToBubble() {
         let size = Self.bubbleWindowSize
-        window.setFrame(NSRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width,
-                               height: size.height), display: true)
         bubble.layout(center: CGPoint(x: size.width / 2, y: size.height / 2), window: size)
+        // Fenêtre et contenu changent ensemble à l'image suivante : la bulle ne saute pas d'une image.
+        window.disableScreenUpdatesUntilFlush()
+        window.setFrame(NSRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width,
+                               height: size.height), display: false)
     }
 
     private func moveWindow() {
@@ -557,7 +562,8 @@ final class BubbleController {
             .visibleFrame ?? CGRect(origin: .zero, size: size)
         let frame = BubbleGeometry.panelFrame(size: size, bubble: center, visible: visible)
         bubble.layout(center: CGPoint(x: center.x - frame.minX, y: frame.maxY - center.y), window: frame.size)
-        window.setFrame(frame, display: true)
+        window.disableScreenUpdatesUntilFlush()
+        window.setFrame(frame, display: false)
         apply(.open)
         registry.setPanelOpen(true)
         haptic(.alignment)
@@ -609,7 +615,8 @@ final class BubbleController {
         frame.origin.y += frame.height - height
         frame.size.height = height
         bubble.layout(center: CGPoint(x: center.x - frame.minX, y: frame.maxY - center.y), window: frame.size)
-        window.setFrame(frame, display: true)
+        window.disableScreenUpdatesUntilFlush()
+        window.setFrame(frame, display: false)
     }
 
     private var panelRect: CGRect {

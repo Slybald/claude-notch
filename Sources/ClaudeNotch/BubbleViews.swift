@@ -18,8 +18,6 @@ final class BubbleModel: ObservableObject {
     @Published var scale: CGFloat = 1
     /// « Réduire les animations » : bulle à demi transparente qui suit la souris avant le décollage.
     @Published var ghost = false
-    /// Goutte en cours (fenêtre de la goutte) ; nil = rien à dessiner.
-    @Published var goo: GooState?
 
     func layout(center: CGPoint, window: CGSize) {
         if centerInWindow != center { centerInWindow = center }
@@ -107,13 +105,19 @@ struct DetachGrip: View {
 
 // MARK: - Goutte
 
+/// Goutte en cours (fenêtre de la goutte) ; à part de `BubbleModel` : la bulle ne se redessine pas à chaque mouvement.
+final class GooModel: ObservableObject {
+    /// nil = rien à dessiner.
+    @Published var state: GooState?
+}
+
 /// Fenêtre de la goutte : redessinée à chaque image tant qu'une animation est en cours, rien sinon.
 struct GooView: View {
-    @ObservedObject var bubble: BubbleModel
+    @ObservedObject var goo: GooModel
     let color: Color
 
     var body: some View {
-        if let goo = bubble.goo {
+        if let goo = goo.state {
             TimelineView(.animation) { timeline in
                 GooCanvas(shapes: goo.shapes(at: timeline.date), color: color)
             }

@@ -164,6 +164,10 @@ Open **…** › **Settings…** (⌘,).
   motion" on in macOS, the animations become a simple fade.
 - **Screen**: the built-in display (the default), the main display, the display under the mouse, or a display
   picked by name. A screen without a notch gets a virtual one at the top center.
+- **Bubble**: hold the bottom right corner of the open panel and drag, and the notch peels off into a bubble you can put
+  anywhere, its tabs in a revolver cylinder (scroll or click to turn, click the centre to open). Bring it back under the
+  notch, double-click its edge or choose **Reattach to Notch**. It can be turned off, and can return to the notch at
+  each relaunch.
 - **Privacy**: hide the notch from screenshots and screen sharing. This depends on the app that captures the screen.
 - **Profile**: **Change Profile…** starts you from a profile (Developer, Student, Creative or Minimal): it shows
   the tabs it will show and hide, the opening mode and the ears, and changes nothing until you confirm. Your tab
@@ -656,6 +660,10 @@ Ouvre **…** › **Réglages…** (⌘,).
   animations. Avec « Réduire les animations » activé dans macOS, les animations deviennent un simple fondu.
 - **Écran** : l'écran intégré (par défaut), l'écran principal, l'écran sous la souris, ou un écran choisi par son
   nom. Un écran sans encoche reçoit une encoche virtuelle en haut au centre.
+- **Bulle** : maintiens l'angle en bas à droite du panneau ouvert puis glisse, et la notch se décolle en une bulle à
+  poser où tu veux, ses onglets en barillet de revolver (molette ou clic pour tourner, clic au centre pour ouvrir).
+  Ramène-la sous la notch, double-clique sur son bord ou choisis **Rattacher à la notch**. Désactivable, et elle peut
+  revenir dans la notch à chaque lancement.
 - **Confidentialité** : masquer la notch des captures d'écran et du partage d'écran. Cela dépend de l'app qui capture
   l'écran.
 - **Profil** : **Changer de profil…** te fait partir d'un profil (Développeur, Étudiant, Créatif ou Minimal) : la
