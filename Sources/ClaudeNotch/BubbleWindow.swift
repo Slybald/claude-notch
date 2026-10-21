@@ -556,15 +556,17 @@ final class BubbleController {
     // MARK: - Panneau de la bulle
 
     /// La bulle s'ouvre en panneau sur l'onglet du haut (ou `tab`, clic sur un intercalaire).
-    func open(tab: String? = nil, keyboard: Bool = false) {
+    /// `staysOpen` : reste ouvert quand la souris est ailleurs, sans prendre le clavier (carte d'approbation).
+    func open(tab: String? = nil, keyboard: Bool = false, staysOpen: Bool = false) {
         if let tab, registry.isEnabled(tab) { model.selectedTab = tab }
+        if model.bubble == .bubblePanel, staysOpen { openedByKeyboard = true }
         guard model.bubble == .bubble else { return }
         cancelMove()
         if !registry.enabled.contains(where: { $0.id == model.selectedTab }), let first = registry.enabled.first {
             model.selectedTab = first.id
         }
         cancelShrink()
-        openedByKeyboard = keyboard
+        openedByKeyboard = keyboard || staysOpen
         let margin = BubbleGeometry.panelMargin
         let size = CGSize(width: prefs.expandedWidth(compact: false) + 2 * margin,
                           height: (panelHeight ?? ExpandedPanel.maxPanelHeight) + 2 * margin)

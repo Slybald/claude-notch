@@ -184,6 +184,9 @@ final class NotchController {
             self?.collapse()
         }
         codex.openSettings = { [weak self] in self?.openSettings() }
+        ApprovalQueue.shared.attach([.claude(claude), .codex(codex)]) { [weak self] tab in
+            self?.revealApproval(tab: tab)
+        }
         let root = NotchRootView(model: model, store: store, registry: registry, prefs: prefs, actions: actions)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.sizingOptions = []
@@ -253,6 +256,7 @@ final class NotchController {
             "editingTabs": model.isEditingTabs,
             "hotKeys": [prefs.toggleHotKey.rawValue, prefs.hideHotKey.rawValue],
             "hotKeysUnavailable": HotKeyCenter.shared.unavailable.map { $0.rawValue }.sorted(),
+            "approvalKeys": ApprovalQueue.shared.debugInfo,
             "panelWidth": prefs.expandedWidth(compact: false),
             "background": prefs.panelBackground.rawValue,
             "reduceMotion": model.reduceMotion,
@@ -959,6 +963,22 @@ final class NotchController {
         expand()
         openedByKeyboard = true
         NotchKeyboard.take()
+    }
+
+    /// Premier appui de « Approuver au clavier » quand la carte n'est pas à l'écran : on la montre, sans rien décider
+    /// et sans prendre le clavier (la frappe en cours continue d'aller à l'app de devant). Ouvert ainsi, le panneau
+    /// reste jusqu'à un clic à l'extérieur.
+    private func revealApproval(tab: String) {
+        // Notch détachée : la carte s'ouvre dans la bulle, qui reste ouverte comme le panneau ci-dessous.
+        if model.bubble.isDetached { return bubble.open(tab: tab, staysOpen: true) }
+        if model.isExpanded {
+            model.selectedTab = tab
+            return
+        }
+        showOnDemand()
+        if prefs.screenChoice == ScreenChoice.mouse { updateGeometry() }
+        expand(tab: tab)
+        openedByKeyboard = true
     }
 
     /// Mode édition des onglets : le panneau prend le clavier pour qu'Échap en sorte (un champ de texte rend la main),

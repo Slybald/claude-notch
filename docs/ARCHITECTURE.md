@@ -52,6 +52,7 @@ organised and why some choices were made, so they are not undone by accident.
   per module:
   - `Claude/`: sessions, compact summary, Claude settings. `ReplyCenter` holds the long requests of `/permission`
     and `/inbox` (one waiter per session, FIFO queue of messages); `ReplyViews` draws the cards;
+    `ApprovalQueue` (approve with the keyboard, see below) and `ApprovalViews` (key caps, rank, settings row);
     `ConversationViews` draws the conversation of a session (last lines, message field, or "Answer in *app*" +
     **Open**) and the card that proposes to turn replies on.
   - `Codex/` (`codex`): `CodexModule` (tab, ears, settings, `CodexRelay` for the server), `CodexStore` (per-session state
@@ -350,6 +351,25 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   script compares it with shell builtins (never in argv) and ignores any answer without it: a program bound to
   the port while the app is closed (any account can bind 47823) gets the request but decides nothing. While
   the app runs, nobody else can bind the port (checked, even with `SO_REUSEPORT`).
+- **Approve with the keyboard** (`ApprovalQueue`, `claude.approveByKeyboard`, off by default): ⌃⌥Y allows, ⌃⌥N denies the
+  oldest keyable request of both agents (`ApprovalSource.claude` / `.codex`: tool permissions only; questions and plans
+  need a choice or a text and stay with the mouse). Carbon `RegisterEventHotKey` again (no Accessibility), through the
+  `HotKeyRegistering` protocol so tests use a double. Why this shape: a reflex must not allow a command nobody read.
+  - The combinations are registered only while the queue is not empty (and the setting is on), then released: nothing is
+    reserved the rest of the time. A combination macOS refuses (`approveLive`/`denyLive`) shows no key cap.
+  - A key decides only if the **head** card is on screen (`cardAppeared`/`cardDisappeared` from the cards' `onAppear`/
+    `onDisappear`; the panel content is removed when it collapses, and only the selected tab is in the tree) and has been
+    for `guardDelay` (1 s) *since it became the head while visible* (`armed`). Otherwise the first press only calls
+    `reveal(tab)` (`NotchController.revealApproval`: opens the panel on that tab or switches tab, `openedByKeyboard` so
+    it stays up, no `NotchKeyboard.take()`: the typing in the front app is not captured). It decides nothing.
+  - One at a time: `armed` is cleared before `decide`, and the next head re-arms from the moment it becomes the head,
+    even if its card was already visible. A head settled elsewhere between two presses does the same: a press aimed at
+    the old card never settles the new one. Decisions go through `ClaudeModule.decide` / `CodexModule.decide`, the same
+    as a click (`.deny("")` = the default message, `Decision.deny` for Codex): deadlines, "first answer wins" and the
+    output format are unchanged; still no "always allow".
+  - Not done: the automatic drawer of the idea (the notch opening by itself on a request) and the "smart suppress" when
+    the session's terminal is in front; both touch `NotchViews`/`NotchController` more and are left for later.
+  - Known limits: a card scrolled out of a long list still counts as on screen; tab editing mode (cards dimmed) too.
 - **Notch keyboard**: the panel never activates the app; it becomes key only for a text field
   (`NotchKeyboard.take`) and gives the keyboard back with `orderOut` + `orderFrontRegardless` when the field
   closes or the panel collapses, otherwise the next keystrokes would be swallowed by the hidden panel.

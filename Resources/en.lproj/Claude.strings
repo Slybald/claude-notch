@@ -65,3 +65,7 @@
 "Autorise une action, réponds à une question ou écris à Claude depuis ici. Rien ne part sans ton clic ; le terminal ou Claude Desktop gardent toujours la main." = "Allow an action, answer a question or write to Claude from here. Nothing is sent without your click; the terminal or Claude Desktop always keep control.";
 "Activer" = "Turn On";
 "Plus tard" = "Later";
+"1 sur %d" = "1 of %d";
+"Approuver au clavier" = "Approve with the keyboard";
+"⌃⌥Y autorise et ⌃⌥N refuse la plus ancienne demande, Claude et Codex ensemble. Une touche ne décide que si sa carte est ouverte dans la notch depuis plus d'une seconde ; sinon le premier appui montre la carte." = "⌃⌥Y allows and ⌃⌥N denies the oldest request, Claude and Codex together. A key only decides if its card has been open in the notch for more than a second; otherwise the first press shows the card.";
+"Ces touches ne sont prises que tant qu'une demande attend. Une demande à la fois, jamais de « toujours autoriser »." = "These keys are only taken while a request is waiting. One request at a time, never \"always allow\".";
