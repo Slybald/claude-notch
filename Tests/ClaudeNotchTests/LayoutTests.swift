@@ -43,13 +43,18 @@ final class LayoutTests: XCTestCase {
     }
 
     /// Survoler un onglet l'ouvre : les onglets ne doivent pas bouger, sinon un autre glisse sous la souris et
-    /// s'ouvre à son tour sans que l'utilisateur ait bougé.
+    /// s'ouvre à son tour sans que l'utilisateur ait bougé. Le mode édition n'y change rien : « + » vient après.
     func testTabPositionsDoNotDependOnSelection() {
         let modules: [any NotchModule] = [FakeModule(id: "a"), FakeModule(id: "un titre assez long"), FakeModule(id: "c")]
-        let widths = modules.map { module in
-            NSHostingView(rootView: NotchTabBar(modules: modules, selection: .constant(module.id))).fittingSize.width
+        let registry = ModuleRegistry(modules: modules, prefs: Preferences(defaults: makeEphemeralDefaults(self)))
+        func width(_ selection: String, editing: Bool) -> CGFloat {
+            NSHostingView(rootView: NotchTabBar(registry: registry, selection: .constant(selection),
+                                                editing: .constant(editing))).fittingSize.width
         }
+        let widths = modules.map { width($0.id, editing: false) }
         XCTAssertEqual(Set(widths).count, 1, "largeur de la barre selon l'onglet actif : \(widths)")
+        XCTAssertEqual(width("a", editing: true), widths[0] + NotchTabBar.spacing + NotchTabBar.tabWidth,
+                       "mode édition : mêmes onglets, « + » en bout de barre")
     }
 
     /// Taille du panneau choisie dans les réglages, et plein écran « normal » qui la garde.

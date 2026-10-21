@@ -55,8 +55,10 @@ Interface available in English and French (follows the system language). Screens
 
 The expanded notch is a row of tabs. Click a tab, or hover it for a moment. All tabs are on by default, except Claude
 when Claude Code is not found on the Mac. In **Settings › Tabs** you can hide a tab (a hidden tab does no work),
-change the order, or pick the tab that opens by default. The panel reopens on the last tab you used, or on Claude
-when a session needs you.
+change the order, or pick the tab that opens by default. You can also do it in the notch, like apps on an iPhone:
+press and hold the tab bar, then drag the icons, hide a tab with **−** or bring one back with **+**, and click **Done**
+(or press Esc, or click outside the bar). The panel reopens on the last tab you used, or on Claude when a session
+needs you.
 
 - **Claude**: your sessions, with their state, permissions, questions and plans. Optional: on first launch it is
   on only if Claude Code is found on the Mac (`~/.claude` or `$CLAUDE_CONFIG_DIR`). Off, nothing Claude-related
@@ -455,8 +457,10 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 
 La notch déployée est une rangée d'onglets. Clique sur un onglet, ou survole-le un instant. Tous les onglets sont
 activés par défaut, sauf Claude si Claude Code n'est pas sur le Mac. Dans **Réglages › Onglets**, tu peux masquer
-un onglet (un onglet masqué ne fait aucun travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Le panneau se rouvre sur le dernier onglet
-utilisé, ou sur Claude quand une session a besoin de toi.
+un onglet (un onglet masqué ne fait aucun travail), changer leur ordre ou choisir celui qui s'ouvre par défaut. Tu
+peux aussi le faire dans la notch, comme les apps sur iPhone : appui long sur la barre d'onglets, puis glisse les
+icônes, masque un onglet avec **−** ou remets-en un avec **+**, et clique sur **OK** (ou Échap, ou un clic hors de la
+barre). Le panneau se rouvre sur le dernier onglet utilisé, ou sur Claude quand une session a besoin de toi.
 
 - **Claude** : tes sessions, avec leur état, leurs permissions, leurs questions et leurs plans. En option : au
   premier lancement, il n'est activé que si Claude Code est sur le Mac (`~/.claude` ou `$CLAUDE_CONFIG_DIR`).
