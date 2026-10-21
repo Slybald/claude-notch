@@ -75,7 +75,7 @@ export const DURATION4 = Math.round(v4Of(T.loopEnd) * FPS2);
 /** Plan de caméra (temps de la v3) : échelle, point visé en pt du panneau ; `x: "cursor"` vise la prochaine arrivée du curseur. */
 type Shot = { at: number; s: number; x: number | "cursor"; y: number };
 const SHOTS: Shot[] = [
-  { at: 0, s: 1.8, x: 322, y: 8 }, // accroche : la notch en gros plan
+  { at: 0, s: 2.4, x: 322, y: 8 }, // accroche : la notch en gros plan
   { at: 0.25, s: 1.6, x: "cursor", y: 20 }, // le curseur survole l'intercalaire
   { at: 1.05, s: 1.15, x: 322, y: 120 }, // le panneau s'ouvre : recul pour révéler
   { at: 1.5, s: 1.45, x: "cursor", y: 150 }, // pause
@@ -112,19 +112,22 @@ type Target = { at4: number; s: number; x: number; y: number };
 
 function targetsFor(format: Format3, L: Layout3, keys: Key[]): Target[] {
   const left = L.cx - (644 * L.S) / 2;
-  const k = format === "wide" ? 1 : 0.75; // en 9:16 le panneau remplit déjà la largeur
-  const out = SHOTS.map((c) => {
+  // En 9:16 le panneau remplit déjà la largeur : poussées réduites (sauf l'accroche sur la notch repliée).
+  const k = (i: number) => (format === "wide" || i < 2 ? 1 : 0.3);
+  const out = SHOTS.map((c, i) => {
     const next = keys.find((q) => q.arrive >= c.at) ?? keys[keys.length - 1];
-    return { at4: v4Of(c.at), s: 1 + (c.s - 1) * k, x: c.x === "cursor" ? next.x : left + c.x * L.S, y: c.y * L.S };
+    return { at4: v4Of(c.at), s: 1 + (c.s - 1) * k(i), x: c.x === "cursor" ? next.x : left + c.x * L.S, y: c.y * L.S };
   });
   // Assistant : poussée vers le profil choisi, puis plan large pour la carte du nom.
   const wl = L.cx - (WINDOW_W * L.win.S) / 2;
-  out.push({ at4: v4Of(24.0), s: 1 + 0.25 * k, x: wl + 328 * L.win.S, y: L.win.top + 270 * L.win.S });
+  out.push({ at4: v4Of(24.0), s: 1 + 0.25 * k(99), x: wl + 328 * L.win.S, y: L.win.top + 270 * L.win.S });
   out.push({ at4: v4Of(24.85), s: 1, x: L.cx, y: L.h / 2 });
   return out;
 }
 
 function cameraAt(t4: number, L: Layout3, tg: Target[]): Cam {
+  const panelL = L.cx - (644 * L.S) / 2;
+  const panelR = L.cx + (644 * L.S) / 2;
   let { s, x, y } = tg[0];
   for (let i = 1; i < tg.length; i++) {
     const p = spring({ frame: (t4 - tg[i].at4) * FPS2, fps: FPS2, config: CAM });
@@ -134,8 +137,13 @@ function cameraAt(t4: number, L: Layout3, tg: Target[]): Cam {
   }
   // Le point visé va au centre (un peu au-dessus en hauteur), sans jamais montrer le bord de la scène :
   // la notch reste accrochée au haut du cadre tant que la caméra vise haut.
+  // Tant que le panneau est ouvert, ses bords latéraux bornent le cadrage (aucun vide à côté d'un gros plan).
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-  return { s, tx: clamp(L.w / 2 - x * s, L.w - L.w * s, 0), ty: clamp(L.h * 0.42 - y * s, L.h - L.h * s, 0) };
+  const free = L.w / 2 - x * s;
+  const onStage = clamp(free, L.w - L.w * s, 0);
+  const onPanel = (panelR - panelL) * s >= L.w ? clamp(free, L.w - panelR * s, -panelL * s) : L.w / 2 - L.cx * s;
+  const k = smoothstep(v4Of(T.collapse - 0.1), v4Of(T.collapse + 0.4), t4);
+  return { s, tx: onPanel + (onStage - onPanel) * k, ty: clamp(L.h * 0.42 - y * s, L.h - L.h * s, 0) };
 }
 
 // ─────────────────────────────── Flou de vitesse ───────────────────────────────
