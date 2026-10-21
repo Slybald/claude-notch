@@ -296,24 +296,51 @@ final class ClaudeHookScriptTests: XCTestCase {
         XCTAssertEqual(hook.stderr, "Après la relance")
     }
 
+    /// `date` et `sleep` factices en tête du PATH du script, qui compte en secondes entières et dort pour de vrai :
+    /// ici chaque `sleep` revient tout de suite et avance l'horloge d'une seconde, donc le test ne mesure plus de durée.
+    private struct FakeClock {
+        let path: String
+        private let log: URL
+
+        init(in directory: URL) throws {
+            let bin = directory.appendingPathComponent("fake-bin")
+            log = directory.appendingPathComponent("fake-sleeps")
+            try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: log.path, contents: nil)
+            let scripts = ["sleep": "echo \"$1\" >> '\(log.path)'",
+                           "date": "echo $((1000 + $(wc -l < '\(log.path)')))"]
+            for (name, body) in scripts {
+                let file = bin.appendingPathComponent(name)
+                try "#!/bin/sh\n\(body)\n".write(to: file, atomically: true, encoding: .utf8)
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+            }
+            path = "\(bin.path):/usr/bin:/bin"
+        }
+
+        /// Arguments des `sleep` demandés par le script, dans l'ordre.
+        var sleeps: [String] {
+            ((try? String(contentsOf: log, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+        }
+    }
+
     /// L'app ne revient pas : le script abandonne après le délai (0, rien sur stderr), sans bloquer Claude.
     func testInboxGivesUpWhenTheAppDoesNotComeBack() throws {
         let fixture = try ReplyServerFixture(self)
-        let hook = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "2"])
+        let clock = try FakeClock(in: fixture.home)
+        let hook = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "2", "PATH": clock.path])
         XCTAssertTrue(spin { fixture.replies.waiting == ["s1"] })
         fixture.server.stop()
         XCTAssertTrue(hook.finish(timeout: 12))
         XCTAssertEqual(hook.status, 0)
         XCTAssertEqual(hook.stderr, "")
-        // Le script compte en secondes entières (`date +%s`) : avec 2 s de délai, il attend entre 1 et 2 s selon l'instant
-        // où la connexion tombe. Au moins une pause d'une seconde : il a bien attendu le retour de l'app.
-        XCTAssertGreaterThan(hook.duration, 1, "il a attendu le retour de l'app")
+        // Délai de 2 s sur l'horloge factice : deux pauses d'une seconde (il a attendu le retour de l'app), puis il abandonne.
+        XCTAssertEqual(clock.sleeps, ["1", "1"])
 
         // App déjà arrêtée au départ : pas de nouvelle tentative, la session n'attend rien.
-        let absent = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "30"])
+        let absent = try run("inbox", stop, fixture, environment: ["CLAUDE_NOTCH_RETRY": "30", "PATH": clock.path])
         XCTAssertTrue(absent.finish(timeout: 5))
         XCTAssertEqual(absent.status, 0)
-        XCTAssertLessThan(absent.duration, 2)
+        XCTAssertEqual(clock.sleeps.count, 2, "aucune pause de plus")
     }
 
     /// Une décision de permission n'est jamais rejouée : app arrêtée pendant la demande, le terminal garde la main.

@@ -130,15 +130,23 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         return nil
     }
 
+    /// La commande réelle crée ses fichiers de travail dans /tmp/claude-notch.XXXXXX, partagé entre tests en parallèle :
+    /// ici le modèle pointe vers un dossier propre au test, et `workFiles()` ne compte que ce qui s'y trouve.
+    private var work: URL!
+
+    override func setUpWithError() throws { work = try makeTemporaryDirectory(self) }
+
     private func shell(_ command: String) throws -> SystemProcess.Output {
-        try XCTUnwrap(SystemProcess.run("/bin/sh", ["-c", command], timeout: 10))
+        let isolated = command.replacingOccurrences(of: LowPowerAuthorization.workFileTemplate,
+                                                    with: work.appendingPathComponent("claude-notch.XXXXXX").path)
+        return try XCTUnwrap(SystemProcess.run("/bin/sh", ["-c", isolated], timeout: 10))
     }
 
     private func text(_ data: Data) -> String { String(decoding: data, as: UTF8.self) }
 
-    /// Les fichiers de travail de root restés dans /tmp (une commande qui ne nettoie pas en laisserait un).
+    /// Les fichiers de travail restés dans le dossier du test (une commande qui ne nettoie pas en laisserait un).
     private func workFiles() -> Set<String> {
-        Set(((try? FileManager.default.contentsOfDirectory(atPath: "/tmp")) ?? []).filter { $0.hasPrefix("claude-notch.") })
+        Set(((try? FileManager.default.contentsOfDirectory(atPath: work.path)) ?? []).filter { $0.hasPrefix("claude-notch.") })
     }
 
     /// Un dossier d'essai au nom hostile (espace, apostrophe, accent), supprimé en fin de test.
@@ -159,6 +167,7 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         let visudoStep = "\(LowPowerAuthorization.visudoPath) -cf \"$T\""
         XCTAssertTrue(real.contains(installStep))
         XCTAssertTrue(real.contains(visudoStep))
+        XCTAssertTrue(real.contains(LowPowerAuthorization.workFileTemplate), "le fichier de travail est redirigé vers le dossier du test")
         var dry = real.replacingOccurrences(of: installStep, with: install)
         if let visudo { dry = dry.replacingOccurrences(of: visudoStep, with: visudo) }
         XCTAssertFalse(dry.contains(LowPowerAuthorization.installPath), "l'installation réelle est retirée")
@@ -422,7 +431,7 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
     /// Les fichiers que l'app laisserait dans le dossier temporaire de l'utilisateur : il ne doit y en avoir aucun.
     private func userTemporaryFiles() -> Set<String> {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: NSTemporaryDirectory())) ?? []
-        return Set(names.filter { $0.hasPrefix("claude-notch") })
+        return Set(names.filter { $0.hasPrefix("claude-notch.") })
     }
 
     func testInstallRunsOneAdministratorScriptAndLeavesNoUserFile() throws {
@@ -554,6 +563,7 @@ final class QuickSettingsAuthorizationTests: XCTestCase {
         let pmset = LowPowerAuthorization.pmsetShellCommand(lowPower: true)
         let installStep = "\(LowPowerAuthorization.installPath) -m 0440 -o root -g wheel \"$T\" \(LowPowerAuthorization.rulePath)"
         XCTAssertTrue(real.hasPrefix(pmset))
+        XCTAssertTrue(real.contains(LowPowerAuthorization.workFileTemplate), "le fichier de travail est redirigé vers le dossier du test")
         let before = workFiles()
         for (toggle, install, expected) in [("true", "true", Int32(0)), ("true", "false", 0), ("(exit 3)", "true", 3)] {
             let dry = real.replacingOccurrences(of: pmset, with: toggle).replacingOccurrences(of: installStep, with: install)

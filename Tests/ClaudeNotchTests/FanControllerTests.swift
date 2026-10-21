@@ -11,17 +11,25 @@ final class FanControllerTests: XCTestCase {
     private var defaults: UserDefaults!
     private var workspace: NotificationCenter!
     private var issues: [QuickSettingsIssue] = []
+    /// Minuteurs créés par le contrôleur : jamais planifiés, le test les déclenche à la main (aucune attente réelle).
+    private var timers: [Timer] = []
 
     override func setUp() {
         backend = QSFakeFans()
         defaults = makeEphemeralDefaults(self)
         workspace = NotificationCenter()
         issues = []
+        timers = []
     }
 
     private func controller(readInterval: TimeInterval = 60, heartbeat: TimeInterval = 60) -> FanController {
         let fans = FanController(backend: backend, defaults: defaults, readInterval: readInterval,
-                                 heartbeatInterval: heartbeat, workspace: workspace)
+                                 heartbeatInterval: heartbeat, workspace: workspace,
+                                 makeTimer: { [weak self] interval, _, fire in
+                                     let timer = Timer(timeInterval: interval, repeats: true) { _ in fire() }
+                                     self?.timers.append(timer)
+                                     return timer
+                                 })
         fans.report = { [weak self] in self?.issues.append($0) }
         return fans
     }
@@ -37,20 +45,21 @@ final class FanControllerTests: XCTestCase {
 
     // MARK: - Lecture
 
-    func testReadsOnlyWhileTheTabIsVisible() {
-        let fans = controller(readInterval: 0.02)
+    func testReadsOnlyWhileTheTabIsVisible() throws {
+        let fans = controller(readInterval: 2)
         fans.start()
         XCTAssertEqual(backend.reads, 0, "rien avant l'affichage de l'onglet")
+        XCTAssertTrue(timers.isEmpty)
         XCTAssertNil(fans.status)
         fans.viewAppeared()
         XCTAssertEqual(backend.reads, 1)
         XCTAssertEqual(fans.status, QSFakeFans.macBookPro())
-        QuickSettingsFixture.settle(0.1)
-        XCTAssertGreaterThan(backend.reads, 2, "rafraîchi tant que l'onglet est affiché")
+        let timer = try XCTUnwrap(timers.first)
+        XCTAssertEqual(timers.count, 1)
+        XCTAssertEqual(timer.timeInterval, 2)
+        for tick in 1...3 { timer.fire(); XCTAssertEqual(backend.reads, 1 + tick, "rafraîchi à chaque top tant que l'onglet est affiché") }
         fans.viewDisappeared()
-        let reads = backend.reads
-        QuickSettingsFixture.settle(0.1)
-        XCTAssertEqual(backend.reads, reads, "plus rien onglet masqué (panneau replié)")
+        XCTAssertFalse(timer.isValid, "plus rien onglet masqué (panneau replié)")
     }
 
     /// Mac sans ventilateur : pas de statut, donc pas de carte ni de vitesse fixe.
@@ -247,16 +256,16 @@ final class FanControllerTests: XCTestCase {
     }
 
     /// Le bail : un `ping` régulier tant que la vitesse fixe tient, plus rien ensuite.
-    func testHeartbeatKeepsTheLeaseAlive() {
-        let fans = controller(heartbeat: 0.02)
+    func testHeartbeatKeepsTheLeaseAlive() throws {
+        let fans = controller(heartbeat: 10)
         fans.viewAppeared()
         fans.setFixed(rpm: 4000)
-        QuickSettingsFixture.settle(0.1)
-        XCTAssertGreaterThan(backend.sent.filter { $0 == "ping" }.count, 1)
+        let heartbeat = try XCTUnwrap(timers.last)
+        XCTAssertEqual(heartbeat.timeInterval, 10)
+        XCTAssertEqual(backend.sent.filter { $0 == "ping" }.count, 0, "rien avant le premier top")
+        for tick in 1...3 { heartbeat.fire(); XCTAssertEqual(backend.sent.filter { $0 == "ping" }.count, tick) }
         fans.returnToAutomatic()
-        let count = backend.sent.count
-        QuickSettingsFixture.settle(0.1)
-        XCTAssertEqual(backend.sent.count, count)
+        XCTAssertFalse(heartbeat.isValid, "plus de ping une fois la main rendue")
     }
 
     /// Le message tardif d'une ancienne tenue ne termine pas la nouvelle.

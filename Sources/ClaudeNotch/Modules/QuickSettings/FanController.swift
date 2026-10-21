@@ -35,6 +35,7 @@ final class FanController: ObservableObject {
     private let readInterval: TimeInterval
     private let heartbeatInterval: TimeInterval
     private let workspace: NotificationCenter
+    private let makeTimer: RepeatingTimer
     private var visibleViews = 0
     private var readTimer: Timer?
     private var heartbeat: Timer?
@@ -43,13 +44,25 @@ final class FanController: ObservableObject {
     /// Empêche App Nap de retarder les nouvelles à l'outil (bail de 30 s) ; la veille reste permise.
     private var activity: NSObjectProtocol?
 
+    /// Minuteur répétitif (intervalle, tolérance, action) ; les tests en fournissent un qu'ils déclenchent à la main.
+    typealias RepeatingTimer = (TimeInterval, TimeInterval, @escaping () -> Void) -> Timer
+
+    static let systemTimer: RepeatingTimer = { interval, tolerance, fire in
+        let timer = Timer(timeInterval: interval, repeats: true) { _ in fire() }
+        timer.tolerance = tolerance
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
+    }
+
     init(backend: FanBackend, defaults: UserDefaults, readInterval: TimeInterval = 2, heartbeatInterval: TimeInterval = 10,
-         workspace: NotificationCenter = NSWorkspace.shared.notificationCenter) {
+         workspace: NotificationCenter = NSWorkspace.shared.notificationCenter,
+         makeTimer: @escaping RepeatingTimer = FanController.systemTimer) {
         self.backend = backend
         self.defaults = defaults
         self.readInterval = readInterval
         self.heartbeatInterval = heartbeatInterval
         self.workspace = workspace
+        self.makeTimer = makeTimer
     }
 
     deinit {
@@ -97,10 +110,7 @@ final class FanController: ObservableObject {
         refreshAuthorization()
         guard readTimer == nil else { return }
         read()
-        let timer = Timer(timeInterval: readInterval, repeats: true) { [weak self] _ in self?.read() }
-        timer.tolerance = readInterval / 4
-        RunLoop.main.add(timer, forMode: .common)
-        readTimer = timer
+        readTimer = makeTimer(readInterval, readInterval / 4) { [weak self] in self?.read() }
     }
 
     func viewDisappeared() {
@@ -254,10 +264,7 @@ final class FanController: ObservableObject {
 
     private func startHeartbeat() {
         heartbeat?.invalidate()
-        let timer = Timer(timeInterval: heartbeatInterval, repeats: true) { [weak self] _ in self?.backend.send("ping") }
-        timer.tolerance = 1
-        RunLoop.main.add(timer, forMode: .common)
-        heartbeat = timer
+        heartbeat = makeTimer(heartbeatInterval, 1) { [weak self] in self?.backend.send("ping") }
     }
 
     /// Veille et changement de session (fermeture, autre utilisateur) : la main revient à macOS.
