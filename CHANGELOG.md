@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Two optional tabs, **off by default** (turn them on in Settings › Tabs or by editing the tabs in the notch):
+  **Messages** shows your recent iMessage and SMS conversations with an unread badge on the collapsed notch and a quick
+  reply; **Mail** shows the unread count of Apple Mail and the latest unread messages, and opens one on click.
+  Messages needs Full Disk Access (macOS has no dialog for it: the tab explains it and links to System Settings),
+  Contacts for names, and Automation to reply. Mail needs Automation and is never launched by Claude Notch. Nothing
+  is stored or sent outside the Mac, and no permission is asked before you open the tab. Feasibility, measures and
+  limits: [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
 - Profiles: Developer, Student, Creative and Minimal. A profile is a starting point (which tabs, in which order, how
   the panel opens, the ears) inside the same app: one update, one signature. The first step of the setup assistant
   offers them (optional, nothing changes without a choice), and **Settings › General › Change Profile…** shows what a

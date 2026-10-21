@@ -12,6 +12,8 @@ extension ModuleRegistry {
             ClipboardModule(),
             TimerModule(),
             NotesModule(),
+            MessagesModule(),
+            MailModule(),
         ]
     }
 }

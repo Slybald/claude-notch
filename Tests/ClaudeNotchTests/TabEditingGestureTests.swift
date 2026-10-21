@@ -254,6 +254,9 @@ final class TabEditingGestureTests: XCTestCase {
     /// par un clic. Pendant le suivi du menu (boucle bloquante), un minuteur relève les éléments, en choisit un et
     /// ferme le menu ; l'onglet choisi revient en bout de barre.
     func testPlusMenuListsHiddenTabs() throws {
+        // Messages et Mail sont masqués au départ : on les affiche pour partir de « rien de masqué ».
+        ["messages", "mail"].forEach { notch.registry.showTab($0) }
+        wait(0.5)
         longPress(tabCenter(0))
         // Le « … » disparaît avec la transition d'entrée : il ne reste que le « + ».
         let deadline = Date().addingTimeInterval(2)

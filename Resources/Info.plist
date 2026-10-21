@@ -37,6 +37,8 @@
 	<string>Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Claude Notch reads your calendars to show your upcoming events in the notch, only if you turn this feature on.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Claude Notch reads your contacts to show their names in the Messages tab, only if you turn this feature on.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Claude Notch runs optional companion tools that read files on your Desktop.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

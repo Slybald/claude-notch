@@ -23,6 +23,8 @@ final class GallerySnapshotTests: XCTestCase {
         try clipboard()
         try timer()
         try notes()
+        try messages()
+        try mail()
         try fullScreenSummaries()
     }
 
@@ -35,6 +37,8 @@ final class GallerySnapshotTests: XCTestCase {
         let modules = ModuleRegistry.standardModules(claude: harness.claude).map { standard in
             replacing.first { $0.id == standard.id } ?? standard
         }
+        // Messages et Mail sont désactivés par défaut : la scène les active pour les mesurer.
+        if ["messages", "mail"].contains(tab) { harness.prefs.tabEnabled[tab] = true }
         let registry = ModuleRegistry(modules: modules, prefs: harness.prefs)
         harness.model.isExpanded = true
         harness.model.isFullScreen = fullScreen
@@ -402,6 +406,71 @@ final class GallerySnapshotTests: XCTestCase {
         }
         rig.clock.now = Date(timeIntervalSince1970: now.timeIntervalSince1970.rounded())
         return module
+    }
+
+    /// Messages : liste avec la zone de réponse ouverte (l'état le plus haut), erreur d'envoi, puis chaque accès refusé.
+    private func messages() throws {
+        MessagesFixtures.now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded())
+        func module(_ result: MessagesRead, contacts: ContactsAccess = .granted, rig: inout [MessagesRig]) -> MessagesModule {
+            let fresh = MessagesRig(self)
+            rig.append(fresh)
+            fresh.contacts.access = contacts
+            fresh.contacts.book = MessagesFixtures.book
+            fresh.database.result = result
+            let module = fresh.makeModule()
+            module.start()
+            module.tabAppeared()
+            addTeardownBlock { module.stop() }
+            return module
+        }
+        var rigs: [MessagesRig] = []
+        addTeardownBlock { rigs.removeAll() }
+        let list = module(.snapshot(MessagesFixtures.sample), rig: &rigs)
+        try shoot("messages", "list", list)
+        try settings("messages", list)
+        let hint = module(.snapshot(MessagesFixtures.sample), contacts: .notDetermined, rig: &rigs)
+        try shoot("messages", "contacts-hint", hint)
+        let reply = module(.snapshot(MessagesFixtures.sample), rig: &rigs)
+        reply.select(reply.threads[0].id)
+        reply.draft = "Oui, à 19 h !"
+        rigs.last?.sender.result = .failure(.notAuthorized)
+        reply.sendDraft()
+        try shoot("messages", "reply-denied", reply)
+        try shoot("messages", "empty", module(.snapshot(MessagesSnapshot(rows: [], unread: 0)), rig: &rigs))
+        try shoot("messages", "full-disk-access", module(.unavailable(.needsFullDiskAccess), rig: &rigs))
+        try shoot("messages", "no-database", module(.unavailable(.noDatabase), rig: &rigs))
+        try shoot("messages", "unsupported", module(.unavailable(.unsupported), rig: &rigs))
+    }
+
+    /// Mail : liste, tout lu, puis chaque état où Mail n'est pas lisible (fermé, pas autorisé, refusé, sans compte).
+    private func mail() throws {
+        MessagesFixtures.now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded())
+        var rigs: [MailRig] = []
+        addTeardownBlock { rigs.removeAll() }
+        func module(_ configure: (MailRig) -> Void) -> MailModule {
+            let rig = MailRig(self)
+            rigs.append(rig)
+            rig.runner.repeatLast = true
+            configure(rig)
+            let module = rig.makeModule()
+            module.tabAppeared()
+            module.start()
+            addTeardownBlock { module.stop() }
+            return module
+        }
+        let sample: [(sender: String, subject: String, age: Int, id: String)] = (0..<8).map {
+            ("Expéditeur \($0 + 1) <exp\($0)@example.com>", "Objet du message numéro \($0 + 1), assez long pour être coupé en fin de ligne",
+             300 + $0 * 1_800, "id\($0)@example.com")
+        }
+        let list = module { $0.runner.answers = [.success(MailRig.answer(unread: 21, messages: sample))] }
+        try shoot("mail", "list", list)
+        try settings("mail", list)
+        try shoot("mail", "all-read", module { $0.runner.answers = [.success(MailRig.answer(unread: 0))] })
+        try shoot("mail", "not-running", module { $0.running = false })
+        try shoot("mail", "needs-permission", module { $0.probeStatus = .notDetermined })
+        try shoot("mail", "denied", module { $0.probeStatus = .denied })
+        try shoot("mail", "no-account", module { $0.runner.answers = [.success(MailRig.answer(unread: 0, accounts: 0))] })
+        try shoot("mail", "failed", module { $0.runner.answers = [.failure(.timedOut)] })
     }
 
     private func notes() throws {

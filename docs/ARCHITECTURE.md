@@ -62,6 +62,13 @@ organised and why some choices were made, so they are not undone by accident.
     (sounds and notifications), `ModuleStorage` (`ModuleScheduler` and `SecureJSONFile`, shared with Notes),
     `TimerViews`.
   - `Notes/` (`notes`): `NotesModule` (list, limits, undo, save) and `NotesViews` (plain-text editor).
+  - `Messages/` (`messages`, off by default): `MessagesModule` (state, badge, quick reply), `MessagesBackends`
+    (read-only `chat.db` through `SQLite3`, Contacts, FSEvents watcher, AppleScript sender: all behind protocols),
+    `MessagesModels` (typedstream decoder for `attributedBody`, dates, contact book), `MessagesViews`.
+  - `Mail/` (`mail`, off by default): `MailModule` (state, 2-minute counter poll while Mail runs), `MailModels` (the
+    AppleScript and the parser of its answer), `MailViews`. `AppleEvents.swift` is shared by both: Automation status
+    without a prompt, `osascript` runner with a time limit, System Settings privacy links. See
+    [MESSAGES-MAIL.md](MESSAGES-MAIL.md).
 - `Preferences`: every setting (UserDefaults, observable, values clamped). `SettingsWindow`: the settings
   window (SwiftUI in an `NSWindow`, sidebar) and the main menu (⌘, ⌘W, editing).
 - `NotchShell`: notch rules that do not need a window: visibility (`NotchVisibilityRule`), screen choice and
@@ -79,7 +86,7 @@ organised and why some choices were made, so they are not undone by accident.
 The expanded notch is a row of tabs; each tab is a module. Adding a module means: a folder
 `Sources/ClaudeNotch/Modules/<Name>/`, its string tables `Resources/{en,fr}.lproj/<Name>.strings`, and one line
 in `ModuleRegistry.standardModules`. A module never edits `Info.plist` (the usage descriptions for calendars,
-Apple Events and Bluetooth are already there) nor another module's files.
+Apple Events and Bluetooth are already there; Messages added the one for Contacts) nor another module's files.
 
 - **Contract** (`NotchModule`, an `ObservableObject`): stable `id` (the settings key: never change it), localized
   `title`, SF Symbol `symbol`, `makeView()`. Optional, with defaults: `makeCompactView()` (full-screen summary),
@@ -150,6 +157,12 @@ Apple Events and Bluetooth are already there) nor another module's files.
   settings under `<id>.<name>`. The accent color is read through `Palette.accent`; the notch view is rebuilt
   when it changes. "Reply from the notch" (`claude.replyFromNotch`, off by default): off, the reply hooks get
   an immediate "no decision".
+- **Messages and Mail** (`docs/MESSAGES-MAIL.md`): optional tabs for everyone, off by default, no permission before the
+  tab is opened. They only run collapsed (`keepsRunningWhenCollapsed`) once a first read worked (`<id>.armed`):
+  Messages listens to FSEvents on `chat.db` / `chat.db-wal` (no timer), Mail polls a counter script every 2 minutes
+  only while Mail runs and never launches it (`application id … is not running` guard, checked). Message text and
+  AppleScript arguments never go through string interpolation. Under XCTest the default accesses are inert
+  (`ModuleEnvironment.isTesting`): tests never read real messages or run `osascript` (except the closed-Mail guard).
 - **Localization per table**: `L("…", table: "Media")` or `Text("…", tableName: "Media")`; without a table,
   `Localizable`. `LocalizationTests` checks every table: each key used in the code is translated in its table, no
   unused keys, French identity, same format specifiers, same tables in `en.lproj` and `fr.lproj`.

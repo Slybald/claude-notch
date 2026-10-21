@@ -31,6 +31,8 @@ struct SetupTab: Identifiable, Equatable {
         case "clipboard": return L("Tes dernières copies, à reprendre d'un clic.")
         case "timer": return L("Un minuteur, ou un cycle Pomodoro.")
         case "notes": return L("Des notes en texte brut, toujours à portée.")
+        case "messages": return L("Tes conversations récentes et une réponse rapide.")
+        case "mail": return L("Tes messages non lus d'Apple Mail.")
         default: return ""
         }
     }

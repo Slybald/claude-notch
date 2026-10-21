@@ -6,7 +6,10 @@ import XCTest
 /// Assistant de configuration : les choix, les étapes et leur écriture dans les réglages. Aucune fenêtre, rien
 /// d'écrit hors des réglages jetables : « Lancer à l'ouverture de session » et les hooks sont des fermetures espionnes.
 final class SetupAssistantTests: XCTestCase {
-    private static let ids = ["claude", "media", "quicksettings", "shelf", "clipboard", "timer", "notes"]
+    /// Les onglets proposés par défaut, puis ceux qui sont désactivés tant que l'utilisateur ne les choisit pas.
+    private static let defaultIds = ["claude", "media", "quicksettings", "shelf", "clipboard", "timer", "notes"]
+    private static let optionalIds = ["messages", "mail"]
+    private static let ids = defaultIds + optionalIds
 
     /// Un assistant sur un registre factice, avec ce que ses fermetures ont reçu.
     private final class Rig {
@@ -24,7 +27,9 @@ final class SetupAssistantTests: XCTestCase {
             // Comme AppCore.start : l'onglet Claude est décidé par la détection avant l'assistant.
             prefs.decideClaudeTab(claudeCodePresent: { claudeDetected })
             prepare(prefs)
-            registry = ModuleRegistry(modules: SetupAssistantTests.ids.map { FakeModule(id: $0) }, prefs: prefs)
+            registry = ModuleRegistry(modules: SetupAssistantTests.ids.map {
+                FakeModule(id: $0, enabledByDefault: !SetupAssistantTests.optionalIds.contains($0))
+            }, prefs: prefs)
             model = SetupAssistantModel(
                 registry: registry, prefs: prefs, claudeDetected: claudeDetected, hookStatus: hookStatus,
                 firstRun: firstRun, inApplications: inApplications,
@@ -50,7 +55,7 @@ final class SetupAssistantTests: XCTestCase {
     func testDefaultsWithClaudeCodeDetected() {
         let rig = Rig(self)
         let choices = rig.model.choices
-        XCTAssertEqual(choices.selected, Self.ids, "tous les onglets, dans l'ordre")
+        XCTAssertEqual(choices.selected, Self.defaultIds, "les onglets activés par défaut, dans l'ordre")
         XCTAssertEqual(rig.model.tabs.map { $0.id }, Self.ids)
         XCTAssertTrue(rig.model.claudeOffered)
         XCTAssertEqual(choices.openTrigger, .hover)
@@ -66,7 +71,7 @@ final class SetupAssistantTests: XCTestCase {
         XCTAssertFalse(rig.model.claudeOffered)
         XCTAssertEqual(rig.model.hooksOffer, .none)
         XCTAssertEqual(rig.model.tabs.map { $0.id }, Array(Self.ids.dropFirst()), "aucune carte Claude")
-        XCTAssertEqual(rig.model.choices.selected, Array(Self.ids.dropFirst()))
+        XCTAssertEqual(rig.model.choices.selected, Array(Self.defaultIds.dropFirst()))
         XCTAssertFalse(rig.model.choices.set("claude", true), "pas proposé : on ne le coche pas en douce")
 
         // Même case des hooks forcée : rien n'est installé sans onglet Claude.
@@ -93,7 +98,7 @@ final class SetupAssistantTests: XCTestCase {
             prefs.toggleHotKey = .controlCommandN
         }
         XCTAssertEqual(rig.model.tabs.map { $0.id },
-                       ["notes", "claude", "media", "quicksettings", "shelf", "clipboard", "timer"],
+                       ["notes", "claude", "media", "quicksettings", "shelf", "clipboard", "timer", "messages", "mail"],
                        "les cartes suivent l'ordre des réglages")
         XCTAssertEqual(rig.model.choices.selected, ["notes", "claude", "quicksettings", "shelf", "clipboard"])
         XCTAssertEqual(rig.model.choices.openTrigger, .click)
@@ -122,7 +127,7 @@ final class SetupAssistantTests: XCTestCase {
     func testLastTabCannotBeTurnedOff() {
         let rig = Rig(self)
         var choices = rig.model.choices
-        for id in Self.ids.dropLast() { XCTAssertTrue(choices.set(id, false), id) }
+        for id in Self.ids where id != "notes" { XCTAssertTrue(choices.set(id, false), id) }
         XCTAssertEqual(choices.selected, ["notes"])
         XCTAssertFalse(choices.set("notes", false), "le dernier reste")
         XCTAssertEqual(choices.selected, ["notes"])
@@ -156,7 +161,7 @@ final class SetupAssistantTests: XCTestCase {
         rig.settle()
         XCTAssertEqual(rig.model.step, .done)
         XCTAssertEqual(rig.prefs.tabEnabled, ["claude": true, "media": false, "quicksettings": true, "shelf": true,
-                                             "clipboard": true, "timer": true, "notes": false])
+                                             "clipboard": true, "timer": true, "notes": false, "messages": false, "mail": false])
         XCTAssertEqual(rig.registry.enabled.map { $0.id }, ["claude", "quicksettings", "shelf", "clipboard", "timer"])
         XCTAssertEqual(rig.prefs.openTrigger, .click)
         XCTAssertEqual(rig.prefs.toggleHotKey, .optionCommandJ)
