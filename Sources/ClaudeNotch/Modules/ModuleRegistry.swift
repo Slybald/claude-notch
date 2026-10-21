@@ -9,6 +9,7 @@ extension ModuleRegistry {
             claude,
             codex,
             MediaModule(),
+            AgendaModule(),
             QuickSettingsModule(),
             ShelfModule(),
             ClipboardModule(),

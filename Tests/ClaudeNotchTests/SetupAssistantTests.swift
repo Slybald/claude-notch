@@ -7,7 +7,7 @@ import XCTest
 /// d'écrit hors des réglages jetables : « Lancer à l'ouverture de session » et les hooks sont des fermetures espionnes.
 final class SetupAssistantTests: XCTestCase {
     /// Les onglets proposés par défaut, puis ceux qui sont désactivés tant que l'utilisateur ne les choisit pas.
-    private static let defaultIds = ["claude", "media", "quicksettings", "shelf", "clipboard", "timer", "notes"]
+    private static let defaultIds = ["claude", "media", "agenda", "quicksettings", "shelf", "clipboard", "timer", "notes"]
     private static let optionalIds = ["messages", "mail"]
     private static let ids = defaultIds + optionalIds
 
@@ -98,9 +98,9 @@ final class SetupAssistantTests: XCTestCase {
             prefs.toggleHotKey = .controlCommandN
         }
         XCTAssertEqual(rig.model.tabs.map { $0.id },
-                       ["notes", "claude", "media", "quicksettings", "shelf", "clipboard", "timer", "messages", "mail"],
+                       ["notes", "claude", "media", "agenda", "quicksettings", "shelf", "clipboard", "timer", "messages", "mail"],
                        "les cartes suivent l'ordre des réglages")
-        XCTAssertEqual(rig.model.choices.selected, ["notes", "claude", "quicksettings", "shelf", "clipboard"])
+        XCTAssertEqual(rig.model.choices.selected, ["notes", "claude", "agenda", "quicksettings", "shelf", "clipboard"])
         XCTAssertEqual(rig.model.choices.openTrigger, .click)
         XCTAssertEqual(rig.model.choices.toggleHotKey, .controlCommandN)
         XCTAssertFalse(rig.model.choices.launchAtLogin, "hors Applications : jamais coché")
@@ -160,14 +160,14 @@ final class SetupAssistantTests: XCTestCase {
         rig.goToEnd()
         rig.settle()
         XCTAssertEqual(rig.model.step, .done)
-        XCTAssertEqual(rig.prefs.tabEnabled, ["claude": true, "media": false, "quicksettings": true, "shelf": true,
+        XCTAssertEqual(rig.prefs.tabEnabled, ["claude": true, "media": false, "agenda": true, "quicksettings": true, "shelf": true,
                                              "clipboard": true, "timer": true, "notes": false, "messages": false, "mail": false])
-        XCTAssertEqual(rig.registry.enabled.map { $0.id }, ["claude", "quicksettings", "shelf", "clipboard", "timer"])
+        XCTAssertEqual(rig.registry.enabled.map { $0.id }, ["claude", "agenda", "quicksettings", "shelf", "clipboard", "timer"])
         XCTAssertEqual(rig.prefs.openTrigger, .click)
         XCTAssertEqual(rig.prefs.toggleHotKey, .optionCommandJ)
         XCTAssertEqual(rig.logins, [false])
         XCTAssertTrue(rig.prefs.tabOrder.isEmpty, "l'ordre reste celui des réglages")
-        XCTAssertEqual(rig.model.selectedTabs.map { $0.id }, ["claude", "quicksettings", "shelf", "clipboard", "timer"])
+        XCTAssertEqual(rig.model.selectedTabs.map { $0.id }, ["claude", "agenda", "quicksettings", "shelf", "clipboard", "timer"])
     }
 
     func testClaudeTabCanBeTurnedOff() {

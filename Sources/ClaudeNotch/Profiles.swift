@@ -22,7 +22,7 @@ enum NotchProfile: String, CaseIterable, Identifiable {
     var tabs: [String] {
         switch self {
         case .developer: return [ModuleRegistry.claudeId, Self.codexId, "clipboard", "timer", "notes"]
-        case .student: return ["media", "timer", "notes", "quicksettings"]
+        case .student: return ["agenda", "media", "timer", "notes", "quicksettings"]
         case .creative: return ["media", "shelf", "clipboard"]
         case .minimal: return ["media", "quicksettings"]
         }

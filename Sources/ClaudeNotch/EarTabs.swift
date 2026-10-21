@@ -141,6 +141,7 @@ enum EarTabs {
         case "messages": return "4ADE80"
         case "mail": return "60A5FA"
         case "quicksettings": return "C084FC"
+        case "agenda": return "D4D4D8"
         case EarTab.moreId: return "A1A1AA"
         default: return "A1A1AA"
         }
