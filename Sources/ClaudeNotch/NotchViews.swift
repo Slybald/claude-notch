@@ -101,13 +101,16 @@ struct NotchRootView: View {
         .environment(\.colorScheme, .dark)
         .onAppear { model.setEarsRotation(shouldRotateEars) }
         .onChange(of: shouldRotateEars) { model.setEarsRotation($0) }
+        // Plein écran compact : pas de barre d'onglets, donc pas de mode édition.
+        .onChange(of: compact) { if $0 { model.isEditingTabs = false } }
     }
 
     private var notch: some View {
         ZStack(alignment: .top) {
             if expanded {
-                ExpandedPanel(registry: registry, prefs: prefs, selection: $model.selectedTab, compact: compact,
-                              notchSize: model.notchSize, tabAnimation: motion, actions: actions)
+                ExpandedPanel(registry: registry, prefs: prefs, selection: $model.selectedTab,
+                              editingTabs: $model.isEditingTabs, compact: compact, notchSize: model.notchSize,
+                              tabAnimation: motion, reduceMotion: model.reduceMotion, actions: actions)
                     .transition(.asymmetric(
                         insertion: (model.reduceMotion ? AnyTransition.opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: .top)))
                             .animation(motion.delay(0.06)),
@@ -138,6 +141,7 @@ struct NotchRootView: View {
         .animation(Self.slideAnimation, value: slots.count >= 2 ? currentSlot?.id : nil)
         .animation(motion, value: compact)
         .animation(motion, value: model.selectedTab)
+        .animation(motion, value: model.isEditingTabs)
     }
 
     /// Intercalaire montré : le premier à l'arrivée des oreilles, puis un de plus toutes les 4 s.
@@ -476,10 +480,12 @@ struct ExpandedPanel: View {
     @ObservedObject var registry: ModuleRegistry
     @ObservedObject var prefs: Preferences
     @Binding var selection: String
+    @Binding var editingTabs: Bool
     let compact: Bool
     let notchSize: CGSize
     /// Ressort du changement d'onglet (vitesse des réglages, ou fondu).
     var tabAnimation: Animation = notchSpring
+    var reduceMotion = false
     let actions: NotchActions
 
     static let spacing: CGFloat = 10
@@ -510,11 +516,20 @@ struct ExpandedPanel: View {
                 module.makeView()
                     .id(module.id)
                     .transition(.opacity.animation(.easeOut(duration: 0.15)))
+                    // Mode édition : le contenu s'efface et ne prend plus les clics (un clic dessus sort du mode).
+                    .opacity(editingTabs ? 0.35 : 1)
+                    .allowsHitTesting(!editingTabs)
             }
         }
         .padding(.horizontal, Self.horizontalPadding)
         .padding(.bottom, Self.bottomPadding)
         .frame(width: width, alignment: .top)
+        .background {
+            // Clic hors de la barre (la barre garde les siens) : sortie du mode édition.
+            if editingTabs {
+                Color.clear.contentShape(Rectangle()).onTapGesture { editingTabs = false }
+            }
+        }
         .environment(\.notchContentWidth, width - 2 * Self.horizontalPadding)
         .environment(\.notchContentMaxHeight, contentMaxHeight)
     }
@@ -533,23 +548,46 @@ struct ExpandedPanel: View {
                 if registry.isClaudeEnabled { registry.module(ModuleRegistry.claudeId)?.makeTabIcon() }
                 Spacer(minLength: 8)
             } else {
-                NotchTabBar(modules: registry.enabled, selection: $selection, animation: tabAnimation)
-                // Titre après la rangée d'onglets, pas dedans : sa largeur ne déplace aucun onglet.
-                if let selected {
-                    Text(selected.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Palette.primary)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .id(selected.id)
-                        .transition(.opacity)
-                        .accessibilityHidden(true)
+                NotchTabBar(registry: registry, selection: $selection, editing: $editingTabs, animation: tabAnimation,
+                            reduceMotion: reduceMotion)
+                if editingTabs {
+                    Spacer(minLength: 8)
+                    doneButton
+                } else {
+                    // Titre après la rangée d'onglets, pas dedans : sa largeur ne déplace aucun onglet.
+                    if let selected {
+                        Text(selected.title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Palette.primary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .id(selected.id)
+                            .transition(.opacity)
+                            .accessibilityHidden(true)
+                    }
+                    Spacer(minLength: 8)
+                    selected?.makeHeaderAccessory()
                 }
-                Spacer(minLength: 8)
-                selected?.makeHeaderAccessory()
             }
-            NotchMoreMenu(prefs: prefs, claudeEnabled: registry.isClaudeEnabled, actions: actions)
+            // En mode édition, « OK » prend la place du menu « … ».
+            if !editingTabs {
+                NotchMoreMenu(prefs: prefs, claudeEnabled: registry.isClaudeEnabled, actions: actions)
+            }
         }
+    }
+
+    private var doneButton: some View {
+        Button { editingTabs = false } label: {
+            Text("OK")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.black)
+                .padding(.horizontal, 12)
+                .frame(height: 20)
+                .background(Capsule().fill(Palette.accent))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity)
     }
 
     /// Résumé de chaque module activé qui en fournit un, dans l'ordre des onglets.
@@ -566,25 +604,60 @@ struct ExpandedPanel: View {
 /// l'autre, son titre est affiché à côté de la barre. Clic, ou survol de 0,2 s, pour changer d'onglet (en passant
 /// dessus, rien ne change). Un onglet ne change jamais de taille : sinon les autres glisseraient sous la souris et
 /// le survol en ouvrirait un autre.
+///
+/// Appui long : mode édition, comme les apps sur iPhone. Les icônes tremblent (pas avec « Réduire les animations »)
+/// et se glissent, les autres s'écartant ; « − » masque un onglet, « + » en bout de barre en remet un ; le survol ne
+/// change plus d'onglet. Hors du glisser, aucun onglet ne bouge : « − » est posé dessus, « + » après le dernier.
 struct NotchTabBar: View {
-    let modules: [any NotchModule]
+    @ObservedObject var registry: ModuleRegistry
     @Binding var selection: String
+    @Binding var editing: Bool
     var animation: Animation = notchSpring
+    var reduceMotion = false
 
     @Namespace private var namespace
     @State private var hovered: String?
+    /// Glisser en cours : l'onglet, son déplacement et la place visée.
+    @State private var dragged: String?
+    @State private var dragOffset: CGFloat = 0
+    @State private var dropTarget: Int?
+    /// Ordre posé au lâcher, montré jusqu'à ce que le registre le relise (au tour de boucle suivant).
+    @State private var droppedOrder: [String]?
 
     static let hoverDelay: TimeInterval = 0.2
+    static let spacing: CGFloat = 2
+    /// Icône de 17 pt et 5 pt de chaque côté.
+    static let tabWidth: CGFloat = 27
+    private static let space = "notch-tab-bar"
+
+    private var enabledIds: [String] { registry.enabled.map { $0.id } }
+    private var ids: [String] { droppedOrder ?? enabledIds }
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(modules.map { $0.id }, id: \.self) { id in
-                if let module = modules.first(where: { $0.id == id }) {
-                    tab(module)
+        HStack(spacing: Self.spacing) {
+            ForEach(Array(ids.enumerated()), id: \.element) { index, id in
+                if let module = registry.module(id) {
+                    if editing { editableTab(module, index: index) } else { tab(module) }
                 }
             }
+            if editing { addMenu }
         }
+        .coordinateSpace(name: Self.space)
+        .contentShape(Rectangle())
         .animation(animation, value: selection)
+        // Simultané : le bouton de l'onglet garde son clic.
+        .simultaneousGesture(LongPressGesture(minimumDuration: TabEditing.pressDuration).onEnded { _ in startEditing() },
+                             including: editing ? .subviews : .all)
+        // Mode édition : un clic sur la barre (hors « − » et « + ») n'en sort pas.
+        .gesture(TapGesture(), including: editing ? .all : .subviews)
+        .onChange(of: enabledIds) { _ in droppedOrder = nil }
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(named: Text("Modifier les onglets")) { startEditing() }
+    }
+
+    private func startEditing() {
+        hovered = nil
+        editing = true
     }
 
     private func tab(_ module: any NotchModule) -> some View {
@@ -592,45 +665,166 @@ struct NotchTabBar: View {
         return Button {
             selection = module.id
         } label: {
-            HStack(spacing: 5) {
-                Group {
-                    if let icon = module.makeTabIcon() {
-                        icon
-                    } else {
-                        Image(systemName: module.symbol)
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                }
-                .frame(width: 17, height: 17)
-            }
-            .foregroundColor(active ? Palette.primary : .white.opacity(hovered == module.id ? 0.85 : 0.5))
-            .padding(.horizontal, 5)
-            .frame(height: 22)
-            .background {
-                if active {
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                        .matchedGeometryEffect(id: "active-tab", in: namespace)
-                }
-            }
-            .contentShape(Capsule())
+            icon(module, active: active)
         }
         .buttonStyle(.plain)
         .onHover { inside in hover(module.id, inside) }
         .help(module.title)
         .accessibilityLabel(module.title)
         .accessibilityAddTraits(active ? .isSelected : [])
+        .transition(.opacity)
+    }
+
+    /// Même icône, même taille qu'en mode normal : rotation, échelle et décalage ne changent pas la mise en page.
+    private func editableTab(_ module: any NotchModule, index: Int) -> some View {
+        let id = module.id
+        let isDragged = dragged == id
+        let shift = dropTarget.flatMap { target in
+            ids.firstIndex { $0 == dragged }.map { TabEditing.shift(index, from: $0, to: target) }
+        } ?? 0
+        return icon(module, active: id == selection)
+            .overlay(alignment: .topLeading) {
+                if TabEditing.canHide(id, enabled: ids) { hideButton(module) }
+            }
+            .modifier(Wiggle(index: index, isOn: !reduceMotion))
+            .scaleEffect(isDragged ? 1.15 : 1)
+            .offset(x: isDragged ? dragOffset : CGFloat(shift) * (Self.tabWidth + Self.spacing))
+            .zIndex(isDragged ? 1 : 0)
+            .gesture(drag(id, from: index))
+            .transition(.opacity)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(module.title)
+            .accessibilityAction(named: Text("Déplacer à gauche")) { registry.moveTab(id, to: index - 1) }
+            .accessibilityAction(named: Text("Déplacer à droite")) { registry.moveTab(id, to: index + 1) }
+    }
+
+    private func icon(_ module: any NotchModule, active: Bool) -> some View {
+        Group {
+            if let icon = module.makeTabIcon() {
+                icon
+            } else {
+                Image(systemName: module.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+        }
+        .frame(width: 17, height: 17)
+        .foregroundColor(active ? Palette.primary
+                         : .white.opacity(editing ? 0.75 : hovered == module.id ? 0.85 : 0.5))
+        .padding(.horizontal, 5)
+        .frame(height: 22)
+        .background {
+            if active {
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .matchedGeometryEffect(id: "active-tab", in: namespace)
+            }
+        }
+        .contentShape(Capsule())
+    }
+
+    /// L'onglet suit la souris, les autres s'écartent ; au lâcher, l'ordre est enregistré comme dans les réglages.
+    private func drag(_ id: String, from index: Int) -> some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .named(Self.space))
+            .onChanged { value in
+                dragged = id
+                dragOffset = value.translation.width
+                let target = TabEditing.dropIndex(from: index, translation: value.translation.width,
+                                                  slot: Self.tabWidth + Self.spacing, count: ids.count)
+                if target != dropTarget { withAnimation(animation) { dropTarget = target } }
+            }
+            .onEnded { _ in
+                let target = dropTarget ?? index
+                withAnimation(animation) {
+                    // Nouvel ordre et décalages remis à zéro ensemble : les onglets écartés restent où ils sont.
+                    if target != index { droppedOrder = TabEditing.move(id, to: target, order: ids, enabled: ids) }
+                    dragged = nil
+                    dragOffset = 0
+                    dropTarget = nil
+                }
+                if target != index { registry.moveTab(id, to: target) }
+            }
+    }
+
+    private func hideButton(_ module: any NotchModule) -> some View {
+        let id = module.id
+        let label = String(format: L("Masquer « %@ »"), module.title)
+        return Button {
+            guard registry.hideTab(id) else { return }
+            // L'onglet affiché disparaît : le premier qui reste prend sa place (règle des réglages).
+            if selection == id, let first = ids.first(where: { $0 != id }) { selection = first }
+        } label: {
+            Image(systemName: "minus")
+                .font(.system(size: 7, weight: .black))
+                .foregroundColor(.black)
+                .frame(width: 12, height: 12)
+                .background(Circle().fill(Color.white.opacity(0.9)))
+                .contentShape(Circle().inset(by: -3))
+        }
+        .buttonStyle(.plain)
+        .offset(x: -3, y: -4)
+        .help(label)
+        .accessibilityLabel(label)
+        .transition(.scale.combined(with: .opacity))
+    }
+
+    /// « + » en bout de barre : les onglets masqués, pour en remettre un.
+    private var addMenu: some View {
+        let hidden = registry.hidden
+        return Menu {
+            ForEach(hidden.map { $0.id }, id: \.self) { id in
+                if let module = registry.module(id) {
+                    Button { registry.showTab(id) } label: { Label(module.title, systemImage: module.symbol) }
+                }
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.white.opacity(hidden.isEmpty ? 0.3 : 0.85))
+                .frame(width: Self.tabWidth, height: 22)
+                .contentShape(Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        // Le menu ignore la largeur de son étiquette : une case d'onglet, posée de l'extérieur.
+        .frame(width: Self.tabWidth, height: 22)
+        .disabled(hidden.isEmpty)
+        .help(hidden.isEmpty ? L("Aucun onglet masqué") : L("Remettre un onglet"))
+        .accessibilityLabel(L("Remettre un onglet"))
+        .transition(.opacity)
     }
 
     private func hover(_ id: String, _ inside: Bool) {
         if inside {
             hovered = id
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.hoverDelay) {
-                if hovered == id, selection != id { selection = id }
+                if hovered == id, selection != id, !editing { selection = id }
             }
         } else if hovered == id {
             hovered = nil
         }
+    }
+}
+
+/// Tremblement du mode édition : petite rotation aller-retour, de sens opposé d'un onglet à l'autre. L'animation
+/// n'existe que tant que l'onglet est affiché en mode édition, panneau ouvert : sortir du mode retire la vue.
+private struct Wiggle: ViewModifier {
+    let isOn: Bool
+    /// Sens de départ fixé à l'apparition : un onglet déplacé ne change pas de sens en cours de route.
+    @State private var tilt: Double
+
+    init(index: Int, isOn: Bool) {
+        self.isOn = isOn
+        _tilt = State(initialValue: index.isMultiple(of: 2) ? -2.5 : 2.5)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .rotationEffect(.degrees(isOn ? tilt : 0))
+            .onAppear {
+                guard isOn else { return }
+                withAnimation(.easeInOut(duration: 0.13).repeatForever(autoreverses: true)) { tilt = -tilt }
+            }
     }
 }
 

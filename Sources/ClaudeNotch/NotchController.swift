@@ -4,7 +4,13 @@ import SwiftUI
 
 /// État partagé entre le contrôleur (AppKit) et la vue (SwiftUI).
 final class NotchViewModel: ObservableObject {
-    @Published var isExpanded = false
+    @Published var isExpanded = false {
+        // Le panneau qui se replie sort du mode édition des onglets.
+        didSet { if !isExpanded, isEditingTabs { isEditingTabs = false } }
+    }
+    /// Mode édition des onglets (appui long sur la barre) : glisser, masquer, remettre. Tant qu'il dure, le survol
+    /// ne change plus d'onglet et le panneau ne se replie pas.
+    @Published var isEditingTabs = false
     @Published var notchSize = CGSize(width: 200, height: 32)
     @Published var hasNotch = false
     /// Onglet affiché (identifiant de module).
@@ -142,6 +148,11 @@ final class NotchController {
         prefs.$hideFromCapture
             .sink { [weak panel] hidden in panel?.sharingType = Self.sharingType(hiddenFromCapture: hidden) }
             .store(in: &cancellables)
+        model.$isEditingTabs
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] editing in self?.editingTabsChanged(editing) }
+            .store(in: &cancellables)
     }
 
     /// `.none` : absente des captures d'écran, enregistrements et partages (selon l'app qui capture).
@@ -223,6 +234,7 @@ final class NotchController {
             "openTrigger": prefs.openTrigger.rawValue,
             "closeOnClickOutside": prefs.closeOnClickOutside,
             "openedByKeyboard": openedByKeyboard,
+            "editingTabs": model.isEditingTabs,
             "hotKeys": [prefs.toggleHotKey.rawValue, prefs.hideHotKey.rawValue],
             "hotKeysUnavailable": HotKeyCenter.shared.unavailable.map { $0.rawValue }.sorted(),
             "panelWidth": prefs.expandedWidth(compact: false),
@@ -359,11 +371,13 @@ final class NotchController {
             if inside {
                 closeWork?.cancel()
                 closeWork = nil
-            } else if closeWork == nil, !menuTracking, !staysOpenOutside {
+            } else if closeWork == nil, !menuTracking, !staysOpenOutside, !model.isEditingTabs {
                 let work = DispatchWorkItem { [weak self] in
                     guard let self else { return }
                     self.closeWork = nil
-                    if !self.menuTracking, !self.isInsideZone(NSEvent.mouseLocation) { self.collapse() }
+                    if !self.menuTracking, !self.model.isEditingTabs, !self.isInsideZone(NSEvent.mouseLocation) {
+                        self.collapse()
+                    }
                 }
                 closeWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + prefs.closeDelay, execute: work)
@@ -387,12 +401,18 @@ final class NotchController {
     private var staysOpenOutside: Bool { prefs.closeOnClickOutside || openedByKeyboard }
 
     /// Mode « au clic » : clic sur la notch repliée. Panneau ouvert qui attend un clic à l'extérieur : il se ferme.
-    private func mouseDown() {
+    /// En mode édition des onglets, un clic à l'extérieur sort seulement du mode.
+    func mouseDown(at point: CGPoint = NSEvent.mouseLocation) {
         guard isShown else { return }
-        let inside = isInsideZone(NSEvent.mouseLocation)
+        let inside = isInsideZone(point)
         if model.isExpanded {
-            // Un clic dans un menu ouvert depuis le panneau (« … ») n'est pas un clic à l'extérieur.
-            if !inside, staysOpenOutside, !menuTracking { collapse() }
+            // Un clic dans un menu ouvert depuis le panneau (« … », « + ») n'est pas un clic à l'extérieur.
+            guard !inside, !menuTracking else { return }
+            if model.isEditingTabs {
+                model.isEditingTabs = false
+            } else if staysOpenOutside {
+                collapse()
+            }
         } else if inside, prefs.openTrigger == .click {
             openWork?.cancel()
             openWork = nil
@@ -770,6 +790,19 @@ final class NotchController {
         NotchKeyboard.take()
     }
 
+    /// Mode édition des onglets : le panneau prend le clavier pour qu'Échap en sorte (un champ de texte rend la main),
+    /// et le rend à la sortie, sauf s'il l'avait déjà (ouvert au raccourci).
+    private func editingTabsChanged(_ editing: Bool) {
+        if editing {
+            closeWork?.cancel()
+            closeWork = nil
+            NotchKeyboard.take()
+            panel.makeFirstResponder(nil)
+        } else if !openedByKeyboard {
+            NotchKeyboard.release()
+        }
+    }
+
     /// Raccourci global : masque la notch jusqu'à réactivation, ou la réaffiche.
     func toggleHiddenFromKeyboard() {
         if prefs.isHidden(at: now()) { prefs.showAgain() } else { prefs.hide(.untilReactivated, now: now()) }
@@ -778,9 +811,15 @@ final class NotchController {
     /// Panneau ouvert au raccourci : ← → et ⌘1…⌘9 changent d'onglet, Échap ferme et rend le clavier (plein écran
     /// compact compris). Ouvert au survol ou au clic, rien ne change (les champs des modules gardent leurs touches).
     func handleKey(_ event: NSEvent) -> Bool {
-        guard openedByKeyboard, model.isExpanded, panel.isKeyWindow,
+        guard model.isExpanded, panel.isKeyWindow,
               let command = NotchKeyCommand.parse(keyCode: event.keyCode, modifiers: event.modifierFlags,
                                                   editingText: panel.firstResponder is NSText) else { return false }
+        // Mode édition des onglets : Échap en sort, le panneau reste ouvert.
+        if model.isEditingTabs, command == .close {
+            model.isEditingTabs = false
+            return true
+        }
+        guard openedByKeyboard else { return false }
         if command == .close {
             suppressUntilExit = true
             collapse()
