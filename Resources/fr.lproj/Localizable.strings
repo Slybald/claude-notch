@@ -97,17 +97,12 @@
 "Tes sessions Claude Code, d'un coup d'œil." = "Tes sessions Claude Code, d'un coup d'œil.";
 "Des onglets utiles, dans la notch." = "Des onglets utiles, dans la notch.";
 "Ouvrir la notch" = "Ouvrir la notch";
-"Survole-la. Ouverture au clic et raccourci clavier se règlent dans les réglages." = "Survole-la. Ouverture au clic et raccourci clavier se règlent dans les réglages.";
-"Lecteur et calendrier, réglages rapides, étagère, presse-papiers, minuteur et notes. Choisis-les et range-les dans Réglages › Onglets." = "Lecteur et calendrier, réglages rapides, étagère, presse-papiers, minuteur et notes. Choisis-les et range-les dans Réglages › Onglets.";
 "Réglages" = "Réglages";
-"Menu « … » du panneau, ou rouvre Claude Notch. Clic droit sur la notch pour la masquer." = "Menu « … » du panneau, ou rouvre Claude Notch. Clic droit sur la notch pour la masquer.";
 "Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac." = "Survole la notch : chaque session Claude Code (terminal, éditeur ou Claude Desktop) y affiche son état, l'outil en cours, ses tâches et les permissions qui t'attendent. Tout reste sur ton Mac.";
 "Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch continue de suivre tes sessions." = "Les hooks installés viennent d'une version précédente de l'app. Mets-les à jour pour que la notch continue de suivre tes sessions.";
 "Glisse d'abord Claude Notch dans Applications" = "Glisse d'abord Claude Notch dans Applications";
 "L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier Applications, puis rouvre-la depuis là." = "L'app tourne depuis l'image disque ou une copie temporaire. Quitte-la, glisse-la dans le dossier Applications, puis rouvre-la depuis là.";
 "CE QUI SERA MODIFIÉ" = "CE QUI SERA MODIFIÉ";
-"INTÉGRATION CLAUDE CODE" = "INTÉGRATION CLAUDE CODE";
-"Claude Code est installé sur ce Mac. Avec ses hooks, l'onglet Claude suit tes sessions : état, outil en cours, tâches, permissions." = "Claude Code est installé sur ce Mac. Avec ses hooks, l'onglet Claude suit tes sessions : état, outil en cours, tâches, permissions.";
 "Tu utilises Claude Code ? Active l'onglet Claude dans Réglages › Onglets." = "Tu utilises Claude Code ? Active l'onglet Claude dans Réglages › Onglets.";
 "Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté." = "Ajout des hooks de Claude Notch. Tes hooks restent en place ; une sauvegarde horodatée est faite à côté.";
 "Petit script qui relaie chaque événement à l'app, en local (127.0.0.1)." = "Petit script qui relaie chaque événement à l'app, en local (127.0.0.1).";
@@ -115,7 +110,6 @@
 "Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks installés. Les sessions déjà ouvertes apparaîtront à leur prochain message.";
 "Hooks à jour. Les sessions déjà ouvertes apparaîtront à leur prochain message." = "Hooks à jour. Les sessions déjà ouvertes apparaîtront à leur prochain message.";
 "Plus tard" = "Plus tard";
-"Installer les hooks" = "Installer les hooks";
 "Commencer" = "Commencer";
 "Mettre à jour les hooks" = "Mettre à jour les hooks";
 "Fermer" = "Fermer";
@@ -326,6 +320,45 @@
 "La règle d'économie d'énergie reste en place" = "La règle d'économie d'énergie reste en place";
 "Pour la retirer : sudo rm /etc/sudoers.d/claude-notch-lowpower" = "Pour la retirer : sudo rm /etc/sudoers.d/claude-notch-lowpower";
 
+/* Setup assistant */
+"Passer" = "Passer";
+"Retour" = "Retour";
+"Continuer" = "Continuer";
+"Appliquer" = "Appliquer";
+"C'est parti" = "C'est parti";
+"En trois étapes, choisis ce qui t'intéresse. Tu pourras tout changer ensuite." = "En trois étapes, choisis ce qui t'intéresse. Tu pourras tout changer ensuite.";
+"Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, presse-papiers et plus encore." = "Claude Notch transforme la notch de ton Mac en panneau d'outils : musique, calendrier, notes, presse-papiers et plus encore.";
+"Choisis tes onglets" = "Choisis tes onglets";
+"Chaque onglet est une fonction de la notch. Garde ceux qui t'intéressent : les autres ne font rien, même en arrière-plan." = "Chaque onglet est une fonction de la notch. Garde ceux qui t'intéressent : les autres ne font rien, même en arrière-plan.";
+"Tes sessions Claude Code : état, tâches et permissions." = "Tes sessions Claude Code : état, tâches et permissions.";
+"La musique en cours et ton calendrier de la semaine." = "La musique en cours et ton calendrier de la semaine.";
+"Wi-Fi, Bluetooth, concentration, économie d'énergie, batterie." = "Wi-Fi, Bluetooth, concentration, économie d'énergie, batterie.";
+"Dépose des fichiers sur la notch, reprends-les plus tard." = "Dépose des fichiers sur la notch, reprends-les plus tard.";
+"Tes dernières copies, à reprendre d'un clic." = "Tes dernières copies, à reprendre d'un clic.";
+"Un minuteur, ou un cycle Pomodoro." = "Un minuteur, ou un cycle Pomodoro.";
+"Des notes en texte brut, toujours à portée." = "Des notes en texte brut, toujours à portée.";
+"Sans eux, l'onglet Claude ne voit pas tes sessions. Rien n'est modifié avant « Appliquer »." = "Sans eux, l'onglet Claude ne voit pas tes sessions. Rien n'est modifié avant « Appliquer ».";
+"Au moins un onglet reste activé." = "Au moins un onglet reste activé.";
+"macOS ne te demande une autorisation (calendrier, Bluetooth…) que lorsque tu utilises l'onglet concerné." = "macOS ne te demande une autorisation (calendrier, Bluetooth…) que lorsque tu utilises l'onglet concerné.";
+"Comment l'ouvrir ?" = "Comment l'ouvrir ?";
+"Tout se règle aussi plus tard dans Réglages." = "Tout se règle aussi plus tard dans Réglages.";
+"Le panneau s'ouvre dès que tu poses le pointeur sur la notch." = "Le panneau s'ouvre dès que tu poses le pointeur sur la notch.";
+"Le panneau s'ouvre quand tu cliques sur la notch." = "Le panneau s'ouvre quand tu cliques sur la notch.";
+"Raccourci clavier (facultatif)" = "Raccourci clavier (facultatif)";
+"Ouvre ou ferme le panneau de partout, sans autorisation." = "Ouvre ou ferme le panneau de partout, sans autorisation.";
+"La notch est là dès que tu ouvres ta session." = "La notch est là dès que tu ouvres ta session.";
+"C'est prêt" = "C'est prêt";
+"Voici ta notch avec les onglets choisis." = "Voici ta notch avec les onglets choisis.";
+"Menu « … »" = "Menu « … »";
+"En haut à droite du panneau : réglages, mises à jour, quitter. Clic droit sur la notch pour la masquer." = "En haut à droite du panneau : réglages, mises à jour, quitter. Clic droit sur la notch pour la masquer.";
+"Onglets, apparence, raccourcis. Pour refaire cet assistant : Réglages › Général." = "Onglets, apparence, raccourcis. Pour refaire cet assistant : Réglages › Général.";
+"Hooks non installés." = "Hooks non installés.";
+"Tu peux réessayer dans Réglages › Claude." = "Tu peux réessayer dans Réglages › Claude.";
+"Relancer l'assistant de configuration" = "Relancer l'assistant de configuration";
+"Rechoisis tes onglets, l'ouverture de la notch et le raccourci clavier." = "Rechoisis tes onglets, l'ouverture de la notch et le raccourci clavier.";
+"Hooks ajoutés, sauvegarde horodatée ; les tiens restent." = "Hooks ajoutés, sauvegarde horodatée ; les tiens restent.";
+"Relaie les événements à l'app, en local (127.0.0.1)." = "Relaie les événements à l'app, en local (127.0.0.1).";
+
 /* Tab editing in the notch (long press) */
 "OK" = "OK";
 "Modifier les onglets" = "Modifier les onglets";
@@ -334,3 +367,4 @@
 "Masquer « %@ »" = "Masquer « %@ »";
 "Aucun onglet masqué" = "Aucun onglet masqué";
 "Remettre un onglet" = "Remettre un onglet";
+"Appui long sur la barre d'onglets : les déplacer, les masquer, en remettre." = "Appui long sur la barre d'onglets : les déplacer, les masquer, en remettre.";

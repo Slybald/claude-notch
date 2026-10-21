@@ -5,7 +5,7 @@ import XCTest
 
 /// Intégration Claude Code optionnelle : fenêtre du premier lancement, arrêt du suivi des sessions.
 final class OptionalClaudeTests: XCTestCase {
-    /// Bienvenue une fois, avec la section des hooks seulement si l'onglet Claude est activé ; jamais après une mise
+    /// Assistant de configuration une fois, l'onglet Claude proposé seulement s'il est activé ; jamais après une mise
     /// à jour depuis une version qui avait posé les hooks ; mise à jour silencieuse ratée : on la propose.
     func testLaunchWindow() {
         func window(_ claude: Bool, _ status: HookInstaller.Status, shown: Bool = false) -> HookSetup.LaunchWindow {
@@ -53,24 +53,9 @@ final class OptionalClaudeTests: XCTestCase {
     }
 }
 
-/// Rendus PNG : bienvenue avec et sans Claude Code, réglages et notch sans l'onglet Claude.
+/// Rendus PNG : réglages et notch sans l'onglet Claude (l'assistant a les siens, voir `SetupAssistantSnapshotTests`).
 /// Ne fait rien sans `CLAUDE_NOTCH_SNAPSHOT_DIR`.
 final class OptionalClaudeSnapshotTests: XCTestCase {
-    func testRenderWelcome() throws {
-        guard let dir = TimerNotesSnapshot.outputDirectory else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
-        // 32 pt en haut : la place de la barre de titre transparente de la vraie fenêtre.
-        func welcome(_ view: OnboardingView, _ name: String) throws {
-            try TimerNotesSnapshot.render(view.padding(.top, 32).background(Color.black), name, dir,
-                                          size: CGSize(width: 470, height: 760))
-        }
-        try welcome(OnboardingView(mode: .welcome, showsHooks: true, inApplications: true, launchAtLogin: true,
-                                   onInstall: { _ in nil }, onClose: { _ in }), "welcome-claude")
-        try welcome(OnboardingView(mode: .welcome, showsHooks: false, inApplications: true, launchAtLogin: true,
-                                   onInstall: { _ in nil }, onClose: { _ in }), "welcome-no-claude")
-        try welcome(OnboardingView(mode: .welcome, showsHooks: false, inApplications: false, launchAtLogin: true,
-                                   onInstall: { _ in nil }, onClose: { _ in }), "welcome-no-claude-dmg")
-    }
-
     func testRenderWithoutClaudeTab() throws {
         guard let dir = TimerNotesSnapshot.outputDirectory else { throw XCTSkip("CLAUDE_NOTCH_SNAPSHOT_DIR non défini") }
         let notch = NotchHarness(self, store: .working(1))
