@@ -414,6 +414,8 @@ struct SetupAssistantView: View {
                 InfoRow(icon: "ellipsis.circle", title: L("Menu « … »"),
                         detail: L("En haut à droite du panneau : réglages, mises à jour, quitter. Clic droit sur la "
                             + "notch pour la masquer."))
+                InfoRow(icon: "hand.tap", title: L("Onglets"),
+                        detail: L("Appui long sur la barre d'onglets : les déplacer, les masquer, en remettre."))
                 InfoRow(icon: "gearshape", title: L("Réglages"),
                         detail: L("Onglets, apparence, raccourcis. Pour refaire cet assistant : Réglages › Général."))
             }

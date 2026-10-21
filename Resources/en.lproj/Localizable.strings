@@ -367,3 +367,4 @@
 "Masquer « %@ »" = "Hide “%@”";
 "Aucun onglet masqué" = "No Hidden Tabs";
 "Remettre un onglet" = "Add a Tab";
+"Appui long sur la barre d'onglets : les déplacer, les masquer, en remettre." = "Press and hold the tab bar: move, hide or bring back tabs.";
