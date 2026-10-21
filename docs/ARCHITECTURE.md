@@ -64,7 +64,8 @@ organised and why some choices were made, so they are not undone by accident.
   virtual notch geometry (`NotchScreenPicker`). `HotKeys`: global shortcuts (`HotKeyCenter`) through Carbon
   `RegisterEventHotKey`, which needs no Accessibility permission.
 - `HookInstaller` + `OrderedJSON`: add and remove the hooks in `~/.claude/settings.json`. `Onboarding`:
-  hook window (install, update) and hook menu items. `SetupAssistant`: the first-launch setup assistant. `AppIdentity`: bundle identifier and migration from early builds.
+  hook window (install, update) and hook menu items. `SetupAssistant`: the first-launch setup assistant.
+  `AppIdentity`: bundle identifier and migration from early builds.
 - `ActivityLog`: `files.jsonl` / `permissions.jsonl`. `JobRunner`: optional companion tool jobs.
 - `Localization`: the `L()` helper, with an optional table. `LaunchAgent`: open at login.
 - `Updater`: automatic updates from GitHub releases (check, signature, install, relaunch) and its menu items.

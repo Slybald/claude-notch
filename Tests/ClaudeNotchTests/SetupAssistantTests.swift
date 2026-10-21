@@ -259,6 +259,25 @@ final class SetupAssistantTests: XCTestCase {
         XCTAssertEqual(SetupAssistantTests.ids, notch.registry.modules.map { $0.id }, "la liste des tests suit l'app")
     }
 
+    /// La vraie fenêtre (jamais affichée ici) garde la même taille à chaque étape et tient sur un petit écran.
+    func testWindowKeepsItsSizeAcrossSteps() {
+        _ = NSApplication.shared
+        let rig = Rig(self)
+        let controller = OnboardingWindowController(rootView: SetupAssistantView(model: rig.model))
+        let window = try! XCTUnwrap(controller.window)
+        addTeardownBlock { window.close() }
+        // SwiftUI donne sa taille préférée à la fenêtre au tour de boucle suivant.
+        rig.settle()
+        let first = window.frame.size
+        XCTAssertEqual(first.width, SetupAssistantView.size.width, accuracy: 1)
+        XCTAssertLessThanOrEqual(first.height, 780, "tient sur un écran de 800 pt avec la barre des menus")
+        for step in SetupAssistantModel.Step.allCases {
+            rig.model.step = step
+            rig.settle()
+            XCTAssertEqual(window.frame.size.height, first.height, accuracy: 1, "\(step)")
+        }
+    }
+
     /// Premier lancement : le drapeau tombe même sans fenêtre à montrer ; ensuite, plus rien (voir aussi
     /// `OptionalClaudeTests.testLaunchWindow` pour toutes les combinaisons).
     func testFirstLaunchMarksTheAssistantAsShown() {
