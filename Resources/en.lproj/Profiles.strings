@@ -1,0 +1,20 @@
+/* Claude Notch: English texts of the profiles (setup assistant, Settings › General). The key is the French text used in the code. */
+"Développeur" = "Developer";
+"Étudiant" = "Student";
+"Créatif" = "Creative";
+"Minimal" = "Minimal";
+"Profil" = "Profile";
+"Pour commencer, un profil (facultatif)" = "To start, pick a profile (optional)";
+"Changer de profil" = "Change Profile";
+"Changer de profil…" = "Change Profile…";
+"Appliquer le profil" = "Apply Profile";
+"Actuel" = "Current";
+"Un profil règle les onglets, leur ordre, l'ouverture du panneau et les oreilles. Tes données ne changent pas." = "A profile sets the tabs, their order, how the panel opens and the ears. Your data does not change.";
+"Un profil règle tes onglets, leur ordre, l'ouverture du panneau et les oreilles. Tes données et tes hooks ne changent pas." = "A profile sets your tabs, their order, how the panel opens and the ears. Your data and hooks do not change.";
+"Choisis un profil pour voir ce qui change." = "Pick a profile to see what changes.";
+"Onglets affichés" = "Tabs shown";
+"Onglets masqués" = "Tabs hidden";
+"ils s'arrêtent mais gardent leurs données." = "they stop but keep their data.";
+"Ouverture et oreilles" = "Opening and ears";
+"Oreilles affichées" = "Ears shown";
+"Oreilles masquées" = "Ears hidden";

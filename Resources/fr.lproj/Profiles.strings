@@ -1,0 +1,20 @@
+/* Claude Notch : textes français des profils (assistant de configuration, Réglages › Général) (la clé est le texte). */
+"Développeur" = "Développeur";
+"Étudiant" = "Étudiant";
+"Créatif" = "Créatif";
+"Minimal" = "Minimal";
+"Profil" = "Profil";
+"Pour commencer, un profil (facultatif)" = "Pour commencer, un profil (facultatif)";
+"Changer de profil" = "Changer de profil";
+"Changer de profil…" = "Changer de profil…";
+"Appliquer le profil" = "Appliquer le profil";
+"Actuel" = "Actuel";
+"Un profil règle les onglets, leur ordre, l'ouverture du panneau et les oreilles. Tes données ne changent pas." = "Un profil règle les onglets, leur ordre, l'ouverture du panneau et les oreilles. Tes données ne changent pas.";
+"Un profil règle tes onglets, leur ordre, l'ouverture du panneau et les oreilles. Tes données et tes hooks ne changent pas." = "Un profil règle tes onglets, leur ordre, l'ouverture du panneau et les oreilles. Tes données et tes hooks ne changent pas.";
+"Choisis un profil pour voir ce qui change." = "Choisis un profil pour voir ce qui change.";
+"Onglets affichés" = "Onglets affichés";
+"Onglets masqués" = "Onglets masqués";
+"ils s'arrêtent mais gardent leurs données." = "ils s'arrêtent mais gardent leurs données.";
+"Ouverture et oreilles" = "Ouverture et oreilles";
+"Oreilles affichées" = "Oreilles affichées";
+"Oreilles masquées" = "Oreilles masquées";

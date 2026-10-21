@@ -15,6 +15,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   Contacts for names, and Automation to reply. Mail needs Automation and is never launched by Claude Notch. Nothing
   is stored or sent outside the Mac, and no permission is asked before you open the tab. Feasibility, measures and
   limits: [docs/MESSAGES-MAIL.md](docs/MESSAGES-MAIL.md).
+- Profiles: Developer, Student, Creative and Minimal. A profile is a starting point (which tabs, in which order, how
+  the panel opens, the ears) inside the same app: one update, one signature. The first step of the setup assistant
+  offers them (optional, nothing changes without a choice), and **Settings › General › Change Profile…** shows what a
+  profile will show and hide and changes nothing until you confirm. Your tab data and the hooks are never touched.
+  Claude and Codex are only offered when they are found on the Mac.
+- `docs/EDITIONS.md` compares three ways to make "editions" (profiles, separate builds, installable modules) and
+  explains why profiles come first.
 
 ## [1.5.0] - 2026-10-21
 
