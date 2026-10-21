@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 import XCTest
 @testable import ClaudeNotch
@@ -106,5 +107,116 @@ final class TabEditingTests: XCTestCase {
         XCTAssertEqual(prefs.tabOrder, ["a", "b", "d", "c"])
         settle()
         XCTAssertEqual(registry.ordered.map { $0.id }, ["a", "b", "d", "c"])
+    }
+
+    // MARK: - Sorties du mode
+
+    func testCollapsingLeavesEditMode() {
+        let model = NotchViewModel()
+        model.isExpanded = true
+        model.isEditingTabs = true
+        model.isExpanded = false
+        XCTAssertFalse(model.isEditingTabs, "le panneau qui se replie sort du mode")
+    }
+
+    private func controller() -> (NotchController, Preferences) {
+        _ = NSApplication.shared
+        let prefs = Preferences(defaults: makeEphemeralDefaults(self))
+        prefs.hapticFeedback = false
+        // Seul l'onglet Claude : aucun autre module ne démarre à l'ouverture.
+        for id in ["media", "quicksettings", "shelf", "clipboard", "timer", "notes"] { prefs.tabEnabled[id] = false }
+        let notch = NotchController(store: SessionStore(), monitor: ClaudeMonitor(), prefs: prefs,
+                                    tools: ToolsFeed(paths: LayoutTests.absentPaths))
+        addTeardownBlock { notch.panel.orderOut(nil) }
+        return (notch, prefs)
+    }
+
+    private func key(_ code: Int, _ notch: NotchController) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                       windowNumber: notch.panel.windowNumber, context: nil, characters: "",
+                                       charactersIgnoringModifiers: "", isARepeat: false, keyCode: UInt16(code)))
+    }
+
+    /// Hors de tout écran, donc de la zone de survol.
+    private let outside = CGPoint(x: -50_000, y: -50_000)
+
+    /// Notch montrée par le raccourci puis repliée (elle reste affichée, à la place de la vraie encoche), puis
+    /// rouverte par un clic sur l'encoche : ni clavier, ni fermeture au clic extérieur.
+    private func openByClick(_ notch: NotchController, _ prefs: Preferences) {
+        notch.togglePanelFromKeyboard()
+        notch.togglePanelFromKeyboard()
+        prefs.openTrigger = .click
+        notch.mouseDown(at: CGPoint(x: notch.panel.frame.midX, y: notch.panel.frame.maxY - 1))
+    }
+
+    /// Ouvert au clic (ni clavier, ni « fermer au clic extérieur ») : le mode prend le clavier pour Échap, Échap en
+    /// sort sans replier le panneau, et le clavier revient à l'app de devant.
+    func testEscapeLeavesEditModeAndGivesKeyboardBack() throws {
+        let (notch, prefs) = controller()
+        openByClick(notch, prefs)
+        XCTAssertTrue(notch.model.isExpanded)
+        XCTAssertFalse(notch.panel.isKeyWindow, "ouvert au clic : pas de clavier")
+
+        notch.model.isEditingTabs = true
+        XCTAssertTrue(notch.panel.isKeyWindow, "le mode édition prend le clavier pour Échap")
+        XCTAssertTrue(notch.handleKey(try key(kVK_Escape, notch)))
+        XCTAssertFalse(notch.model.isEditingTabs)
+        XCTAssertTrue(notch.model.isExpanded, "Échap sort du mode, le panneau reste ouvert")
+        XCTAssertFalse(notch.panel.isKeyWindow, "clavier rendu")
+        XCTAssertFalse(notch.handleKey(try key(kVK_Escape, notch)), "hors du mode, Échap n'est plus au panneau")
+    }
+
+    /// Ouvert au clavier : Échap sort d'abord du mode (le panneau garde le clavier), puis ferme.
+    func testEscapeWithKeyboardPanelLeavesModeThenCloses() throws {
+        let (notch, _) = controller()
+        notch.togglePanelFromKeyboard()
+        notch.model.isEditingTabs = true
+        XCTAssertTrue(notch.handleKey(try key(kVK_Escape, notch)))
+        XCTAssertFalse(notch.model.isEditingTabs)
+        XCTAssertTrue(notch.model.isExpanded)
+        XCTAssertTrue(notch.panel.isKeyWindow, "ouvert au raccourci : il garde le clavier")
+        XCTAssertTrue(notch.handleKey(try key(kVK_Escape, notch)))
+        XCTAssertFalse(notch.model.isExpanded)
+    }
+
+    /// Un clic à l'extérieur sort du mode sans replier le panneau, même quand il se ferme d'habitude à ce clic.
+    func testClickOutsideLeavesEditModeOnly() {
+        let (notch, _) = controller()
+        notch.togglePanelFromKeyboard() // ouvert au clavier : un clic extérieur le ferme d'habitude
+        notch.model.isEditingTabs = true
+        notch.mouseDown(at: outside)
+        XCTAssertFalse(notch.model.isEditingTabs)
+        XCTAssertTrue(notch.model.isExpanded, "premier clic : sortie du mode seulement")
+        notch.mouseDown(at: outside)
+        XCTAssertFalse(notch.model.isExpanded, "clic suivant : règle habituelle")
+    }
+
+    func testShortcutCollapseLeavesEditMode() {
+        let (notch, _) = controller()
+        notch.togglePanelFromKeyboard()
+        notch.model.isEditingTabs = true
+        notch.togglePanelFromKeyboard()
+        XCTAssertFalse(notch.model.isExpanded)
+        XCTAssertFalse(notch.model.isEditingTabs)
+    }
+
+    /// Souris hors du panneau (ouvert au clic, fermeture à la sortie) : rien ne se replie tant que le mode dure ;
+    /// en sortir rend la règle habituelle. Le contrôleur lit la vraie souris : sautée si elle est sur la notch.
+    func testPanelStaysOpenWhileEditing() throws {
+        let (notch, prefs) = controller()
+        prefs.closeDelay = 0.1
+        openByClick(notch, prefs)
+        // Zone dépliée sans vue mesurée : largeur du panneau, hauteur de l'encoche + 48 pt, en haut de l'écran.
+        let frame = notch.panel.frame
+        let zone = CGRect(x: frame.midX - 300, y: frame.maxY - 100, width: 600, height: 100)
+        try XCTSkipIf(zone.contains(NSEvent.mouseLocation), "souris sur la notch")
+        XCTAssertTrue(notch.model.isExpanded)
+        notch.model.isEditingTabs = true
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertTrue(notch.model.isExpanded, "ne se replie pas en mode édition")
+        notch.model.isEditingTabs = false
+        let deadline = Date().addingTimeInterval(2)
+        while notch.model.isExpanded, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        XCTAssertFalse(notch.model.isExpanded, "hors du mode, la sortie de la souris replie le panneau")
     }
 }
