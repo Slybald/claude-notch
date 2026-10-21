@@ -37,9 +37,9 @@ export const COPY = {
   free: ["Free and open source · macOS 13+", "Gratuit et open source · macOS 13+"] as Pair,
   link: "github.com/Slybald/claude-notch",
   legal: [
-    "Independent project, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.",
-    "Projet indépendant, ni affilié à Anthropic ni approuvé par Anthropic. Claude est une marque d'Anthropic.",
-  ] as Pair,
+    ["Independent project, not affiliated with or endorsed by Anthropic.", "Projet indépendant, ni affilié à Anthropic ni approuvé par Anthropic."],
+    ["Claude is a trademark of Anthropic.", "Claude est une marque d'Anthropic."],
+  ] as Pair[],
   tag: "CLAUDE NOTCH 1.5",
 };
 

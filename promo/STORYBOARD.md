@@ -31,7 +31,8 @@ On garde de B le **geste unique vers le haut** : le curseur monte d'un trait ver
 - Fond crème `#EFEAE0` (« bureau clair »), encre `#0B0B0B`, orange app `#D97757`. Une seule scène sur fond sombre
   `#181818` (développeurs), amenée par la notch qui grossit jusqu'à remplir le cadre.
 - Interface recréée en composants vectoriels d'après les rendus et le code de l'app (mesures en pt, ressort
-  `notchSpring` de l'app : response 0,42, damping 0,78).
+  `notchSpring` de l'app : response 0,42, damping 0,78). Échelle 1,85 px par point en 16:9 (1,5 dans la scène sombre,
+  où le panneau Claude est plus haut), 1,6 en 9:16.
 - Hiérarchie : un seul élément principal bouge à la fois ; le panneau est l'acteur, le mot géant est le décor qui
   change sur les temps.
 
@@ -43,8 +44,8 @@ Les temps sont comptés depuis le début (temps 0 = image 0).
 |---|---|---|---|---|---|
 | 1 | 0–4 | 0,0–2,0 | 0–60 | « Your Mac / has a hole / in the screen. » — « Ton Mac / a un trou / dans l'écran. » | Notch noire seule en haut. Une ligne entre au temps 0, 1 et 2 (révélation par masque, 10 images, sortie expo). Au temps 2 la notch « bat » (ressort) : c'est elle, le trou. |
 | 2 | 4–6 | 2,0–3,0 | 60–90 | « It does / nothing. » — « Il ne / sert à rien. » | Coupe sèche : les 3 lignes tombent (6 images), 2 lignes les remplacent. Rien d'autre ne bouge : le vide fait la blague. |
-| 3 | 6–7 | 3,0–3,5 | 90–105 | « Until now. » (orange) — « Plus maintenant. » | Le curseur monte d'un trait depuis le bas du cadre jusqu'à la notch (1 geste, 12 images). La phrase orange remplace la précédente sur le temps. |
-| 4 | 7–12 | 3,5–6,0 | 105–180 | « Listen. » — « Écoute. » + « Now playing. Your week. » | La notch s'ouvre (ressort app) sur **Lecteur** : pochette, progression, calendrier. Le mot géant entre au temps 8. Curseur au repos sur la barre d'onglets. |
+| 3 | 6–7 | 3,0–3,5 | 90–105 | « Until now. » (orange) — « Plus maintenant. » | Le curseur monte d'un trait depuis le bas du cadre jusqu'à la notch (1 geste, 16 images, arrivée image 104). La phrase orange remplace la précédente sur le temps et sort quand le curseur arrive. |
+| 4 | 7–12 | 3,5–6,0 | 105–180 | « Listen. » — « Écoute. » + « Now playing. Your week. » | La notch s'ouvre (ressort app, image 104) sur **Lecteur** : pochette, progression, calendrier. Un demi-temps de produit seul, puis le mot géant entre au temps 8. Curseur au repos sur la barre d'onglets. |
 | 5 | 12–18 | 6,0–9,0 | 180–270 | « Switch. » — « Bascule. » + « Wi-Fi, Bluetooth, caffeine. » | Le curseur survole l'onglet **Réglages rapides**, le panneau change de hauteur (ressort), clic sur Caféine : la tuile passe à l'orange. |
 | 6 | 18–26 | 9,0–13,0 | 270–390 | « Drop. » — « Dépose. » + « Files wait on the notch. » | Onglet **Étagère**. Un fichier traîne jusqu'au panneau (cadre pointillé orange « déposer »), se pose, les icônes s'écartent, le compteur passe de 5 à 6 éléments. |
 | 7 | 26–31 | 13,0–15,5 | 390–465 | « Reuse. » — « Reprends. » + « Your last copies, one click. » | Onglet **Presse-papiers**. Les lignes entrent en cascade (un temps sur deux), survol, clic : « Copié ». |
@@ -54,8 +55,8 @@ Les temps sont comptés depuis le début (temps 0 = image 0).
 | 11 | 42–48 | 21,0–24,0 | 630–720 | « Code with Claude Code? » (légende) puis « It asks. » — « Il demande. » | Les oreilles pulsent. Le curseur monte, le panneau s'ouvre sur **Claude** : trois sessions, la première bordée d'ambre. |
 | 12 | 48–52 | 24,0–26,0 | 720–780 | « You answer. » — « Tu réponds. » | Survol de la carte, la demande se déplie (`rm -rf build && …`), clic sur **Allow** : la carte passe en « Terminal ». |
 | 13 | 52–56 | 26,0–28,0 | 780–840 | « From the notch. » — « Depuis la notch. » + « Optional. Off until you turn it on. » | Survol de « mon-app » : bouton **Chat**, la conversation s'ouvre, le message se tape par rafales et part. |
-| 14 | 56–60 | 28,0–30,0 | 840–900 | — | La notch se rétracte vers le haut, le fond redevient crème. Retour sur la barre d'onglets. |
-| 15 | 60–66 | 30,0–33,0 | 900–990 | « Yours. » — « À toi. » + « Press, hold, drag. » | Appui long sur la barre : les icônes oscillent, les `−` apparaissent, une icône est glissée à sa nouvelle place, une autre masquée. |
+| 14 | 56–58 | 28,0–29,0 | 840–870 | — | Le rideau se rétracte vers le panneau, le fond redevient crème, la conversation se referme. |
+| 15 | 58–66 | 29,0–33,0 | 870–990 | « Yours. » — « À toi. » + « Press, hold, drag. Like home-screen apps. » | Appui long sur la barre (image 870) : les icônes oscillent, les `−` apparaissent, « Notes rapides » est glissée en 2e position (892–920), « Presse-papiers » masquée (942), clic sur **OK** (964). |
 | 16 | 66–80 | 33,0–40,0 | 990–1200 | « Claude Notch. » + « Your notch finally has a job. » + 3 pastilles (« Everything stays on your Mac », « Signed automatic updates », « Setup in four steps ») + lien | Le panneau se replie en notch à oreilles (coche verte, `1·0`). Titre géant au temps 67, légende 69, une pastille par temps (70, 71, 72), lien au temps 74. Au temps 76 les oreilles alternent (comme dans l'app, toutes les 4 s). Dernier plan fixe 2 s. Mention en petit : projet indépendant, non affilié à Anthropic. |
 
 ## Accroche et appel à l'action

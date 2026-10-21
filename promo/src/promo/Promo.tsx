@@ -4,12 +4,12 @@ import { useFontsReady } from "../fonts";
 import { LangProvider, Lang, useLang } from "../i18n";
 import { C, FONT } from "../theme";
 import { beat, outExpo, outQuart, NOTCH_SPRING, ramp, sp, swiftSpring } from "../motion";
-import { DEFAULT_ORDER, NotchBody, NOTCH_H, PanelInner, TAB_CONTENT_H, TabId, panelHeight } from "../ui/notch";
+import { DEFAULT_ORDER, NotchBody, NOTCH_H, PanelInner, TabId, panelHeight } from "../ui/notch";
 import { ClipboardTab, FileGlyph, NotesTab, PlayerTab, QuickTab, SHELF_ITEMS, ShelfTab, TimerTab } from "../ui/tabs";
 import { Conversation, PermissionReply, SessionCard, SessionCount } from "../ui/claude";
 import { Check, Hand, PauseCircle, Radio, Trash } from "../ui/icons";
 import { COPY, tx } from "./copy";
-import { Format, Layout, fit, layoutFor } from "./layout";
+import { Format, Layout, fit, fitMono, layoutFor } from "./layout";
 import { Chip, MonoLine, MaskLine, PKey, Pointer, hexMix, pointerAt } from "./parts";
 
 const B = beat;
@@ -234,7 +234,6 @@ export const Promo: React.FC<PromoProps> = ({ format, lang, music }) => {
 const Scene: React.FC<{ format: Format; lang: Lang }> = ({ format, lang }) => {
   const f = useCurrentFrame();
   const L = layoutFor(format);
-  const S = L.S;
   const wide = format === "wide";
 
   // ── mode de la notch : repliée simple, oreilles, déployée ──
@@ -290,16 +289,17 @@ const Scene: React.FC<{ format: Format; lang: Lang }> = ({ format, lang }) => {
   const gIn = clamp01(sp(f, T.curtain, swiftSpring(0.34, 0.9)));
   const gOut = clamp01(sp(f, T.retract, swiftSpring(0.34, 0.9)));
   const g = clamp01(gIn - gOut);
+  // Échelle du panneau : plus petite dans la scène sombre, où le panneau Claude est plus haut.
+  const S = lerp(L.S, L.S * L.devRatio, g);
+  const Sdev = L.S * L.devRatio;
   const darkAmt = ramp(g, 0.7, 0.98, 0, 1, (x) => x);
   const bg = C.paper;
   const ink = hexMix("#0B0B0B", "#EFEAE0", darkAmt);
-  const curtainColor = hexMix("#000000", "#181818", ramp(f, T.curtain + 10, T.curtain + 20, 0, 1) * (1 - ramp(f, T.retract - 2, T.retract + 6, 0, 1)));
+  const curtainColor = hexMix("#000000", "#181818", ramp(f, T.curtain + 26, T.curtain + 42, 0, 1) * (1 - ramp(f, T.retract - 2, T.retract + 6, 0, 1)));
 
   // rectangle du panneau déplié (px), au moment du rideau et pendant l'édition
   const panelLeftPx = L.cx - (W_OPEN * S) / 2;
-  const startPanelH = panelHeight(TAB_CONTENT_H.notes) * S;
-  const endPanelH = panelHeight(209) * S;
-  const rectH = f < T.openDev ? startPanelH : endPanelH;
+  const rectH = panelH * S;
   const curtainRect = {
     left: lerp(panelLeftPx, 0, g),
     top: 0,
@@ -356,10 +356,12 @@ const Scene: React.FC<{ format: Format; lang: Lang }> = ({ format, lang }) => {
     );
 
   // ── pointeur (px) ──
-  const px = (xpt: number, ypt: number) => ({ x: panelLeftPx + xpt * S, y: ypt * S });
+  const pxS = (s: number, xpt: number, ypt: number) => ({ x: L.cx - (W_OPEN * s) / 2 + xpt * s, y: ypt * s });
+  const px = (xpt: number, ypt: number) => pxS(L.S, xpt, ypt);
+  const pd = (xpt: number, ypt: number) => pxS(Sdev, xpt, ypt);
   const tabC = (i: number) => px(39.5 + 29 * i, 44);
   const kp = (fr: number, p2: { x: number; y: number }, d?: number): PKey => ({ f: fr, x: p2.x, y: p2.y, d });
-  const notchTop = { x: L.cx, y: 26 * S };
+  const notchTop = { x: L.cx, y: 26 * L.S };
   const off1 = { x: wide ? 420 : 180, y: L.h + 40 };
   const keys: PKey[] = [
     kp(86, off1),
@@ -376,12 +378,12 @@ const Scene: React.FC<{ format: Format; lang: Lang }> = ({ format, lang }) => {
     kp(534, tabC(6), 12),
     // acte 4
     kp(622, off1, 1),
-    kp(642, notchTop, 18),
-    kp(690, px(322, 94.5), 20),
-    kp(730, px(584, 209.5), 14),
-    kp(756, px(322, 169), 12),
-    kp(764, px(559, 149), 8),
-    kp(826, px(579.5, 285), 22),
+    kp(642, { x: L.cx, y: 26 * Sdev }, 18),
+    kp(690, pd(322, 94.5), 20),
+    kp(730, pd(584, 209.5), 14),
+    kp(756, pd(322, 169), 12),
+    kp(764, pd(559, 149), 8),
+    kp(826, pd(579.5, 285), 22),
     // acte 5
     kp(862, tabC(6), 20),
     kp(916, tabC(1), 22),
@@ -476,12 +478,12 @@ const Scene: React.FC<{ format: Format; lang: Lang }> = ({ format, lang }) => {
         const cap = wide ? L.caption.size : L.caption.size;
         return (
           <React.Fragment key={v.key}>
-            <MaskLine text={v.verb} size={v.size} frame={f} inAt={v.from} outAt={v.to - 1} color={v.dark ? textColor : textColor} left={L.margin} top={L.verb.bottom - v.size} />
-            <MonoLine text={v.caption} size={cap} frame={f} inAt={v.from + 4} outAt={v.to - 1} color={subColor} left={L.margin + 6} top={L.caption.y} />
+            <MaskLine text={v.verb} size={v.size} frame={f} inAt={v.from} outAt={v.to - 7} color={textColor} left={L.margin} top={L.verb.bottom - v.size} />
+            <MonoLine text={v.caption} size={fitMono(v.caption, L.maxTextW - 12, cap)} frame={f} inAt={v.from + 4} outAt={v.to - 6} color={subColor} left={L.margin + 6} top={L.caption.y} />
           </React.Fragment>
         );
       })}
-      <MonoLine text={tx(lang, COPY.devIntro)} size={wide ? 46 : 40} frame={f} inAt={B(42)} outAt={B(44) - 1} color={subColor} left={L.margin} top={L.verb.bottom - (wide ? 100 : 90)} />
+      <MonoLine text={tx(lang, COPY.devIntro)} size={fitMono(tx(lang, COPY.devIntro), L.maxTextW, wide ? 46 : 40)} frame={f} inAt={B(42)} outAt={B(44) - 7} color={subColor} left={L.margin} top={L.verb.bottom - (wide ? 100 : 90)} />
 
       {/* panneau / notch */}
       <div style={{ position: "absolute", left: bodyLeftPx, top: 0, transform: `scale(${S})`, transformOrigin: "0 0" }}>
@@ -517,7 +519,7 @@ const Scene: React.FC<{ format: Format; lang: Lang }> = ({ format, lang }) => {
       </div>
 
       {/* fichier traîné */}
-      {dragFileP > 0 && <DraggedFile f={f} keys={keys} p={dragFileP} S={S} />}
+      {dragFileP > 0 && <DraggedFile f={f} keys={keys} p={dragFileP} S={L.S} />}
 
       <Pointer frame={f} keys={keys} presses={presses} holds={holds} visible={visible} size={wide ? 30 : 34} />
 
@@ -559,7 +561,7 @@ const Closing: React.FC<{
       ))}
       <MonoLine
         text={tx(lang, COPY.tagline)}
-        size={wide ? 36 : 36}
+        size={fitMono(tx(lang, COPY.tagline), L.maxTextW, 36)}
         frame={f}
         inAt={B(69)}
         color={C.accent}
@@ -570,9 +572,11 @@ const Closing: React.FC<{
       {chipTexts.map((txt, i) => (
         <Chip key={i} text={txt} frame={f} at={B(70) + i * 15} left={chipPositions[i].left} top={chipPositions[i].top} color={color} size={chipSize} />
       ))}
-      <MonoLine text={COPY.link} size={wide ? 46 : 40} frame={f} inAt={B(74)} color={color} left={L.margin} top={wide ? 790 : 1720} weight={700} />
-      <MonoLine text={tx(lang, COPY.free)} size={wide ? 30 : 29} frame={f} inAt={B(74) + 4} color={sub} left={L.margin + 4} top={wide ? 860 : 1782} />
-      <MonoLine text={tx(lang, COPY.legal)} size={wide ? 17 : 15.5} frame={f} inAt={B(75)} color={sub} left={L.margin + 4} top={wide ? 1020 : 1862} />
+      <MonoLine text={COPY.link} size={fitMono(COPY.link, L.maxTextW, wide ? 46 : 40)} frame={f} inAt={B(74)} color={color} left={L.margin} top={wide ? 790 : 1720} weight={700} />
+      <MonoLine text={tx(lang, COPY.free)} size={fitMono(tx(lang, COPY.free), L.maxTextW, wide ? 30 : 29)} frame={f} inAt={B(74) + 4} color={sub} left={L.margin + 4} top={wide ? 860 : 1782} />
+      {COPY.legal.map((line, i) => (
+        <MonoLine key={i} text={tx(lang, line)} size={fitMono(tx(lang, line), L.maxTextW, wide ? 18 : 19)} frame={f} inAt={B(75) + i * 2} color={sub} left={L.margin + 4} top={(wide ? 1004 : 1836) + i * (wide ? 28 : 30)} />
+      ))}
     </>
   );
 };
