@@ -82,3 +82,7 @@
 "Sans statusLine existante, le relais affiche seulement « 5h 39% · 7d 63% »." = "With no existing statusLine, the relay only prints \"5h 39% · 7d 63%\".";
 "Sauvegarde horodatée de settings.json, retrait en un clic. Seuls les pourcentages sont gardés, en mémoire." = "Timestamped backup of settings.json, removed in one click. Only the percentages are kept, in memory.";
 "Le relais de statusLine des jauges de quota sera aussi retiré de ~/.claude/settings.json, et ta commande d'origine remise." = "The quota gauges' statusLine relay will also be removed from ~/.claude/settings.json, and your original command put back.";
+"1 sur %d" = "1 of %d";
+"Approuver au clavier" = "Approve with the keyboard";
+"⌃⌥Y autorise et ⌃⌥N refuse la plus ancienne demande, Claude et Codex ensemble. Une touche ne décide que si sa carte est ouverte dans la notch depuis plus d'une seconde ; sinon le premier appui montre la carte." = "⌃⌥Y allows and ⌃⌥N denies the oldest request, Claude and Codex together. A key only decides if its card has been open in the notch for more than a second; otherwise the first press shows the card.";
+"Ces touches ne sont prises que tant qu'une demande attend. Une demande à la fois, jamais de « toujours autoriser »." = "These keys are only taken while a request is waiting. One request at a time, never \"always allow\".";

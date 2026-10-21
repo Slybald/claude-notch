@@ -399,6 +399,7 @@ struct ClaudeSettingsView: View {
                     }
                 }
             }
+            if prefs.replyFromNotch { ApprovalKeysSettings(prefs: prefs) }
             quotaSection
             Section {
                 LabeledContent("État") {

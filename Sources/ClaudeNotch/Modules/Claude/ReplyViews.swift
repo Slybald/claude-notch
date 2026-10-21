@@ -222,6 +222,7 @@ struct RequestCard: View {
     let request: ReplyCenter.Request
     @ObservedObject var drafts: ReplyDrafts
     var compact = false
+    @ObservedObject var keys: ApprovalQueue = .shared
     let engage: () -> Void
     let decide: (ReplyCenter.Decision) -> Void
 
@@ -243,11 +244,22 @@ struct RequestCard: View {
                 .strokeBorder(Palette.amber.opacity(0.35), lineWidth: 1)
         )
         // La carte est à l'écran : la notch garde la demande le temps qu'il faut (sinon 4 s).
-        .onAppear(perform: engage)
-        .onDisappear { NotchKeyboard.release() }
+        .onAppear {
+            engage()
+            keys.cardAppeared(request.id)
+        }
+        .onDisappear {
+            keys.cardDisappeared(request.id)
+            NotchKeyboard.release()
+        }
     }
 
     // MARK: Permission
+
+    /// La touche, seulement sur la carte qui a les touches (la plus ancienne) et si macOS a accepté la combinaison.
+    private func keycap(_ choice: HotKeyChoice, live: Bool) -> String? {
+        keys.keyedId == request.id && live ? choice.title : nil
+    }
 
     private func permissionBody(_ permission: ReplyCenter.Permission) -> some View {
         let reason = drafts.binding(key)
@@ -266,6 +278,7 @@ struct RequestCard: View {
                         .foregroundColor(Palette.secondary)
                         .lineLimit(1)
                 }
+                ApprovalRank(keys: keys, id: request.id)
             }
             if let detail = permission.detail {
                 PermissionDetail(text: detail, isCode: permission.isCode)
@@ -273,10 +286,12 @@ struct RequestCard: View {
             actionRow(
                 field: ReplyField(placeholder: L("Pourquoi refuser ? (facultatif)", table: "Claude"), text: reason,
                                   onSubmit: { if !reason.wrappedValue.isEmpty { decide(.deny(reason.wrappedValue)) } }),
-                secondary: ReplyButton(title: L("Refuser", table: "Claude"), style: .destructive) {
+                secondary: ReplyButton(title: L("Refuser", table: "Claude"), style: .destructive,
+                                       keycap: keycap(.controlOptionN, live: keys.denyLive)) {
                     decide(.deny(reason.wrappedValue))
                 },
-                primary: ReplyButton(title: L("Autoriser", table: "Claude"), style: .primary) { decide(.allow) }
+                primary: ReplyButton(title: L("Autoriser", table: "Claude"), style: .primary,
+                                     keycap: keycap(.controlOptionY, live: keys.approveLive)) { decide(.allow) }
             )
         }
     }
@@ -643,21 +658,26 @@ struct ReplyButton: View {
     let title: String
     let style: Style
     var isEnabled = true
+    /// Touche du clavier qui fait la même chose (« ⌃⌥Y »), pour « Approuver au clavier ».
+    var keycap: String?
     let action: () -> Void
 
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundColor(foreground)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 11)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(background))
-                .contentShape(Capsule())
+            HStack(spacing: 6) {
+                Text(title)
+                if let keycap { KeyCap(text: keycap) }
+            }
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundColor(foreground)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 11)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(background))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)

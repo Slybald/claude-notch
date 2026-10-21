@@ -328,8 +328,14 @@ extension CodexApprovals.Notice.Tone {
 struct CodexApprovalCard: View {
     let request: CodexApprovals.Request
     var compact = false
+    @ObservedObject var keys: ApprovalQueue = .shared
     let engage: () -> Void
     let decide: (CodexApprovals.Decision) -> Void
+
+    /// La touche, seulement sur la carte qui a les touches (la plus ancienne) et si macOS a accepté la combinaison.
+    private func keycap(_ choice: HotKeyChoice, live: Bool) -> String? {
+        keys.keyedId == request.id && live ? choice.title : nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -347,6 +353,7 @@ struct CodexApprovalCard: View {
                         .foregroundColor(Palette.secondary)
                         .lineLimit(1)
                 }
+                ApprovalRank(keys: keys, id: request.id)
             }
             if let detail = request.tool.detail {
                 Text(verbatim: detail)
@@ -373,15 +380,21 @@ struct CodexApprovalCard: View {
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 ReplyButton(title: L("Dans le terminal", table: "Codex"), style: .secondary) { decide(.terminal) }
-                ReplyButton(title: L("Refuser", table: "Codex"), style: .destructive) { decide(.deny) }
-                ReplyButton(title: L("Autoriser", table: "Codex"), style: .primary) { decide(.allow) }
+                ReplyButton(title: L("Refuser", table: "Codex"), style: .destructive,
+                            keycap: keycap(.controlOptionN, live: keys.denyLive)) { decide(.deny) }
+                ReplyButton(title: L("Autoriser", table: "Codex"), style: .primary,
+                            keycap: keycap(.controlOptionY, live: keys.approveLive)) { decide(.allow) }
             }
         }
         .padding(10)
         .background(ModuleStyle.shape(ModuleStyle.cardRadius).fill(Color.white.opacity(0.07)))
         .overlay(ModuleStyle.shape(ModuleStyle.cardRadius).strokeBorder(Palette.amber.opacity(0.35), lineWidth: 1))
         // La carte est à l'écran : la notch garde la demande le temps qu'il faut (sinon 4 s).
-        .onAppear(perform: engage)
+        .onAppear {
+            engage()
+            keys.cardAppeared(request.id)
+        }
+        .onDisappear { keys.cardDisappeared(request.id) }
     }
 }
 
@@ -464,6 +477,7 @@ struct CodexCompactView: View {
 struct CodexSettingsView: View {
     @ObservedObject var module: CodexModule
     @ObservedObject var setup: CodexHookSetup
+    @ObservedObject var prefs: Preferences = .shared
 
     var body: some View {
         SettingsPane {
@@ -482,6 +496,7 @@ struct CodexSettingsView: View {
                                                   table: "Codex"), Int(CodexApprovals.engagedDelay)))
                 }
             }
+            if module.replyFromNotch { ApprovalKeysSettings(prefs: prefs) }
             Section {
                 Toggle(isOn: $module.showsQuota) {
                     Text("Afficher le quota (5 h et 7 jours)", tableName: "Codex")

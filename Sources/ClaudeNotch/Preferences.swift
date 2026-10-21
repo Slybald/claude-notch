@@ -184,6 +184,7 @@ final class Preferences: ObservableObject {
         static let hideFromCapture = "privacy.hideFromCapture"
         static let replyFromNotch = "claude.replyFromNotch"
         static let replyPromptDismissed = "claude.replyPromptDismissed"
+        static let approveByKeyboard = "claude.approveByKeyboard"
 
         /// Réglages de la notch remis à zéro par « Rétablir les réglages par défaut » : ni les onglets, ni les
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
@@ -362,6 +363,11 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(replyFromNotch, forKey: Key.replyFromNotch) }
     }
 
+    /// Approuver au clavier (⌃⌥Y, ⌃⌥N) les demandes de Claude et de Codex ; éteint par défaut.
+    @Published var approveByKeyboard: Bool {
+        didSet { defaults.set(approveByKeyboard, forKey: Key.approveByKeyboard) }
+    }
+
     /// « Plus tard » sur la carte qui propose d'activer les réponses : elle ne revient pas (le réglage reste dans
     /// Réglages › Claude).
     @Published var replyPromptDismissed: Bool {
@@ -435,6 +441,7 @@ final class Preferences: ObservableObject {
         }
         replyFromNotch = defaults.bool(forKey: Key.replyFromNotch)
         replyPromptDismissed = defaults.bool(forKey: Key.replyPromptDismissed)
+        approveByKeyboard = defaults.bool(forKey: Key.approveByKeyboard)
     }
 
     /// Ancien « Alterner Claude et les autres oreilles » : activé (ou jamais réglé) → intercalaires toujours visibles,
