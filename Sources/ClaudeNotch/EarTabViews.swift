@@ -110,7 +110,7 @@ private struct EarTabItemView: View {
     private var isSliver: Bool { item.width <= EarTabs.sliverWidth }
     private var title: String {
         if case .more(let hidden) = item.tab.kind { return Self.moreTitle(hidden.count) }
-        return registry.module(item.tab.id)?.title ?? item.tab.id
+        return registry.earTitle(item.tab.id)
     }
 
     static func moreTitle(_ count: Int) -> String {
@@ -212,7 +212,7 @@ private struct EarTabItemView: View {
         Group {
             if case .more(let hidden) = item.tab.kind {
                 EarTabMoreList(tabs: hidden, registry: registry, openTab: openTab)
-            } else if let view = registry.module(item.tab.id)?.makeTabDetailView() {
+            } else if let view = registry.earDetailView(item.tab.id) {
                 view
             }
         }
@@ -312,7 +312,7 @@ private struct EarTabMoreList: View {
                 let accent = tab.accentHex.flatMap { Color(hex: $0) } ?? Palette.accent
                 ModuleSummaryRow {
                     EarTabIcon(tab: tab, accent: accent)
-                    Text(verbatim: registry.module(tab.id)?.title ?? tab.id)
+                    Text(verbatim: registry.earTitle(tab.id))
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundColor(Palette.primary)
                         .lineLimit(1)

@@ -98,6 +98,7 @@ final class AppCore {
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
         server.codex = notch.codex
+        server.api = notch.registry.external
         self.server = server
         // Onglet Codex : même principe, indépendant de celui de Claude.
         notch.registry.$enabled
@@ -191,6 +192,7 @@ final class AppCore {
         state["sessionTimer"] = store.isTicking
         state["notch"] = notch?.debugInfo
         state["codex"] = notch?.codex.debugInfo
+        state["api"] = notch?.registry.external.debugInfo
         var tools = self.tools.debugSummary
         tools["filesLogged"] = activityLog.filesLogged
         tools["permissionsLogged"] = activityLog.permissionsLogged

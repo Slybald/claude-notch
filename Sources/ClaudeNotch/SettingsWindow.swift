@@ -98,6 +98,7 @@ enum SettingsSection: Hashable {
     case appearance
     case privacy
     case module(String)
+    case scripts
     case updates
     case about
 }
@@ -144,6 +145,7 @@ struct SettingsView: View {
             ForEach(moduleSections) { section in
                 Label(section.title, systemImage: section.symbol).tag(SettingsSection.module(section.id))
             }
+            Label { Text("Scripts", tableName: "API") } icon: { Image(systemName: "terminal") }.tag(SettingsSection.scripts)
             Label("Mises à jour", systemImage: "arrow.down.circle").tag(SettingsSection.updates)
             Label("À propos", systemImage: "info.circle").tag(SettingsSection.about)
         }
@@ -162,6 +164,7 @@ struct SettingsView: View {
         case .appearance: AppearanceSettings(prefs: prefs, claudeEnabled: registry.isClaudeEnabled)
         case .privacy: PrivacySettings(prefs: prefs)
         case .module(let id): registry.module(id)?.makeSettingsView()
+        case .scripts: LocalAPISettings(api: registry.external)
         case .updates: UpdateSettings(updater: updater, prefs: prefs)
         case .about: AboutSettings(registry: registry, updater: updater)
         }

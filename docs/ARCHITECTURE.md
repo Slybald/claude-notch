@@ -24,15 +24,15 @@ organised and why some choices were made, so they are not undone by accident.
   `UPDATE_SIGNING_KEY` secret and creates the release (DMG, `.sha256`, `.sig`).
 - Live diagnostics of the running app: `GET http://127.0.0.1:47823/state` with the hook token
   (`curl -H @"$HOME/Library/Application Support/ClaudeNotch/hook-token" …`): sessions, notch, tools, jobs,
-  version, updater, replies (counts only); `notch` gives the window level seen by the window server, the Space,
+  version, updater, replies (counts only), local API (on, tab count, client names); `notch` gives the window level seen by the window server, the Space,
   occlusion, screen, front app, full-screen state, tab, tab edit mode (`editingTabs`) and running modules.
 
 ## Code map (`Sources/ClaudeNotch/`)
 
 - `HookServer`: minimal HTTP server on 127.0.0.1:47823. It resolves the process context *before* replying,
   while the hook process is still alive. Exact `Host`, no `Origin`, token (`HookAccess`) on every route but
-  `/health`; `/permission` and `/inbox` are long requests handed to `ReplyCenter`; `/codex/hook` and `/codex/permission` do the
-  same for Codex (`CodexRelay`). `HookEvent`: tolerant JSON
+  `/health` and `/api/…`; `/permission` and `/inbox` are long requests handed to `ReplyCenter`; `/codex/hook` and `/codex/permission` do the
+  same for Codex (`CodexRelay`); `/api/…` goes to `LocalAPI` with its own token. `HookEvent`: tolerant JSON
   reading, every field optional.
 - `ProcessInspector`: walks the ancestors of the hook's `$PPID` to find the Claude process, the host app
   (outermost `.app` bundle) and the source (CLI or Desktop). `ClaudeMonitor`: is Claude Desktop running,
@@ -90,6 +90,9 @@ organised and why some choices were made, so they are not undone by accident.
 - `ActivityLog`: `files.jsonl` / `permissions.jsonl`. `JobRunner`: optional companion tool jobs.
 - `Localization`: the `L()` helper, with an optional table. `LaunchAgent`: open at login.
 - `Updater`: automatic updates from GitHub releases (check, signature, install, relaunch) and its menu items.
+- `LocalAPI`: the local API of the user's scripts (`/api/v1/ears`, see [API.md](API.md)): token, strict schema
+  (`ExternalEar`), rate limit, expiry, the ear tabs it hands to `ModuleRegistry` (ids `api.<id>`), and `NotchCommand`
+  (installs `hooks/notch` in `~/.local/bin`). `LocalAPIViews`: the unfolded card of a script's tab and Settings › Scripts.
 
 ## Modules (tabs)
 
@@ -479,6 +482,16 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
   already had the hooks; with the tab off, `~/.claude` is not even read at launch. A window opens only if that
   update fails. Hooks that were never installed are offered once, in the setup assistant (first launch, Claude Code
   detected, unticked), then from Settings › Claude; never at every launch.
+- **Local API** (`LocalAPI`, [API.md](API.md)): off by default (`api.enabled`), for scripts only. Its own token
+  (`api-token`, 0600, `Authorization: Bearer …` so curl reads it with `-H @file`), written once the listener is ready and
+  only while the API is on, new at each launch and each time it is turned on: the hook token does not open it and its
+  token opens nothing else. Strict schema (unknown field, wrong type or too long = 400, never cut), icons and colors from
+  lists, 3 tabs (the oldest leaves), 1 h at most, token bucket (10, then 2/s). No URL, command or file: the only action
+  opens an installed app by bundle id, on a click. Tabs rank 2 (under timer, Codex, Claude), never `alert`, no
+  Allow/Deny, "via <client>" on the card (names with claude, codex, anthropic or openai refused, no color is Codex's).
+  `notch run` resends a result refused by the rate limit once, a second later, else removes its hourglass. Expiry is one wall-clock `asyncAfter` re-armed for the next deadline (no
+  periodic timer). Requests are handled on the main thread (`DispatchQueue.main.sync` from the server queue, like
+  `/state`). Not done: a `claude-notch://` scheme (any web page can open one) and App Intents.
 - **Reply flow** (`/permission`, `/inbox`): the hook script posts with the token (curl reads it from the 0600 file
   `hook-token`, never from argv) and waits. `HookServer` checks `Host`, `Origin` and the token, then hands the
   request to `ReplyCenter`. A click gives the answer: the app returns it with the `X-Claude-Notch-Proof` header,

@@ -16,6 +16,8 @@ struct ModuleEars: Equatable {
     var bars = false
     /// Le module attend l'utilisateur : son intercalaire reste déployé, même en mode « Rétractés ».
     var alert = false
+    /// Couleur d'accent (hex) à la place de celle du module (intercalaires de l'API locale).
+    var accentHex: String? = nil
 }
 
 /// Notice d'un composant tiers, affichée dans Réglages › À propos › Licences.

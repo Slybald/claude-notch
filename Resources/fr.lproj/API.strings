@@ -1,0 +1,25 @@
+/* Claude Notch : textes français de l'API locale (Réglages › Scripts, intercalaires des scripts ; la clé est le texte). */
+"%@ · %d appel" = "%@ · %d appel";
+"%@ · %d appels" = "%@ · %d appels";
+"API locale" = "API locale";
+"Ancienne version" = "Ancienne version";
+"Aucun pour l'instant" = "Aucun pour l'instant";
+"Autoriser les scripts de ce Mac à poser des intercalaires" = "Autoriser les scripts de ce Mac à poser des intercalaires";
+"Build fini" = "Build fini";
+"Commande notch" = "Commande notch";
+"Coupée par défaut. Seuls les programmes de ton compte qui lisent son jeton (un fichier réservé à ton compte, renouvelé à chaque lancement) peuvent l'appeler, jamais une page web. Un intercalaire ne lance rien : un texte court, une icône de la liste et, au plus, un bouton qui ouvre une app." = "Coupée par défaut. Seuls les programmes de ton compte qui lisent son jeton (un fichier réservé à ton compte, renouvelé à chaque lancement) peuvent l'appeler, jamais une page web. Un intercalaire ne lance rien : un texte court, une icône de la liste et, au plus, un bouton qui ouvre une app.";
+"Derniers clients" = "Derniers clients";
+"Installer" = "Installer";
+"Installée" = "Installée";
+"Installée seulement sur ton clic, jamais par-dessus un autre programme. Si le terminal ne la trouve pas, ajoute ~/.local/bin à ton PATH. Toutes les options : docs/API.md." = "Installée seulement sur ton clic, jamais par-dessus un autre programme. Si le terminal ne la trouve pas, ajoute ~/.local/bin à ton PATH. Toutes les options : docs/API.md.";
+"La commande n'est pas livrée avec cette copie de l'app." = "La commande n'est pas livrée avec cette copie de l'app.";
+"Le nom que chaque programme se donne, gardé en mémoire jusqu'à la fermeture de l'app." = "Le nom que chaque programme se donne, gardé en mémoire jusqu'à la fermeture de l'app.";
+"Mettre à jour" = "Mettre à jour";
+"Ouvrir %@" = "Ouvrir %@";
+"Pas installée" = "Pas installée";
+"Pas livrée avec cette copie de l'app" = "Pas livrée avec cette copie de l'app";
+"Retirer" = "Retirer";
+"Scripts" = "Scripts";
+"Un autre programme porte ce nom" = "Un autre programme porte ce nom";
+"Un autre programme s'appelle déjà « notch » à cet endroit : rien n'a été modifié." = "Un autre programme s'appelle déjà « notch » à cet endroit : rien n'a été modifié.";
+"via %@" = "via %@";
