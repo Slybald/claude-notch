@@ -306,7 +306,7 @@ Apple Events and Bluetooth are already there; Messages added the one for Contact
     on. Tab off (`AppCore.setCodexTracking`): `HookServer.isCodexPaused` (the `/codex/*` routes answer 204 without
     inspecting a process), `CodexStore` stopped (sessions forgotten, watchers and timer cancelled), held approvals given
     back. The module runs while collapsed only while something happens (`keepsRunningWhenCollapsed` =
-    `store.hasActivity`), so its ears join the existing rotation (priority 9 waiting, 6 working or done).
+    `store.hasActivity`), so its ears get their own index tab (priority 9 waiting, as an alert that stays deployed, 6 working or done).
   - **Hooks**: one async relay per event (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`,
     `Interrupt`, `SessionEnd`; the last two are capped at 3 s by Codex) and the synchronous `PermissionRequest` entry
     (`codex-notch-hook.sh permission`, timeout 75 s). Same token, proof and `Host`/`Origin` rules as Claude's hooks
