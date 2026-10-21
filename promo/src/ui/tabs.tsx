@@ -224,11 +224,18 @@ export const PlayerTab: React.FC<{ progress?: number; playing?: boolean; frame?:
   const days = [19, 20, 21, 22, 23, 24, 25];
   const letters = ["M", "T", "W", "T", "F", "S", "S"];
   const lettersFr = ["L", "M", "M", "J", "V", "S", "D"];
-  const events: [string, string, string][] = [
-    [C.green, t("All day", "Journée"), t("Workshop", "Formation")],
-    ["#4C8DFF", "09:00", t("Team sync", "Point d'équipe")],
-    [C.accent, "14:30", t("Design review", "Revue de design")],
-  ];
+  const events: [string, string, string][] =
+    day === 20
+      ? [
+          [C.green, t("All day", "Journée"), t("Workshop", "Formation")],
+          ["#4C8DFF", "09:00", t("Team sync", "Point d'équipe")],
+          [C.accent, "14:30", t("Design review", "Revue de design")],
+        ]
+      : [
+          ["#4C8DFF", "10:30", t("Dentist", "Dentiste")],
+          [C.accent, "12:30", t("Lunch with Sam", "Déjeuner avec Sam")],
+          [C.green, "18:00", t("Run", "Course")],
+        ];
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", gap: 10 }}>
       <Card style={{ width: 314, height: 150, position: "relative" }} radius={12}>
