@@ -286,6 +286,15 @@ private struct GeneralSettings: View {
                 }
                 SettingsNote(L("Sans encoche, une encoche virtuelle est dessinée en haut au centre."))
             }
+            Section(L("Bulle", table: "Bubble")) {
+                Toggle(L("Permettre de détacher la notch", table: "Bubble"), isOn: $prefs.allowsDetach)
+                if prefs.allowsDetach {
+                    Toggle(L("Revenir à la notch au redémarrage", table: "Bubble"), isOn: $prefs.bubbleReturnsOnRelaunch)
+                }
+                SettingsNote(L("Maintiens l'angle en bas à droite du panneau puis glisse : la notch se décolle en bulle, "
+                               + "à poser où tu veux. Ramène-la sous la notch, double-clique sur son bord ou choisis "
+                               + "« Rattacher à la notch » pour la remettre.", table: "Bubble"))
+            }
             Section {
                 HStack {
                     Spacer()

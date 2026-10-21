@@ -38,7 +38,10 @@ final class ReplyDrafts: ObservableObject {
 /// Clavier du panneau de la notch, qui ne s'active jamais : il ne devient fenêtre clé que pour un champ de texte,
 /// et rend le clavier à l'app de devant dès que le champ se ferme, sinon les frappes suivantes s'y perdraient.
 enum NotchKeyboard {
-    private static var panel: NSWindow? { NSApp.windows.first { $0 is NotchPanel && $0.isVisible } }
+    /// La bulle quand la notch est détachée (la notch ne peut alors pas se déplier), sinon la notch.
+    static var panel: NSWindow? {
+        NSApp.windows.first { $0 is BubblePanel && $0.isVisible } ?? NSApp.windows.first { $0 is NotchPanel && $0.isVisible }
+    }
 
     static func take() {
         panel?.makeKey()

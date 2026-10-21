@@ -64,6 +64,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   **…** › **Command Bar…** opens it without a shortcut. Fuzzy search ignores case and accents.
 - `NotchModule` gets two optional members, `commandVerb` and `commands(for:)` (empty by default): a module offers its
   own actions to the bar, nothing is hard-coded in the bar. A stopped or hidden tab is never woken by a search.
+- **Detach the notch into a bubble.** Hold the bottom right corner of the open panel (a small arc marks it), then drag:
+  the panel stretches like a drop of liquid, a neck forms and thins, and the drop comes off as a round bubble you can put
+  anywhere on your screens (all Spaces, above apps, like the notch). Its position is remembered per display.
+- **Tabs in a revolver cylinder.** Inside the bubble, your tabs sit in a circle in the order you chose; the one at the
+  top is the active tab. Scroll, drag around the cylinder or click a tab to turn it, one detent at a time; click the
+  centre (or the top tab) and the bubble opens into the panel with that tab, then closes back into a bubble. Activities
+  (Claude working, a timer, music…) show as a colored ring and a pill on the bubble, and a dot on their tab.
+- **Back to the notch**: bring the bubble under the notch (it snaps to it) and it merges back with the reverse drop
+  effect; or double-click its edge, or choose **Reattach to Notch** (right click, **…** menu). While detached, hovering
+  the notch does not open a second panel; index tabs still work and open the bubble on their tab. **Detach Notch** is
+  also in the **…** menu and the right-click menu of the notch, and VoiceOver can use it and turn the cylinder.
+- **Settings › General › Bubble**: *Allow detaching the notch* (on by default) and *Return to the notch at relaunch*.
+  With "Reduce motion", the drop becomes a simple fade.
 
 ### Fixed
 

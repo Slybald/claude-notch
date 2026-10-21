@@ -186,6 +186,12 @@ final class Preferences: ObservableObject {
         static let replyFromNotch = "claude.replyFromNotch"
         static let replyPromptDismissed = "claude.replyPromptDismissed"
         static let approveByKeyboard = "claude.approveByKeyboard"
+        static let allowsDetach = "bubble.allowDetach"
+        static let bubbleReturnsOnRelaunch = "bubble.returnOnRelaunch"
+        /// État de la bulle (pas des réglages) : détachée, dernier écran, position par écran.
+        static let bubbleDetached = "bubble.detached"
+        static let bubbleScreen = "bubble.screen"
+        static let bubblePositions = "bubble.positions"
 
         /// Réglages de la notch remis à zéro par « Rétablir les réglages par défaut » : ni les onglets, ni les
         /// réglages des modules, ni le lancement à l'ouverture de session, ni les mises à jour.
@@ -193,6 +199,7 @@ final class Preferences: ObservableObject {
             alwaysVisible, visibility, hiddenUntil, openTrigger, closeOnClickOutside, openDelay, closeDelay, haptics,
             toggleHotKey, hideHotKey, commandHotKey, fullScreen, screen, accent, panelSize, customWidth, background,
             customBackground, tintCollapsed, opacity, shadow, animationSpeed, showEars, earTabs, hideFromCapture,
+            allowsDetach, bubbleReturnsOnRelaunch,
         ]
     }
 
@@ -283,6 +290,30 @@ final class Preferences: ObservableObject {
     /// Fenêtre de la notch exclue des captures et du partage d'écran (`NSWindow.sharingType = .none`).
     @Published var hideFromCapture: Bool {
         didSet { defaults.set(hideFromCapture, forKey: Key.hideFromCapture) }
+    }
+
+    /// Poignée de l'angle du panneau et « Détacher la notch » : la notch devient une bulle à poser n'importe où.
+    @Published var allowsDetach: Bool {
+        didSet { defaults.set(allowsDetach, forKey: Key.allowsDetach) }
+    }
+
+    /// Au lancement, la bulle revient dans la notch au lieu de reprendre sa place.
+    @Published var bubbleReturnsOnRelaunch: Bool {
+        didSet { defaults.set(bubbleReturnsOnRelaunch, forKey: Key.bubbleReturnsOnRelaunch) }
+    }
+
+    @Published var bubbleDetached: Bool {
+        didSet { defaults.set(bubbleDetached, forKey: Key.bubbleDetached) }
+    }
+
+    /// Dernier écran de la bulle (nom de `NotchScreenPicker.labels`).
+    @Published var bubbleScreen: String? {
+        didSet { defaults.set(bubbleScreen, forKey: Key.bubbleScreen) }
+    }
+
+    /// Position de la bulle par écran : décalage [x, y] depuis l'origine de l'écran.
+    @Published var bubblePositions: [String: [Double]] {
+        didSet { defaults.set(bubblePositions, forKey: Key.bubblePositions) }
     }
 
     // MARK: Onglets
@@ -426,6 +457,11 @@ final class Preferences: ObservableObject {
         fullScreenBehavior = choice(Key.fullScreen, FullScreenBehavior.compact)
         screenChoice = defaults.string(forKey: Key.screen).flatMap { $0.isEmpty ? nil : $0 } ?? ScreenChoice.builtin
         hideFromCapture = defaults.object(forKey: Key.hideFromCapture) as? Bool ?? false
+        allowsDetach = defaults.object(forKey: Key.allowsDetach) as? Bool ?? true
+        bubbleReturnsOnRelaunch = defaults.bool(forKey: Key.bubbleReturnsOnRelaunch)
+        bubbleDetached = defaults.bool(forKey: Key.bubbleDetached)
+        bubbleScreen = defaults.string(forKey: Key.bubbleScreen)
+        bubblePositions = defaults.dictionary(forKey: Key.bubblePositions) as? [String: [Double]] ?? [:]
         tabOrder = defaults.stringArray(forKey: Key.tabOrder) ?? []
         tabEnabled = defaults.dictionary(forKey: Key.tabEnabled) as? [String: Bool] ?? [:]
         defaultTab = defaults.string(forKey: Key.defaultTab) ?? Self.lastTabChoice
@@ -557,6 +593,8 @@ final class Preferences: ObservableObject {
         fullScreenBehavior = fresh.fullScreenBehavior
         screenChoice = fresh.screenChoice
         hideFromCapture = fresh.hideFromCapture
+        allowsDetach = fresh.allowsDetach
+        bubbleReturnsOnRelaunch = fresh.bubbleReturnsOnRelaunch
         accentHex = fresh.accentHex
         panelSize = fresh.panelSize
         customPanelWidth = fresh.customPanelWidth
