@@ -27,7 +27,9 @@ const RUSH: [number, number, number][] = [
   [9.45, 10.28, 1.45], // saisie du mail, puis « Envoyer »
   [10.78, 10.98, 2],
   [13.1, 13.83, 1.35], // saisie de la conversation
-  [14.28, 14.48, 2], [15.05, 15.25, 2], [16.47, 16.58, 2], [17.22, 17.4, 2], [18.88, 18.98, 2], [19.42, 19.62, 2],
+  [14.28, 14.48, 2], [15.05, 15.25, 2], [15.72, 15.8, 2],
+  [15.83, 16.37, 1], // appui long : 0,5 s réelles, comme dans l'app
+  [16.47, 16.58, 2], [17.22, 17.4, 2], [18.88, 18.98, 2], [19.42, 19.62, 2],
   [19.8, 20.45, 1.4], // saisie du message
   [20.85, 21.08, 2], [21.48, 22.08, 2.1], [22.62, 22.93, 2.1], [23.58, 23.75, 2], [24.05, 24.22, 2],
   [24.92, 25.13, 2], [25.82, 25.98, 2],
@@ -186,7 +188,7 @@ export const Promo4: React.FC<Promo4Props> = ({ format, lang }) => {
   const shot = <Shot format={format} lang={lang} L={L} tg={tg} />;
   return (
     <LangProvider lang={lang}>
-      <AbsoluteFill style={{ background: "#EDEDE8" }}>{fast ? <MotionBlur n={5}>{shot}</MotionBlur> : shot}</AbsoluteFill>
+      <AbsoluteFill style={{ background: "#EDEDE8" }}>{fast ? <MotionBlur n={6}>{shot}</MotionBlur> : shot}</AbsoluteFill>
     </LangProvider>
   );
 };

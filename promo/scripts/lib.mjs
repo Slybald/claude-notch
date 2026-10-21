@@ -23,4 +23,4 @@ export async function open() {
 export const CTA_END_FRAME = 948;
 export const CTA_END_FRAME_V3 = 1695;
 /** v4 : `CTA_END4` dans src/promo4/Promo4.tsx (T.ret de la v3 après la rampe de vitesse, 22,0 s). À recalculer si la rampe change. */
-export const CTA_END_FRAME_V4 = 1320;
+export const CTA_END_FRAME_V4 = 1321;

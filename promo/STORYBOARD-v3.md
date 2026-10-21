@@ -1,4 +1,4 @@
-# Storyboard minuté, version 3 : toutes les fonctions
+# Storyboard minuté, version 3 : toutes les fonctions (remplacée par la v4 : [STORYBOARD.md](STORYBOARD.md))
 
 Vidéo de présentation de **28,25 s** en **60 images/s**, muette. Même style que la v2 (validé par l'utilisateur :
 [STORYBOARD-v2.md](STORYBOARD-v2.md), analyse mesurée de la référence dans [REFERENCE.md](REFERENCE.md)), mais elle montre
