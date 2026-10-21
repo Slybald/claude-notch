@@ -331,7 +331,10 @@ hooks it already receives:
   restarts. Sessions without a terminal other than the Code tab of Claude Desktop (`claude -p`, SDK, IDEs)
   cannot receive a message: the conversation offers to open the session instead. With Claude Desktop, plans were
   not checked, nor how its window shows a turn started from the notch. The conversation keeps the last 6 lines
-  per session, in memory only.
+  per session, in memory only. After the app restarts (update, relaunch) a session that is idle has no waiting
+  hook until its next turn ends: the held hooks reconnect by themselves when the app comes back within 30 seconds
+  (hooks started by an older script do not), and otherwise a message is queued and the conversation says it will
+  go on Claude's next turn, with an **Open** button.
 - Esc while Claude is thinking, before any text: Claude writes nothing to the transcript, so the card stays on
   "thinking" until the next event.
 - A `claude` session started from a terminal opened inside Claude Desktop is classified as Desktop (Claude.app
@@ -762,7 +765,11 @@ partir de hooks qu'elle reçoit déjà :
   qu'après son redémarrage. Une session sans terminal autre que l'onglet Code de Claude Desktop (`claude -p`,
   SDK, IDE) ne peut pas recevoir de message : la conversation propose d'ouvrir la session. Avec Claude Desktop,
   les plans n'ont pas été vérifiés, ni la façon dont sa fenêtre montre un tour démarré depuis la notch. La
-  conversation garde les 6 dernières répliques de chaque session, en mémoire seulement.
+  conversation garde les 6 dernières répliques de chaque session, en mémoire seulement. Après un redémarrage de
+  l'app (mise à jour, relance), une session au repos n'a plus de hook en attente jusqu'à la fin de son prochain
+  tour : les hooks tenus se reconnectent seuls si l'app revient dans les 30 secondes (pas ceux lancés par un
+  ancien script), sinon un message reste en file et la conversation dit qu'il partira au prochain tour de Claude,
+  avec un bouton **Ouvrir**.
 - Esc pendant la réflexion, avant le moindre texte : Claude n'écrit rien dans le transcript, la carte reste en
   « Réfléchit » jusqu'au prochain événement.
 - Une session `claude` lancée depuis un terminal ouvert dans Claude Desktop est classée Desktop (Claude.app

@@ -8,6 +8,9 @@
 #   inbox            attente `asyncRewake` (SessionStart, Stop) d'un message envoyé depuis la notch : le texte
 #                    part sur stderr avec le code 2, ce qui réveille Claude. Sinon 0. L'identifiant de session
 #                    de Claude Desktop accompagne la requête : seul l'onglet Code est tenu sur Stop sans terminal.
+#                    Si l'app s'arrête pendant l'attente (relance, mise à jour), l'attente est rétablie dès qu'elle
+#                    revient (CLAUDE_NOTCH_RETRY secondes au plus, 30 par défaut) : sans cela la session resterait
+#                    sans attente jusqu'à son prochain Stop.
 # Une décision ou un message n'est appliqué que s'il porte la preuve de l'app (second fichier 0600, jamais
 # envoyé) : un autre programme qui occuperait le port, app fermée, ne décide rien.
 
@@ -26,17 +29,38 @@ permission | inbox)
     trap 'if [ -n "$CURL" ]; then kill "$CURL" 2>/dev/null; fi; exit 0' HUP INT TERM
     cat > "$WORK/in"
     if [ "$1" = permission ]; then MAX=598; else MAX=86000; fi
-    curl -q -sf --noproxy "*" -D "$WORK/head" -o "$WORK/out" --connect-timeout 0.5 --max-time "$MAX" \
-        -H @"$TOKEN" \
-        -H 'Content-Type: application/json' \
-        -H 'Expect:' \
-        -H "X-Claude-PPID: $PPID" \
-        -H "X-Host-Session-Id: ${CLAUDE_CODE_HOST_SESSION_ID:-}" \
-        --data-binary @"$WORK/in" \
-        "$URL/$1" &
-    CURL=$!
-    wait "$CURL" || exit 0
-    CURL=
+    UNTIL=
+    while :; do
+        curl -q -sf --noproxy "*" -D "$WORK/head" -o "$WORK/out" --connect-timeout 0.5 --max-time "$MAX" \
+            -H @"$TOKEN" \
+            -H 'Content-Type: application/json' \
+            -H 'Expect:' \
+            -H "X-Claude-PPID: $PPID" \
+            -H "X-Host-Session-Id: ${CLAUDE_CODE_HOST_SESSION_ID:-}" \
+            --data-binary @"$WORK/in" \
+            "$URL/$1" &
+        CURL=$!
+        wait "$CURL"
+        STATUS=$?
+        CURL=
+        [ "$STATUS" -eq 0 ] && break
+        # Hors `inbox`, ou pour toute autre cause : le terminal garde la main (jamais de décision par défaut).
+        [ "$1" = inbox ] || exit 0
+        NOW=$(date +%s)
+        case "$STATUS" in
+        # 52, 56 : l'app a fermé la connexion sans répondre (elle s'arrête). Délai pour qu'elle revienne.
+        52 | 56) UNTIL=$((NOW + ${CLAUDE_NOTCH_RETRY:-30})) ;;
+        # 7, 28 : pas encore revenue ; 22 : jeton de l'ancien lancement, pas encore réécrit.
+        7 | 22 | 28) [ -n "$UNTIL" ] && [ "$NOW" -lt "$UNTIL" ] || exit 0 ;;
+        *) exit 0 ;;
+        esac
+        # Claude parti : plus personne à réveiller.
+        kill -0 "$PPID" 2>/dev/null || exit 0
+        sleep 1 &
+        CURL=$!
+        wait "$CURL"
+        CURL=
+    done
     [ -s "$WORK/out" ] || exit 0
     # Comparaison par des commandes internes du shell : la preuve n'apparaît dans aucune liste de processus.
     IFS= read -r EXPECTED < "$PROOF" && [ -n "$EXPECTED" ] || exit 0

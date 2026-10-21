@@ -158,6 +158,7 @@ final class AppCore {
             item["pid"] = session.claudePid.map { Int($0) }
             item["title"] = session.title
             item["desktopSessionId"] = session.desktopSessionId
+            item["replyChannel"] = ReplyCenter.shared.channel(for: session.id)
             item["currentTask"] = session.currentTask?.subject
             return item
         }

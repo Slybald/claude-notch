@@ -24,6 +24,9 @@
 "trop long, il sera coupé" = "too long, it will be cut";
 "%d message en file : il partira à la fin du tour" = "%d message queued: it will go at the end of the turn";
 "%d messages en file : ils partiront à la fin du tour" = "%d messages queued: they will go at the end of the turn";
+"En file : Claude le lira à son prochain tour" = "Queued: Claude will read it on its next turn";
+"%d message en file : il partira au prochain tour de Claude" = "%d message queued: it will go on Claude's next turn";
+"%d messages en file : ils partiront au prochain tour de Claude" = "%d messages queued: they will go on Claude's next turn";
 "Annuler" = "Cancel";
 "message envoyé depuis la notch" = "message sent from the notch";
 

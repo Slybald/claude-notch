@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Messages to a Claude session from the notch were left queued after the app restarted (an update, a relaunch):
+  every waiting hook dropped with the app and only came back at the session's next turn. The hook now reconnects
+  by itself when the app is back (within 30 seconds).
+- When a message cannot reach an idle session right away, the conversation says it will go on Claude's next turn
+  (not "at the end of the turn") and offers **Open** to write in the session at once.
+
+### Changed
+
+- `/state` shows how each session can be reached (`replyChannel`).
+
 ## [1.5.0] - 2026-10-21
 
 ### Added

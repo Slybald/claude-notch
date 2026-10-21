@@ -141,7 +141,7 @@ struct ConversationView: View {
                             text: String(format: L("Réponds dans %@", table: "Claude"), session.replyTarget),
                             button: L("Ouvrir", table: "Claude"), action: open, close: close)
         } else {
-            MessageComposer(replies: replies, drafts: drafts, session: session, framed: false)
+            MessageComposer(replies: replies, drafts: drafts, session: session, framed: false, open: open)
         }
     }
 }

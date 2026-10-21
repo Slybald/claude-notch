@@ -234,6 +234,18 @@ Apple Events and Bluetooth are already there) nor another module's files.
     (SDK, IDE, `-p`, an old script without the header) keeps the 204 and gets "Answer in *app*". End to end with
     the real server, script and `claude`: waiter held at `Stop`, message delivered, answer ~3 s later.
   - Not checked: ExitPlanMode with Desktop, and how the Desktop window displays a turn started by a hook.
+  - **Held waiter lost at an app restart** (found with 1.5.0 on real Desktop sessions: a message to an idle session
+    stayed queued, `waiting` 0, no `inbox` process). Not a Desktop limit: a `claude` started with the real Code-tab
+    flags and the installed hooks, against the real app, keeps the `Stop` hook alive while idle and during the next
+    turn (`ps`), and `ReplyCenter.wait` holds the argv of every real Desktop session of the machine. What happens:
+    when the app quits (update, relaunch, crash) the connection of every held hook drops, the script exits 0, and
+    Claude does not start it again before the next `Stop`. A session idle since before the relaunch has no waiter
+    until then. Fix: in `inbox` mode the script retries when the connection was cut (curl 52/56), every second, until
+    the app is back (`CLAUDE_NOTCH_RETRY`, 30 s by default; 7/22/28 while it is not up or has not rewritten its
+    token), then holds again; it gives up (exit 0) after the delay or when its parent is gone. `permission` is never
+    retried. Hooks started by an older script keep the old behaviour until their next `Stop`. `HookServer.stop()`
+    now closes the open connections like a quit does (tests). `/state` shows `replyChannel` per session
+    (`waiting`, `queued`, `headless`, `none`).
 - **CLI, same version** (interactive `claude` in a pty): `PermissionRequest` is called for Bash and AskUserQuestion,
   the terminal dialog stays up ("Allowed by PermissionRequest hook" when the hook answers first).
 - **Reply design**: one long connection per request; the app answers on the first of: the user's decision; the
