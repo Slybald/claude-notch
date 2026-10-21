@@ -403,9 +403,11 @@ final class NotchController {
         // Bouton relâché sans que le relâchement nous parvienne (fenêtre retirée en plein glisser) : on termine.
         if detachMonitor != nil || bubble.isMoving, NSEvent.pressedMouseButtons & 1 == 0 { endDetachDrag() }
         // Décollage ou bulle déplacée : la souris est à la bulle, la notch ne réagit pas à son passage.
-        guard isShown, !bubble.isInteracting else { return }
+        guard !bubble.isInteracting else { return }
         let point = mouseLocation()
+        // Avant `isShown` : le panneau de la bulle se referme à la sortie de la souris même notch cachée.
         bubble.mouseMoved(point)
+        guard isShown else { return }
         let hit = model.isExpanded ? .none : collapsedHit(point)
         let inside = model.isExpanded ? isInsideZone(point) : hit != .none
         if !inside { suppressUntilExit = false }

@@ -210,6 +210,7 @@ final class BubbleController {
         guard suppressed != isSuppressed else { return }
         isSuppressed = suppressed
         if suppressed {
+            cancelMove()
             if model.bubble == .bubblePanel { close() }
             if model.bubble == .detaching { cancelPull() }
             window.orderOut(nil)
@@ -230,11 +231,11 @@ final class BubbleController {
         closeWork?.cancel()
         closeWork = nil
         cancelShrink()
-        if moveOffset != nil { NSCursor.pop() }
-        moveOffset = nil
+        cancelMove()
         pull = nil
         if window.isKeyWindow { NotchKeyboard.release(force: true) }
         window.orderOut(nil)
+        window.alphaValue = 1
         endGoo(after: 0)
         apply(.reset)
         if wasOpen { registry.setPanelOpen(false) }
@@ -309,7 +310,7 @@ final class BubbleController {
         switch model.bubble {
         case .detaching: cancelPull()
         case .bubble: moveEnded()
-        default: break
+        default: cancelMove()
         }
         pull = nil
     }
@@ -439,6 +440,7 @@ final class BubbleController {
 
     private func showBubble() {
         finishShrink()
+        window.alphaValue = 1
         fitWindowToBubble()
         if !isSuppressed { window.orderFrontRegardless() }
     }
@@ -507,6 +509,13 @@ final class BubbleController {
         }
     }
 
+    /// Glisser de la bulle interrompu (panneau ouvert, rattachement, notch masquée) : la souris est rendue.
+    private func cancelMove() {
+        guard moveOffset != nil else { return }
+        moveOffset = nil
+        NSCursor.pop()
+    }
+
     private func savePosition() {
         guard let saved = BubblePlacement.save(center: center, screens: NSScreen.screens.map(ScreenCandidate.init))
         else { return }
@@ -550,6 +559,7 @@ final class BubbleController {
     func open(tab: String? = nil, keyboard: Bool = false) {
         if let tab, registry.isEnabled(tab) { model.selectedTab = tab }
         guard model.bubble == .bubble else { return }
+        cancelMove()
         if !registry.enabled.contains(where: { $0.id == model.selectedTab }), let first = registry.enabled.first {
             model.selectedTab = first.id
         }
@@ -646,10 +656,15 @@ final class BubbleController {
         DispatchQueue.main.asyncAfter(deadline: .now() + prefs.closeDelay, execute: work)
     }
 
-    /// Clic hors du panneau ouvert : il se referme (en mode édition, on sort seulement du mode).
+    /// Clic hors du panneau ouvert, comme pour la notch : il le referme s'il attend un clic à l'extérieur (réglage,
+    /// ouverture au clavier) ; en mode édition, on sort seulement du mode.
     func mouseDown(at point: CGPoint) {
         guard model.bubble == .bubblePanel, !isMenuTracking(), !panelRect.contains(point) else { return }
-        if model.isEditingTabs { model.isEditingTabs = false } else { close() }
+        if model.isEditingTabs {
+            model.isEditingTabs = false
+        } else if prefs.closeOnClickOutside || openedByKeyboard {
+            close()
+        }
     }
 
     /// Panneau de la bulle qui a le clavier : Échap le referme (ou sort du mode édition) ; ouvert au raccourci, ← → et
@@ -678,6 +693,7 @@ final class BubbleController {
         let wasOpen = model.bubble == .bubblePanel
         closeWork?.cancel()
         closeWork = nil
+        cancelMove()
         if window.isKeyWindow { NotchKeyboard.release(force: true) }
         model.isEditingTabs = false
         apply(.reattach)

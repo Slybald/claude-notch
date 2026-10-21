@@ -343,6 +343,47 @@ final class BubbleTests: XCTestCase {
         XCTAssertEqual(arrived.drop.radius, Goo.dropRadius(progress: 1), accuracy: 0.001)
     }
 
+    // MARK: - Contrôleur (sans fenêtre à l'écran)
+
+    /// Même niveau, mêmes Spaces et même confidentialité que la notch ; la fenêtre n'est jamais affichée ici.
+    func testBubbleWindowMatchesTheNotchWindow() {
+        let notch = NotchHarness(self)
+        let controller = BubbleController(model: notch.model, prefs: notch.prefs, registry: notch.registry,
+                                          store: notch.store)
+        XCTAssertEqual(controller.window.level, NotchController.windowLevel, "isFloatingPanel posé avant level")
+        XCTAssertTrue(controller.window.collectionBehavior.contains(.canJoinAllSpaces))
+        XCTAssertTrue(controller.window.collectionBehavior.contains(.fullScreenAuxiliary))
+        XCTAssertFalse(controller.window.isVisible)
+        XCTAssertEqual(controller.window.sharingType, .readOnly)
+        notch.prefs.hideFromCapture = true
+        XCTAssertEqual(controller.window.sharingType, .none)
+    }
+
+    /// Le barillet et l'onglet actif restent liés, dans les deux sens.
+    func testRevolverFollowsTheSelectedTab() {
+        let notch = NotchHarness(self)
+        let controller = BubbleController(model: notch.model, prefs: notch.prefs, registry: notch.registry,
+                                          store: notch.store)
+        let ids = notch.registry.enabled.map { $0.id }
+        XCTAssertGreaterThan(ids.count, 4)
+        notch.model.selectedTab = ids[0]
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        controller.rotate(by: 2)
+        XCTAssertEqual(notch.model.selectedTab, ids[0], "attachée : le barillet ne tourne pas")
+        notch.model.bubble = .bubble
+        controller.rotate(by: 2)
+        XCTAssertEqual(notch.model.selectedTab, ids[2])
+        controller.rotate(by: -3)
+        XCTAssertEqual(notch.model.selectedTab, ids[ids.count - 1], "dans l'autre sens, en bouclant")
+
+        // Onglet changé ailleurs (barre d'onglets du panneau, raccourci) : il vient en haut par le plus court.
+        notch.model.selectedTab = ids[1]
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(Revolver(count: ids.count, turn: controller.bubble.turn).activeIndex, 1)
+        XCTAssertEqual(controller.bubble.turn, 1, "deux crans en avant depuis −1, pas un tour complet")
+    }
+
     private func assertEqual(_ a: CGPoint, _ b: CGPoint, _ message: String = "", line: UInt = #line) {
         XCTAssertEqual(a.x, b.x, accuracy: 0.001, message, line: line)
         XCTAssertEqual(a.y, b.y, accuracy: 0.001, message, line: line)

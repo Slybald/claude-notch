@@ -60,7 +60,8 @@ struct DetachHandle: View {
     var body: some View {
         DetachGrip(cornerRadius: cornerRadius, lit: hovering || pressing, pressed: pressing)
             .frame(width: Self.size, height: Self.size)
-            .contentShape(Rectangle())
+            // Seulement la marge du panneau (14 pt) : les contrôles d'un module dans ce coin gardent leurs clics.
+            .contentShape(CornerBand(width: ExpandedPanel.bottomPadding))
             .onHover { inside in
                 guard inside != hovering else { return }
                 hovering = inside
@@ -75,6 +76,18 @@ struct DetachHandle: View {
             .accessibilityHint(Text(L("La notch devient une bulle à poser où tu veux.", table: "Bubble")))
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { detach() }
+    }
+}
+
+/// Bandes basse et droite d'un carré : la zone de la poignée hors du contenu du panneau.
+private struct CornerBand: Shape {
+    let width: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addRect(CGRect(x: rect.minX, y: rect.maxY - width, width: rect.width, height: width))
+        path.addRect(CGRect(x: rect.maxX - width, y: rect.minY, width: width, height: rect.height - width))
+        return path
     }
 }
 
