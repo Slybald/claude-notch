@@ -37,6 +37,6 @@ export const layout3 = (f: Format3): Layout3 =>
         cursor: 40,
         pick: { x: 860, y: 640 },
         wheel: { w: 960, h: 276, top: 830, pitch: 92, font: 64, counter: 40 },
-        win: { S: 1.75, top: 70 },
+        win: { S: 1.5, top: 40 },
         end: { cardW: 940, cardH: 216, linkW: 860, linkH: 124, gap: 32, top: 760, title: 68, caption: 36, link: 33, legal: 21, legalY: 1810 },
       };
