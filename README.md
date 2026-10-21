@@ -48,6 +48,8 @@ Interface available in English and French (follows the system language). Screens
 - **Optional tools section**: files recently written by Claude, Git status of your repositories, today's usage.
   It only appears when its data files exist (see [Tools section](#tools-section)).
 - **Six more tabs**: Player, Quick Settings, Shelf, Clipboard, Timer and Quick notes (see [Tabs](#tabs)).
+- **Your own index tabs** (optional, see [Scripts](#scripts-local-api-and-notch-command)): `notch run -- make` shows an
+  hourglass, then ✓ or ✗ with the duration; any script can show a short status through a local API.
 - Works on screens without a notch too (external display, closed lid): a small notch is drawn at the top
   center of the screen.
 
@@ -144,6 +146,22 @@ card shows it, with **Allow**, **Deny** and **In the terminal**. Unlike Claude C
 asking in the terminal, so the hold is short: 4 seconds if the card never appeared, 60 seconds otherwise, then Codex asks
 you itself. Nothing is approved by default, and there is no "always allow". Not possible: writing a message to a
 running Codex session, or answering Codex's own questions.
+
+## Scripts: local API and `notch` command
+
+Off by default (**Settings › Scripts**). Once on, your scripts and programs can put up to three small index tabs of
+their own beside the collapsed notch, with a short text, an icon and a color from fixed lists, for up to an hour. Install
+the `notch` command from the same pane (it goes to `~/.local/bin`, only on your click):
+
+```sh
+notch show --title "Backup done" --text OK --icon externaldrive.fill --color green
+notch run -- make test
+```
+
+No code is loaded into the app and nothing is run from a tab: the only action is a button that opens an app you named.
+Only programs of your account that read the token file can call it, never a web page; a script's tab always says which
+program sent it and can never pass for a Claude or Codex request. HTTP details, limits and the security model:
+[docs/API.md](docs/API.md).
 
 ## Notch settings
 
@@ -542,6 +560,8 @@ français (suit la langue du système). Les captures ci-dessus utilisent des don
 - **Section outils (optionnelle)** : fichiers récemment écrits par Claude, état Git de tes dépôts, usage du
   jour. Elle n'apparaît que si ses fichiers de données existent (voir [Section outils](#section-outils)).
 - **Six autres onglets** : Lecteur, Réglages rapides, Étagère, Presse-papiers, Minuteur et Notes rapides (voir [Onglets](#onglets)).
+- **Tes propres intercalaires** (en option, voir [Scripts](#scripts--api-locale-et-commande-notch)) : `notch run -- make`
+  affiche un sablier, puis ✓ ou ✗ avec la durée ; n'importe quel script peut afficher un état court par une API locale.
 - Marche aussi sur un écran sans notch (écran externe, capot fermé) : une petite notch est dessinée en haut
   au centre de l'écran.
 
@@ -636,6 +656,23 @@ appliquer un patch, la carte l'affiche, avec **Autoriser**, **Refuser** et **Dan
 Code, Codex attend la notch avant de demander dans le terminal : l'attente est courte, 4 secondes si la carte n'a jamais
 été affichée, 60 secondes sinon, puis Codex te demande lui-même. Rien n'est approuvé par défaut, jamais de « toujours
 autoriser ». Impossible : écrire à une session Codex en cours, ou répondre aux questions propres de Codex.
+
+### Scripts : API locale et commande `notch`
+
+Désactivée par défaut (**Réglages › Scripts**). Une fois activée, tes scripts et tes programmes peuvent poser jusqu'à
+trois intercalaires à eux à côté de la notch repliée, avec un texte court, une icône et une couleur prises dans des
+listes, pour une heure au plus. La commande `notch` s'installe depuis le même volet (dans `~/.local/bin`, seulement sur
+ton clic) :
+
+```sh
+notch show --title "Sauvegarde finie" --text OK --icon externaldrive.fill --color green
+notch run -- make test
+```
+
+Aucun code n'est chargé dans l'app et un intercalaire ne lance rien : la seule action est un bouton qui ouvre l'app que
+tu as nommée. Seuls les programmes de ton compte qui lisent le fichier du jeton peuvent l'appeler, jamais une page web ;
+l'intercalaire d'un script dit toujours de quel programme il vient et ne peut pas se faire passer pour une demande de
+Claude ou de Codex. Détails HTTP, limites et modèle de sécurité : [docs/API.md](docs/API.md).
 
 ### Réglages de la notch
 

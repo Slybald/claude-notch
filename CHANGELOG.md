@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Your own index tabs: local API and `notch` command** (off by default, **Settings › Scripts**). Scripts and
+  programs can put up to three small tabs beside the collapsed notch: a title, a short text, an icon and a color from
+  fixed lists, for up to an hour (`POST /api/v1/ears` on the local server, see [docs/API.md](docs/API.md)).
+  `notch show --title "Backup done"`, `notch run -- make test` (hourglass, then ✓ or ✗ with the duration), `notch
+  clear`; the command is installed in `~/.local/bin` from the settings, only on your click. Its own token (0600 file,
+  passed with `curl -H @file`), exact `Host` and no `Origin` (no web page can call it), strict schema, rate limit; no
+  code, command or URL from a tab, only a button that opens a named app. A script's tab always says which program sent
+  it and can never pass for a Claude or Codex request. Settings › Scripts lists the last clients.
+
 ## [1.8.0] - 2026-10-21
 
 ### Changed
