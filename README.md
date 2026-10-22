@@ -555,6 +555,8 @@ scripts/make-dmg.sh   # build/Oriel-<version>.dmg and its .sha256, checked after
 - `SIGN_KEYCHAIN=<keychain> SIGN_IDENTITY=<certificate name> scripts/build.sh` signs with that certificate
   instead of ad hoc (both variables or neither). This is what the release workflow does; local builds stay ad
   hoc, and macOS asks again for its accesses after each one.
+- `scripts/test-local.sh [swift test options]` runs `swift test --parallel` without the test classes that put windows on
+  your screen (the full suite runs in CI).
 - `scripts/install.sh` builds and installs from source; `scripts/uninstall.sh` removes it.
 - Translations: `Resources/en.lproj` and `Resources/fr.lproj`. The French text in the code is the key;
   `LocalizationTests` checks that every key used in the code has an English translation.
@@ -1168,6 +1170,8 @@ scripts/make-dmg.sh   # build/Oriel-<version>.dmg et son .sha256, vérifié apr�
 - `SIGN_KEYCHAIN=<trousseau> SIGN_IDENTITY=<nom du certificat> scripts/build.sh` signe avec ce certificat au
   lieu d'ad hoc (les deux variables, ou aucune). C'est ce que fait le workflow de release ; les builds locaux
   restent ad hoc et macOS redemande leurs accès après chacun.
+- `scripts/test-local.sh [options de swift test]` lance `swift test --parallel` sans les classes de tests qui ouvrent des
+  fenêtres à l'écran (la suite complète tourne en CI).
 - `scripts/install.sh` compile et installe depuis les sources ; `scripts/uninstall.sh` retire tout.
 - Traductions : `Resources/en.lproj` et `Resources/fr.lproj`. Le texte français du code sert de clé ;
   `LocalizationTests` vérifie que chaque clé utilisée dans le code a sa traduction anglaise.
