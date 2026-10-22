@@ -353,8 +353,14 @@ final class EarTabsTests: XCTestCase {
 
 /// Le contrôleur : survol d'un intercalaire (déploiement, zones, clic) sans toucher à l'ouverture du panneau.
 final class EarTabsHoverTests: XCTestCase {
+    /// Durée fixe, seulement avant une assertion « rien ne s'est passé » (elle ne peut pas échouer par lenteur).
     private func settle(_ seconds: TimeInterval = 0.35) {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    /// Attend l'état asynchrone (3 s au plus) plutôt qu'une durée fixe, que le minuteur de l'app dépasse sur une machine chargée.
+    private func wait(_ message: String, until condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(spin(timeout: 3, until: condition), message, file: file, line: line)
     }
 
     private let store = SessionStore.working(1)
@@ -405,8 +411,9 @@ final class EarTabsHoverTests: XCTestCase {
         let onClaude = point(notch, tab: "claude")
         move(notch, to: onClaude)
         XCTAssertNil(notch.model.hoveredTab, "délai d'intention : traverser la barre ne déploie rien")
-        settle()
+        wait("déployé après le délai d'intention") { notch.model.hoveredTab == "claude" }
         XCTAssertEqual(notch.model.hoveredTab, "claude")
+        settle()
         XCTAssertFalse(notch.model.isExpanded, "un intercalaire n'ouvre pas le panneau, même plus longtemps que le délai")
         XCTAssertFalse(notch.panel.ignoresMouseEvents, "déployé : ses boutons reçoivent la souris")
         XCTAssertEqual(notch.debugInfo["polling"] as? Bool, true)
@@ -414,7 +421,9 @@ final class EarTabsHoverTests: XCTestCase {
 
         move(notch, to: CGPoint(x: onClaude.x - 400, y: onClaude.y - 200))
         XCTAssertEqual(notch.model.hoveredTab, "claude", "un écart ne le referme pas aussitôt")
-        settle(0.5)
+        wait("replié") {
+            notch.model.hoveredTab == nil && notch.panel.ignoresMouseEvents && notch.debugInfo["polling"] as? Bool == false
+        }
         XCTAssertNil(notch.model.hoveredTab)
         XCTAssertTrue(notch.panel.ignoresMouseEvents)
         XCTAssertEqual(notch.debugInfo["polling"] as? Bool, false, "plus de relevé une fois replié")
@@ -434,12 +443,12 @@ final class EarTabsHoverTests: XCTestCase {
     func testNotchCenterStillOpensThePanelAndFoldsTheTab() {
         let notch = controller()
         move(notch, to: point(notch, tab: "claude"))
-        settle()
+        wait("déployé") { notch.model.hoveredTab == "claude" }
         XCTAssertEqual(notch.model.hoveredTab, "claude")
 
         move(notch, to: CGPoint(x: notch.panel.frame.midX, y: notch.panel.frame.maxY - 4))
         XCTAssertNil(notch.model.hoveredTab, "le centre n'est pas un intercalaire")
-        settle()
+        wait("ouvert par le centre") { notch.model.isExpanded }
         XCTAssertTrue(notch.model.isExpanded, "comportement validé : le centre ouvre le panneau")
         XCTAssertNil(notch.model.hoveredTab)
     }
@@ -466,10 +475,10 @@ final class EarTabsHoverTests: XCTestCase {
     func testDeployedTabFoldsWhenItsActivityEnds() {
         let notch = controller()
         move(notch, to: point(notch, tab: "claude"))
-        settle()
+        wait("déployé") { notch.model.hoveredTab == "claude" }
         XCTAssertEqual(notch.model.hoveredTab, "claude")
         prefs.showEars = false
-        settle()
+        wait("replié") { notch.model.hoveredTab == nil && notch.panel.ignoresMouseEvents }
         XCTAssertNil(notch.model.hoveredTab, "plus d'intercalaire : rien ne reste déployé")
         XCTAssertTrue(notch.panel.ignoresMouseEvents)
     }
