@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-22
+
 ### Added
 
 - **The bubble comes back like a drop rejoining a puddle, in ferrofluid**, live while you drag. As soon as it nears
@@ -30,6 +32,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   now drawn, transparent, while you drag; the notch folds and the setting is saved when you let go. The drop is redrawn
   once per screen refresh instead of once more at each mouse move.
 - A click outside the bubble's panel always brings back the cylinder, whatever "Close on Click Outside" says.
+- **The tabs beside the notch now have its curves**: the same flare where they meet the top of the screen and the
+  same rounded bottom corner, instead of square edges. Opened, a card meets the notch with a rounded joint, and the
+  light rim follows the outline instead of running along the top of the screen.
 
 ## [2.0.0] - 2026-10-21
 
