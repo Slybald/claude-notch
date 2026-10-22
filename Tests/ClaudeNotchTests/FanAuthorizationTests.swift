@@ -7,8 +7,16 @@ import XCTest
 /// étapes d'installation remplacées par des copies dans un dossier d'essai (même méthode que la règle d'économie
 /// d'énergie).
 final class FanAuthorizationTests: XCTestCase {
+    /// La commande réelle crée ses fichiers de travail dans /tmp/claude-notch.XXXXXX, partagé entre tests en parallèle :
+    /// ici le modèle pointe vers un dossier propre au test, et `workFiles()` ne compte que ce qui s'y trouve.
+    private var work: URL!
+
+    override func setUpWithError() throws { work = try makeTemporaryDirectory(self) }
+
     private func shell(_ command: String) throws -> SystemProcess.Output {
-        try XCTUnwrap(SystemProcess.run("/bin/sh", ["-c", command], timeout: 20))
+        let isolated = command.replacingOccurrences(of: LowPowerAuthorization.workFileTemplate,
+                                                    with: work.appendingPathComponent("claude-notch.XXXXXX").path)
+        return try XCTUnwrap(SystemProcess.run("/bin/sh", ["-c", isolated], timeout: 20))
     }
 
     private func text(_ data: Data) -> String { String(decoding: data, as: UTF8.self) }
@@ -23,7 +31,7 @@ final class FanAuthorizationTests: XCTestCase {
     }
 
     private func workFiles() -> Set<String> {
-        Set(((try? FileManager.default.contentsOfDirectory(atPath: "/tmp")) ?? []).filter { $0.hasPrefix("claude-notch.") })
+        Set(((try? FileManager.default.contentsOfDirectory(atPath: work.path)) ?? []).filter { $0.hasPrefix("claude-notch.") })
     }
 
     private var installHelperStep: String {
@@ -39,7 +47,9 @@ final class FanAuthorizationTests: XCTestCase {
     /// La vraie commande, avec les trois étapes qui écrivent hors du dossier d'essai remplacées : rien n'est installé.
     private func dryRun(source: URL, sha256: String, rule: String, into target: URL) throws -> SystemProcess.Output {
         let real = try XCTUnwrap(FanAuthorization.installShellCommand(helperSource: source.path, sha256: sha256, ruleContents: rule))
-        for step in [installHelperStep, installRuleStep, mkdirStep] { XCTAssertTrue(real.contains(step), step) }
+        for step in [installHelperStep, installRuleStep, mkdirStep, LowPowerAuthorization.workFileTemplate] {
+            XCTAssertTrue(real.contains(step), step)
+        }
         let q = LowPowerAuthorization.shellQuote
         let dry = real
             .replacingOccurrences(of: installHelperStep, with: "/bin/cp \"$B\" \(q(target.appendingPathComponent("fanctl").path))")

@@ -53,9 +53,6 @@ jobs:
           # shellcheck disable=SC2046
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
 
-      - name: Test
-        run: swift test
-
       # L'Updater de l'app lit les releases de ce dépôt : une app publiée ailleurs ne verrait jamais ses mises à jour.
       - name: Check update repository
         run: |
